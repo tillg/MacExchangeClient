@@ -269,6 +269,31 @@ struct MailStoreTests {
         #expect(s.selection.isEmpty)
     }
 
+    @Test func applyReadFlagChangesAndBodyRecipients() {
+        let s = store([])
+        s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "t1", more: false),
+                account: work.id, mailbox: .inbox)
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], readChanges: ["A": true], token: "t2", more: false),
+                account: work.id, mailbox: .inbox)
+        #expect(s.messages[0].isRead)
+        let to = [Contact(name: "Me", email: "me@work.com")]
+        s.setBody(MessageBody(text: "x", attachments: [], from: Contact(name: "Ann", email: "ann@x.com"), to: to, cc: []),
+                  for: s.messages[0].id)
+        #expect(s.messages[0].to == to)
+        #expect(s.messages[0].from.email == "ann@x.com")
+    }
+
+    @Test func removeLocalAccountsDropsSampleDataOnly() {
+        let s = store([msg(work), msg(home)])
+        s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "t", more: false),
+                account: work.id, mailbox: .inbox)
+        s.selectedMailbox = .account(home.id, .inbox)
+        s.removeLocalAccounts()
+        #expect(s.accounts.isEmpty)
+        #expect(s.messages.map(\.remoteID) == ["A"])
+        #expect(s.selectedMailbox == .smart(.allInboxes))
+    }
+
     @Test func serverMessageShowsServerPreviewUntilBodyLoaded() {
         var m = remote("A")
         m.body = ""; m.bodyLoaded = false; m.serverPreview = "From the server"

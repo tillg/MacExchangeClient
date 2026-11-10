@@ -181,6 +181,15 @@ public final class MailStore {
         backends[account.id] = backend
     }
 
+    /// Drops accounts without a server (the sample data) and their local messages.
+    public func removeLocalAccounts() {
+        let local = Set(accounts.filter { backends[$0.id] == nil }.map(\.id))
+        accounts.removeAll { local.contains($0.id) }
+        messages.removeAll { local.contains($0.accountID) && $0.remoteID == nil }
+        selection = []
+        selectedMailbox = .smart(.allInboxes)
+    }
+
     public func syncToken(_ account: UUID, _ box: MailboxKind) -> String? { syncTokens[key(account, box)] }
 
     private func key(_ account: UUID, _ box: MailboxKind) -> String { "\(account)/\(box.rawValue)" }
@@ -208,6 +217,11 @@ public final class MailStore {
                 if let rid = m.remoteID { index[rid] = messages.count - 1 }
             }
         }
+        if !r.readChanges.isEmpty {
+            for i in messages.indices where messages[i].accountID == account {
+                if let rid = messages[i].remoteID, let read = r.readChanges[rid] { messages[i].isRead = read }
+            }
+        }
         syncTokens[key(account, mailbox)] = r.token
     }
 
@@ -217,6 +231,9 @@ public final class MailStore {
         messages[i].attachments = b.attachments
         messages[i].hasAttachments = !b.attachments.isEmpty
         messages[i].bodyLoaded = true
+        if let f = b.from { messages[i].from = f }
+        if let to = b.to { messages[i].to = to }
+        if let cc = b.cc { messages[i].cc = cc }
     }
 
     /// Fetches the body of a server message the first time it is shown.

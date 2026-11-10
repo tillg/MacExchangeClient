@@ -6,7 +6,8 @@ let package = Package(
     platforms: [.macOS(.v14)],
     targets: [
         .target(name: "MailModel"),
-        .executableTarget(name: "MailReplica", dependencies: ["MailModel"]),
-        .testTarget(name: "MailModelTests", dependencies: ["MailModel"]),
+        .target(name: "EWS", dependencies: ["MailModel"]),
+        .executableTarget(name: "MailReplica", dependencies: ["MailModel", "EWS"]),
+        .testTarget(name: "MailModelTests", dependencies: ["MailModel", "EWS"]),
     ]
 )

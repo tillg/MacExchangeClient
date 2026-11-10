@@ -7,11 +7,12 @@ This is a SwiftUI copy of the macOS Mail main window, built with SwiftPM. The da
 - **App:** `./run.sh` builds and launches, and `./run.sh build` only builds. It uses the macOS 26.5 SDK, because in the 27 SDK `@State` is a macro whose plugin ships only with Xcode.
 - **Tests:** these need the default SDK and their own build folder:
   ```sh
-  swift build --package-path . --scratch-path .build/tests --target MailModelTests
+  swift build --package-path . --scratch-path .build/tests --target MailModelTests \
+    -Xswiftc -load-plugin-library -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing/libTestingMacros.dylib
   swift test  --package-path . --scratch-path .build/tests --skip-build
   ```
   In Claude Code, run each command as its own top-level Bash call. Inside `sh -c`, `run.sh` or `&&` chains, the Testing macro plugin fails to load (the rtk hook only wraps top-level calls). `./run.sh test` works in a normal terminal.
-- If the test build fails with `plugin for module 'TestingMacros' not found` although the command is top-level, the test cache is stale (seen after moving a file between targets): `rm -rf .build/tests` and build again.
+- The build's dependency scanner sometimes leaves out the Testing macro plugin (`plugin for module 'TestingMacros' not found`, which also hides real compile errors). The `-load-plugin-library` flag above loads it explicitly. After a failed build, `swift test --skip-build` runs the old binary, so check the test count.
 - Don't share `.build` between the app build and the test build. Their SDK configs poison each other's cache.
 
 ## Verifying the UI

@@ -24,16 +24,26 @@ public struct RemoteFolder: Hashable, Sendable {
 public struct SyncResult: Sendable {
     public var upserts: [Message]
     public var deletedRemoteIDs: [String]
+    /// Read state changes that arrive without the rest of the message (EWS ReadFlagChange).
+    public var readChanges: [String: Bool]
     public var token: String
     /// More changes are waiting; call `sync` again with `token`.
     public var more: Bool
-    public init(upserts: [Message], deletedRemoteIDs: [String], token: String, more: Bool) {
-        self.upserts = upserts; self.deletedRemoteIDs = deletedRemoteIDs; self.token = token; self.more = more
+    public init(upserts: [Message], deletedRemoteIDs: [String], readChanges: [String: Bool] = [:],
+                token: String, more: Bool) {
+        self.upserts = upserts; self.deletedRemoteIDs = deletedRemoteIDs; self.readChanges = readChanges
+        self.token = token; self.more = more
     }
 }
 
+/// The full message. Sender and recipients are included because list summaries may lack email addresses.
 public struct MessageBody: Sendable {
     public var text: String
     public var attachments: [String]
-    public init(text: String, attachments: [String]) { self.text = text; self.attachments = attachments }
+    public var from: Contact?
+    public var to: [Contact]?
+    public var cc: [Contact]?
+    public init(text: String, attachments: [String], from: Contact? = nil, to: [Contact]? = nil, cc: [Contact]? = nil) {
+        self.text = text; self.attachments = attachments; self.from = from; self.to = to; self.cc = cc
+    }
 }
