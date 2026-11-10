@@ -56,10 +56,10 @@ In the macOS 27 SDK, `@State` is a macro whose plugin (`SwiftUIMacros`) ships on
 
 ```
 Sources/
-  MailModel/        MailStore (@MainActor @Observable) and the models; all behaviour lives here
-  MailReplica/      SwiftUI views, MailCommands (menu bar), drag payload, DebugSnapshot
+  MailModel/        MailStore (@MainActor @Observable), the models and the drag payload; all behaviour lives here
+  MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suite for MailStore (22 tests)
+  MailModelTests/   Swift Testing suites for MailStore and the drag payload (23 tests)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```

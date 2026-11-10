@@ -11,6 +11,7 @@ This is a SwiftUI copy of the macOS Mail main window, built with SwiftPM. The da
   swift test  --package-path . --scratch-path .build/tests --skip-build
   ```
   In Claude Code, run each command as its own top-level Bash call. Inside `sh -c`, `run.sh` or `&&` chains, the Testing macro plugin fails to load (the rtk hook only wraps top-level calls). `./run.sh test` works in a normal terminal.
+- If the test build fails with `plugin for module 'TestingMacros' not found` although the command is top-level, the test cache is stale (seen after moving a file between targets): `rm -rf .build/tests` and build again.
 - Don't share `.build` between the app build and the test build. Their SDK configs poison each other's cache.
 
 ## Verifying the UI
