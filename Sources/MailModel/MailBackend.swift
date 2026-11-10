@@ -26,8 +26,8 @@ public protocol MailBackend: Sendable {
     func delete(_ ids: [String]) async throws
     func send(_ draft: Draft) async throws
     func saveDraft(_ draft: Draft) async throws
-    /// Answers a meeting invite; the server sends the answer to the organizer and updates the calendar.
-    func respond(_ remoteID: String, _ response: InviteResponse) async throws
+    /// Answers a meeting invite: updates the calendar and, unless `reply.send` is false, tells the organizer.
+    func respond(_ remoteID: String, _ reply: InviteReply) async throws
 }
 
 /// A local change waiting to be written to the server.
@@ -39,6 +39,8 @@ public enum ServerChange: Hashable, Codable, Sendable {
     case send(Draft)
     case saveDraft(Draft)
     case respond(String, InviteResponse)
+    /// An answer with options. A separate case, so cached `respond` entries still decode.
+    case reply(String, InviteReply)
 
     func renamed(_ map: [String: String]) -> ServerChange {
         let r = { (ids: [String]) in ids.map { map[$0] ?? $0 } }
@@ -48,6 +50,7 @@ public enum ServerChange: Hashable, Codable, Sendable {
         case let .move(ids, box): .move(r(ids), to: box)
         case let .delete(ids): .delete(r(ids))
         case let .respond(id, r): .respond(map[id] ?? id, r)
+        case let .reply(id, r): .reply(map[id] ?? id, r)
         case .send, .saveDraft: self
         }
     }
@@ -55,7 +58,7 @@ public enum ServerChange: Hashable, Codable, Sendable {
     var remoteIDs: [String] {
         switch self {
         case let .setRead(ids, _), let .setFlagged(ids, _), let .move(ids, _), let .delete(ids): ids
-        case let .respond(id, _): [id]
+        case let .respond(id, _), let .reply(id, _): [id]
         case .send, .saveDraft: []
         }
     }

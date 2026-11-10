@@ -17,11 +17,12 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 
 - **Meeting invites, as in Outlook:** for each invite you see:
   - when and where, with the required and optional attendees;
-  - Accept, Tentative and Decline buttons, which send the answer to the organizer;
+  - Accept, Tentative and Decline menus, as in Outlook: Respond with Comments, Respond without Comments, or Do Not Send a Response (only the calendar changes);
+  - Propose New Time, together with Tentative or Decline, with a new start and end and an optional comment;
   - "Please respond" until you have answered, and a yellow note when the meeting overlaps other events;
   - the invite's day from your Exchange calendar next to the text, with overlapping events side by side and the invite's slot hatched.
 
-  Attendee answer icons and Propose New Time are missing: your copy of an invite reports every attendee's answer as unknown.
+  Attendee answer icons are missing: your copy of an invite reports every attendee's answer as unknown.
 - **Three-column window** with a mailboxes sidebar, a message list and a message view, using Mail's toolbar layout and SF Symbols
 - **Favorites and smart mailboxes:** All Inboxes, VIPs, Flagged, Unread, then each account's Inbox, Drafts, Sent, Junk, Trash and Archive, with unread badges
 - **Categories:** Primary, Transactions, Updates and Promotions in the Inbox (⌥⌘1–4)
@@ -100,7 +101,7 @@ Sources/
   EWS/              MailBackend over Exchange Web Services, Keychain and account settings
   MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (84 tests, plus live tests against a real server)
+  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (89 tests, plus live tests against a real server)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```

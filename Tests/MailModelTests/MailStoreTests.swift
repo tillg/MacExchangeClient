@@ -566,6 +566,39 @@ struct MailStoreTests {
         #expect(s.outbox.map(\.change) == [.respond("M", .accept), .respond("M", .decline)])
     }
 
+    func inviteStore() -> (MailStore, Message.ID) {
+        var m = remote("M")
+        m.invite = Invite(start: Date(timeIntervalSince1970: 3600), end: Date(timeIntervalSince1970: 5400))
+        let s = store([])
+        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "t", more: false), account: work.id, mailbox: .inbox)
+        return (s, id(s, "M"))
+    }
+
+    @Test func answerWithCommentOrWithoutTellingTheOrganizer() {
+        let (s, id) = inviteStore()
+        let quiet = InviteReply(response: .accept, send: false)
+        s.respond(quiet, to: id)
+        #expect(s.message(id)?.invite?.response == .accept)
+        #expect(s.message(id)?.invite?.reply == quiet)
+        let note = InviteReply(response: .decline, comment: "On holiday")
+        s.respond(note, to: id)
+        #expect(s.outbox.map(\.change) == [.reply("M", quiet), .reply("M", note)])
+        s.failed(s.outbox[1], "Denied")
+        #expect(s.message(id)?.invite?.reply == quiet)
+    }
+
+    @Test func proposingANewTimeNeedsAnEndAfterTheStart() {
+        let (s, id) = inviteStore()
+        let start = Date(timeIntervalSince1970: 7200)
+        s.respond(InviteReply(response: .tentative, proposedStart: start, proposedEnd: start), to: id)
+        #expect(s.outbox.isEmpty)
+        #expect(s.status != nil)
+        #expect(s.message(id)?.invite?.response == nil)
+        let ok = InviteReply(response: .decline, proposedStart: start, proposedEnd: start.addingTimeInterval(1800))
+        s.respond(ok, to: id)
+        #expect(s.outbox.map(\.change) == [.reply("M", ok)])
+    }
+
     @Test func markAllRead() {
         let s = store([msg(work), msg(work), msg(home)])
         s.markAllRead(in: .account(work.id, .inbox))

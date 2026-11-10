@@ -157,10 +157,25 @@ struct EWSParsingTests {
 
     @Test func inviteAnswersAreSentToTheOrganizer() throws {
         for (r, tag) in [(InviteResponse.accept, "AcceptItem"), (.tentative, "TentativelyAcceptItem"), (.decline, "DeclineItem")] {
-            let d = try request(EWSBackend.respondRequest("M&1", r))
+            let d = try request(EWSBackend.respondRequest("M&1", InviteReply(response: r)))
             #expect(d.first("CreateItem")?.attr("MessageDisposition") == "SendAndSaveCopy")
             #expect(d.first(tag)?.child("ReferenceItemId")?.attr("Id") == "M&1")
         }
+    }
+
+    @Test func answerOptionsInSchemaOrder() throws {
+        let f = ISO8601DateFormatter()
+        let reply = InviteReply(response: .decline, comment: "Clash <again>", proposedStart: f.date(from: "2026-11-23T13:00:00Z"),
+                                proposedEnd: f.date(from: "2026-11-23T13:30:00Z"))
+        let d = try request(EWSBackend.respondRequest("M", reply))
+        let item = try #require(d.first("DeclineItem"))
+        #expect(item.elementChildren.map(\.localName) == ["Body", "ReferenceItemId", "ProposedStart", "ProposedEnd"])
+        #expect(item.text("Body") == "Clash <again>")
+        #expect(item.text("ProposedStart") == "2026-11-23T13:00:00Z")
+        #expect(d.first("CreateItem")?.attr("MessageDisposition") == "SendAndSaveCopy")
+        let quiet = try request(EWSBackend.respondRequest("M", InviteReply(response: .accept, send: false)))
+        #expect(quiet.first("CreateItem")?.attr("MessageDisposition") == "SaveOnly")
+        #expect(quiet.first("AcceptItem")?.elementChildren.map(\.localName) == ["ReferenceItemId"])
     }
 
     // MARK: Write requests

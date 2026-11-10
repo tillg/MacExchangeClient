@@ -448,6 +448,7 @@ public final class MailStore {
                 // A send or an answer that timed out may have gone out; never repeat it.
                 if case .send = p.change { failed(p, e.localizedDescription); continue }
                 if case .respond = p.change { failed(p, e.localizedDescription); continue }
+                if case .reply = p.change { failed(p, e.localizedDescription); continue }
                 status = "Offline – changes will be sent to Exchange later"
                 return
             } catch {
@@ -481,7 +482,8 @@ public final class MailStore {
         case let .delete(ids): try await b.delete(ids)
         case let .send(d): try await b.send(d)
         case let .saveDraft(d): try await b.saveDraft(d)
-        case let .respond(id, r): try await b.respond(id, r)
+        case let .respond(id, r): try await b.respond(id, InviteReply(response: r))
+        case let .reply(id, r): try await b.respond(id, r)
         }
     }
 
@@ -518,8 +520,24 @@ public final class MailStore {
         guard let i = messages.firstIndex(where: { $0.id == id }), messages[i].invite != nil else { return }
         let old = messages[i]
         messages[i].invite?.response = r
+        messages[i].invite?.reply = nil
         guard let rid = old.remoteID else { return }
         outbox.append(PendingChange(account: old.accountID, change: .respond(rid, r), previous: [old]))
+        scheduleFlush()
+    }
+
+    /// Answers an invite with options (comment, not sending, a proposed time).
+    public func respond(_ reply: InviteReply, to id: Message.ID) {
+        if let s = reply.proposedStart, let e = reply.proposedEnd, e <= s {
+            status = "The proposed meeting must end after it starts."
+            return
+        }
+        guard let i = messages.firstIndex(where: { $0.id == id }), messages[i].invite != nil else { return }
+        let old = messages[i]
+        messages[i].invite?.response = reply.response
+        messages[i].invite?.reply = reply
+        guard let rid = old.remoteID else { return }
+        outbox.append(PendingChange(account: old.accountID, change: .reply(rid, reply), previous: [old]))
         scheduleFlush()
     }
 

@@ -9,8 +9,10 @@ public struct Invite: Hashable, Codable, Sendable {
     public var organizer: Contact?
     public var required: [Contact]
     public var optional: [Contact]
-    /// The answer sent from this Mac, once there is one.
+    /// The answer given on this Mac, once there is one.
     public var response: InviteResponse?
+    /// How it was given (comment, sent or not, proposed time). Optional for caches written before it existed.
+    public var reply: InviteReply?
 
     public init(start: Date, end: Date, location: String = "", isAllDay: Bool = false, organizer: Contact? = nil,
                 required: [Contact] = [], optional: [Contact] = [], response: InviteResponse? = nil) {
@@ -34,6 +36,25 @@ public struct Invite: Hashable, Codable, Sendable {
 
 public enum InviteResponse: String, Hashable, Codable, Sendable, CaseIterable {
     case accept, tentative, decline
+}
+
+/// An answer with Outlook's options: a comment, not telling the organizer, or proposing another time
+/// (with Tentative or Decline).
+public struct InviteReply: Hashable, Codable, Sendable {
+    public var response: InviteResponse
+    public var comment: String?
+    /// False: only the calendar changes; the organizer gets nothing ("Do Not Send a Response").
+    public var send: Bool
+    public var proposedStart: Date?
+    public var proposedEnd: Date?
+
+    public init(response: InviteResponse, comment: String? = nil, send: Bool = true,
+                proposedStart: Date? = nil, proposedEnd: Date? = nil) {
+        self.response = response; self.comment = comment; self.send = send
+        self.proposedStart = proposedStart; self.proposedEnd = proposedEnd
+    }
+
+    public var proposesNewTime: Bool { proposedStart != nil }
 }
 
 public enum BusyStatus: String, Hashable, Codable, Sendable {

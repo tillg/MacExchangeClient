@@ -118,18 +118,26 @@ public struct EWSBackend: MailBackend {
 
     // MARK: Write-back
 
-    public func respond(_ remoteID: String, _ response: InviteResponse) async throws {
-        _ = try await client.call(Self.respondRequest(remoteID, response))
+    public func respond(_ remoteID: String, _ reply: InviteReply) async throws {
+        _ = try await client.call(Self.respondRequest(remoteID, reply))
     }
 
-    static func respondRequest(_ id: String, _ r: InviteResponse) -> String {
-        let tag = switch r {
+    /// Schema order: Body, ReferenceItemId, ProposedStart, ProposedEnd (proposals need Exchange 2013).
+    /// Not sending uses SaveOnly, as the EWS Managed API's `Accept(false)` does.
+    static func respondRequest(_ id: String, _ reply: InviteReply) -> String {
+        let tag = switch reply.response {
         case .accept: "AcceptItem"
         case .tentative: "TentativelyAcceptItem"
         case .decline: "DeclineItem"
         }
-        return "<m:CreateItem MessageDisposition=\"SendAndSaveCopy\"><m:Items><t:\(tag)>"
-            + "<t:ReferenceItemId Id=\"\(xmlEscape(id))\"/></t:\(tag)></m:Items></m:CreateItem>"
+        let f = ISO8601DateFormatter()
+        var inner = reply.comment.map { "<t:Body BodyType=\"Text\">\(xmlEscape($0))</t:Body>" } ?? ""
+        inner += "<t:ReferenceItemId Id=\"\(xmlEscape(id))\"/>"
+        if let s = reply.proposedStart, let e = reply.proposedEnd {
+            inner += "<t:ProposedStart>\(f.string(from: s))</t:ProposedStart><t:ProposedEnd>\(f.string(from: e))</t:ProposedEnd>"
+        }
+        return "<m:CreateItem MessageDisposition=\"\(reply.send ? "SendAndSaveCopy" : "SaveOnly")\"><m:Items>"
+            + "<t:\(tag)>\(inner)</t:\(tag)></m:Items></m:CreateItem>"
     }
 
     public func setRead(_ ids: [String], _ read: Bool) async throws {
