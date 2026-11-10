@@ -495,6 +495,14 @@ struct MailStoreTests {
         #expect(s.message(b) != nil)
     }
 
+    @Test func deletionElsewhereWinsOverAPendingReadChange() {
+        let s = synced(["A"])
+        let a = id(s, "A")
+        s.toggleRead([a])
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: ["A"], token: "t2", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(a) == nil)
+    }
+
     @Test func historyProgressCountsMessagesAgainstServerTotals() {
         let s = synced(["A", "B"])
         let folders = [RemoteFolder(role: .inbox, id: "i", totalCount: 4), RemoteFolder(role: .sent, id: "s", totalCount: 6)]

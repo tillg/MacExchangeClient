@@ -316,13 +316,20 @@ public final class MailStore {
 
     /// Merges server messages into one mailbox without touching its sync position (used for the newest-N
     /// lookup). Known messages keep their local ID, selection and loaded body. Messages with a change still
-    /// waiting for the server keep their local read state, flag and mailbox, and aren't deleted.
+    /// waiting for the server keep their local read state, flag and mailbox.
     public func merge(_ upserts: [Message], deleted: [String] = [], reads: [String: Bool] = [:],
                       account: UUID, mailbox: MailboxKind) {
         serverAccounts.insert(account)
-        let pending = Set(outbox.lazy.filter { $0.account == account }.flatMap(\.change.remoteIDs))
+        let mine = outbox.lazy.filter { $0.account == account }
+        let pending = Set(mine.flatMap(\.change.remoteIDs))
+        // A pending move makes the source folder report the message as deleted; that one stays.
+        // Any other deletion (done elsewhere) wins over a pending read or flag change.
+        let moving = Set<String>(mine.flatMap { (p: PendingChange) -> [String] in
+            if case let .move(ids, _) = p.change { return ids }
+            return []
+        })
         var ms = messages  // one write to the observed array, not one per message
-        let gone = Set(deleted).subtracting(pending)
+        let gone = Set(deleted).subtracting(moving)
         if !gone.isEmpty {
             let ids = Set(ms.filter { $0.accountID == account && $0.remoteID.map(gone.contains) == true }.map(\.id))
             ms.removeAll { ids.contains($0.id) }
