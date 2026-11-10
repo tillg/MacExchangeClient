@@ -7,7 +7,10 @@ struct MessageDetailView: View {
     var body: some View {
         if let m = store.selectedMessage {
             MessageContent(message: m)
-                .task(id: m.id) { await store.loadBody(m.id) }
+                .task(id: m.id) {
+                    await store.loadBody(m.id)
+                    await store.loadDay(for: m.id)
+                }
         } else if store.selection.count > 1 {
             ContentUnavailableView("\(store.selection.count) messages selected", systemImage: "envelope.stack")
         } else {
@@ -17,6 +20,7 @@ struct MessageDetailView: View {
 }
 
 struct MessageContent: View {
+    @Environment(MailStore.self) private var store
     let message: Message
 
     var body: some View {
@@ -25,19 +29,37 @@ struct MessageContent: View {
                 MessageHeader(message: message)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 14)
-                Divider()
-                Text(message.bodyLoaded ? message.body : message.preview)
-                    .font(.system(size: 13))
-                    .lineSpacing(3)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
-                if !message.attachments.isEmpty {
-                    AttachmentStrip(names: message.attachments).padding(.horizontal, 20).padding(.bottom, 20)
+                if let invite = message.invite {
+                    InviteCard(message: message, invite: invite)
+                    HStack(alignment: .top, spacing: 0) {
+                        text
+                        Divider()
+                        DayColumn(invite: invite, subject: message.subject, events: store.dayEvents[message.id])
+                            .frame(width: 300)
+                    }
+                } else {
+                    Divider()
+                    text
                 }
             }
         }
         .background(Color(nsColor: .textBackgroundColor))
+    }
+}
+
+extension MessageContent {
+    private var text: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(message.bodyLoaded ? message.body : message.preview)
+                .font(.system(size: 13))
+                .lineSpacing(3)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
+            if !message.attachments.isEmpty {
+                AttachmentStrip(names: message.attachments).padding(.horizontal, 20).padding(.bottom, 20)
+            }
+        }
     }
 }
 

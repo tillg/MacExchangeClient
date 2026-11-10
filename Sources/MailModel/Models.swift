@@ -141,17 +141,23 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
     public var serverPreview: String?
     /// False while only the summary has been fetched from the server.
     public var bodyLoaded: Bool
+    /// The server says this is a meeting invite (known from the summary, before the body loads).
+    /// Optional, like `invite`, so caches written before these fields existed still load.
+    public var isInvite: Bool?
+    /// Time, place and attendees, loaded with the body.
+    public var invite: Invite?
 
     public init(id: UUID = UUID(), accountID: UUID, mailbox: MailboxKind = .inbox, from: Contact, to: [Contact],
                 cc: [Contact] = [], subject: String, body: String, date: Date, isRead: Bool = false,
                 flag: FlagColor? = nil, category: MailCategory = .primary, isVIP: Bool = false,
                 attachments: [String] = [], remoteID: String? = nil, hasAttachments: Bool? = nil,
-                serverPreview: String? = nil, bodyLoaded: Bool = true) {
+                serverPreview: String? = nil, bodyLoaded: Bool = true, isInvite: Bool? = nil, invite: Invite? = nil) {
         self.id = id; self.accountID = accountID; self.mailbox = mailbox; self.from = from; self.to = to
         self.cc = cc; self.subject = subject; self.body = body; self.date = date; self.isRead = isRead
         self.flag = flag; self.category = category; self.isVIP = isVIP; self.attachments = attachments
         self.remoteID = remoteID; self.hasAttachments = hasAttachments ?? !attachments.isEmpty
         self.serverPreview = serverPreview; self.bodyLoaded = bodyLoaded
+        self.isInvite = isInvite ?? (invite != nil ? true : nil); self.invite = invite
     }
 
     /// First lines of the body, as shown under the subject in the list.

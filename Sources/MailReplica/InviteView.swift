@@ -1,0 +1,217 @@
+import MailModel
+import SwiftUI
+
+/// Meeting details under the header of an invite, like Outlook's: when and where, who, the answer buttons,
+/// and notes about missing answers and conflicts.
+struct InviteCard: View {
+    @Environment(MailStore.self) private var store
+    let message: Message
+    let invite: Invite
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
+                attendees("Required:", invite.required)
+                if !invite.optional.isEmpty { attendees("Optional:", invite.optional) }
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "calendar").foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(when).font(.system(size: 13, weight: .semibold))
+                        if !invite.location.isEmpty { Text(invite.location).font(.system(size: 13, weight: .semibold)) }
+                    }
+                }
+                .padding(.top, 2)
+                HStack(spacing: 8) {
+                    answer(.accept, "Accept", "checkmark")
+                    answer(.tentative, "Tentative", "questionmark")
+                    answer(.decline, "Decline", "xmark")
+                }
+                .padding(.top, 4)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+
+            if let r = invite.response {
+                banner("You answered: \(r.title).", "checkmark.circle", .blue)
+            } else {
+                banner("Please respond.", "info.circle", .blue)
+            }
+            let conflicts = invite.conflicts(in: store.dayEvents[message.id] ?? [], subject: message.subject)
+            if !conflicts.isEmpty {
+                banner(conflicts.count == 1 ? "This meeting conflicts with another event on your calendar."
+                       : "This meeting conflicts with \(conflicts.count) other events on your calendar.",
+                       "exclamationmark.triangle", .yellow)
+            }
+        }
+    }
+
+    private var when: String {
+        let day = invite.start.formatted(.dateTime.weekday(.wide).day().month(.wide).year())
+        if invite.isAllDay { return "\(day), all day" }
+        let t = { (d: Date) in d.formatted(date: .omitted, time: .shortened) }
+        return "\(day) at \(t(invite.start)) – \(t(invite.end))"
+    }
+
+    private func attendees(_ label: String, _ list: [Contact]) -> some View {
+        let shown = list.prefix(8).map(\.name).joined(separator: "; ")
+        let more = list.count > 8 ? "  + \(list.count - 8) more" : ""
+        return (Text(label + " ").foregroundStyle(.secondary) + Text(shown) + Text(more).foregroundStyle(Color.accentColor))
+            .font(.system(size: 12))
+            .lineLimit(2)
+            .textSelection(.enabled)
+    }
+
+    private func answer(_ r: InviteResponse, _ title: String, _ symbol: String) -> some View {
+        Button { store.respond(r, to: message.id) } label: {
+            Label(title, systemImage: symbol).font(.system(size: 12))
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .tint(invite.response == r ? .accentColor : nil)
+    }
+
+    private func banner(_ text: String, _ symbol: String, _ tint: Color) -> some View {
+        Label(text, systemImage: symbol)
+            .font(.system(size: 12))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 5)
+            .background(tint.opacity(0.15))
+            .overlay(alignment: .bottom) { Divider() }
+    }
+}
+
+extension InviteResponse {
+    var title: String {
+        switch self {
+        case .accept: "Accept"
+        case .tentative: "Tentative"
+        case .decline: "Decline"
+        }
+    }
+}
+
+/// The invite's day: one column of hours with the calendar's entries, overlaps side by side,
+/// and the invite's own slot hatched.
+struct DayColumn: View {
+    let invite: Invite
+    let subject: String
+    let events: [CalendarEvent]?
+
+    static let hourHeight: CGFloat = 44
+    private let cal = Calendar.current
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(invite.start.formatted(.dateTime.weekday(.wide).day().month()))
+                .font(.system(size: 12, weight: .semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(Color.accentColor.opacity(0.12))
+            ForEach(allDay, id: \.self) { e in
+                Text(e.subject).font(.system(size: 11)).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(Color.accentColor.opacity(0.18))
+            }
+            if events == nil {
+                ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding()
+            }
+            grid
+        }
+    }
+
+    private var allDay: [CalendarEvent] { (events ?? []).filter(\.isAllDay) }
+
+    /// 8–18 h, widened to include the invite and the day's entries.
+    private var hours: ClosedRange<Int> {
+        let times = [invite.start, invite.end] + (events ?? []).filter { !$0.isAllDay }.flatMap { [$0.start, $0.end] }
+        let first = times.map { cal.component(.hour, from: $0) }.min() ?? 8
+        let last = times.map { d in cal.component(.hour, from: d) + (cal.component(.minute, from: d) > 0 ? 1 : 0) }.max() ?? 18
+        return min(8, first)...max(18, min(24, last))
+    }
+
+    private func y(_ d: Date) -> CGFloat {
+        let c = cal.dateComponents([.hour, .minute], from: d)
+        let sameDay = cal.isDate(d, inSameDayAs: invite.start)
+        let h = sameDay ? Double(c.hour ?? 0) + Double(c.minute ?? 0) / 60 : (d < invite.start ? 0 : 24)
+        return CGFloat(h - Double(hours.lowerBound)) * Self.hourHeight
+    }
+
+    private var grid: some View {
+        let height = CGFloat(hours.count - 1) * Self.hourHeight
+        return GeometryReader { geo in
+            let gutter: CGFloat = 30, w = geo.size.width - gutter
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(hours), id: \.self) { h in
+                    let top = CGFloat(h - hours.lowerBound) * Self.hourHeight
+                    Text("\(h)").font(.system(size: 10)).foregroundStyle(.secondary)
+                        .frame(width: gutter - 6, alignment: .trailing)
+                        .offset(y: top - 6)
+                    Rectangle().fill(Color.secondary.opacity(0.2)).frame(width: w, height: 1)
+                        .offset(x: gutter, y: top)
+                }
+                // The invite's slot, hatched, under the entries.
+                Hatch()
+                    .stroke(Color.accentColor.opacity(0.5), lineWidth: 1)
+                    .background(Color.accentColor.opacity(0.08))
+                    .overlay(Rectangle().strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                    .frame(width: w, height: max(12, y(invite.end) - y(invite.start)))
+                    .offset(x: gutter, y: y(invite.start))
+                ForEach(DayLayout.columns(events ?? []), id: \.self) { p in
+                    let own = invite.isOwnEntry(p.event, subject: subject)
+                    let colW = w / CGFloat(p.of)
+                    EventBox(event: p.event, own: own)
+                        .frame(width: colW - 2, height: max(14, y(p.event.end) - y(p.event.start) - 1))
+                        .offset(x: gutter + CGFloat(p.column) * colW + 1, y: y(p.event.start) + 1)
+                }
+            }
+        }
+        .frame(height: height + 8)
+        .padding(.top, 8)
+        .padding(.trailing, 8)
+    }
+}
+
+private struct EventBox: View {
+    let event: CalendarEvent
+    let own: Bool
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Rectangle().fill(stripe).frame(width: 3)
+            Text(event.subject)
+                .font(.system(size: 11, weight: own ? .semibold : .regular))
+                .foregroundStyle(event.busy == .free ? .secondary : .primary)
+                .padding(.horizontal, 4).padding(.vertical, 2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .background(Color.accentColor.opacity(own ? 0.10 : 0.20))
+        .clipShape(RoundedRectangle(cornerRadius: 3))
+    }
+
+    private var stripe: Color {
+        switch event.busy {
+        case .busy: .accentColor
+        case .tentative: .accentColor.opacity(0.45)
+        case .away: .purple
+        case .free, .unknown: .secondary.opacity(0.4)
+        }
+    }
+}
+
+/// Diagonal lines, for the invite's own time slot.
+private struct Hatch: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        // Lines y = x' - x (45°), clipped to the rectangle.
+        var x = -rect.height
+        while x < rect.width {
+            let x0 = max(x, 0), x1 = min(x + rect.height, rect.width)
+            p.move(to: CGPoint(x: rect.minX + x0, y: rect.minY + x0 - x))
+            p.addLine(to: CGPoint(x: rect.minX + x1, y: rect.minY + x1 - x))
+            x += 8
+        }
+        return p
+    }
+}

@@ -63,7 +63,7 @@ public struct EWSBackend: MailBackend {
             <m:GetItem><m:ItemShape><t:BaseShape>IdOnly</t:BaseShape><t:BodyType>Text</t:BodyType>\
             <t:AdditionalProperties><t:FieldURI FieldURI="item:Body"/><t:FieldURI FieldURI="item:Attachments"/>\
             <t:FieldURI FieldURI="message:From"/><t:FieldURI FieldURI="message:ToRecipients"/>\
-            <t:FieldURI FieldURI="message:CcRecipients"/></t:AdditionalProperties></m:ItemShape>\
+            <t:FieldURI FieldURI="message:CcRecipients"/>\(Self.inviteProps)</t:AdditionalProperties></m:ItemShape>\
             <m:ItemIds><t:ItemId Id="\(xmlEscape(remoteID))"/></m:ItemIds></m:GetItem>
             """)
         guard let item = doc.first("Items")?.elementChildren.first else {
@@ -72,7 +72,65 @@ public struct EWSBackend: MailBackend {
         return Self.parseBody(item)
     }
 
+    /// Asked of every item when its body loads; only meeting requests return them (checked on the real server).
+    static let inviteProps = ["calendar:Start", "calendar:End", "calendar:Location", "calendar:IsAllDayEvent",
+                              "calendar:Organizer", "calendar:RequiredAttendees", "calendar:OptionalAttendees"]
+        .map { "<t:FieldURI FieldURI=\"\($0)\"/>" }.joined()
+
+    public func events(from: Date, to: Date) async throws -> [CalendarEvent] {
+        Self.parseEvents(try await client.call(Self.calendarViewRequest(from: from, to: to)))
+    }
+
+    static func calendarViewRequest(from: Date, to: Date) -> String {
+        let f = ISO8601DateFormatter()
+        return "<m:FindItem Traversal=\"Shallow\"><m:ItemShape><t:BaseShape>IdOnly</t:BaseShape><t:AdditionalProperties>"
+            + ["item:Subject", "calendar:Start", "calendar:End", "calendar:IsAllDayEvent", "calendar:LegacyFreeBusyStatus"]
+                .map { "<t:FieldURI FieldURI=\"\($0)\"/>" }.joined()
+            + "</t:AdditionalProperties></m:ItemShape>"
+            + "<m:CalendarView StartDate=\"\(f.string(from: from))\" EndDate=\"\(f.string(from: to))\"/>"
+            + "<m:ParentFolderIds><t:DistinguishedFolderId Id=\"calendar\"/></m:ParentFolderIds></m:FindItem>"
+    }
+
+    static func parseEvents(_ doc: XMLDocument) -> [CalendarEvent] {
+        (doc.first("Items")?.elementChildren ?? []).compactMap { e in
+            guard let start = e.text("Start").flatMap(isoDate.date), let end = e.text("End").flatMap(isoDate.date) else { return nil }
+            let busy: BusyStatus = switch e.text("LegacyFreeBusyStatus") {
+            case "Free": .free
+            case "Tentative": .tentative
+            case "Busy": .busy
+            case "OOF", "WorkingElsewhere": .away
+            default: .unknown
+            }
+            return CalendarEvent(subject: e.child("Subject")?.stringValue ?? "", start: start, end: end,
+                                 isAllDay: e.text("IsAllDayEvent") == "true", busy: busy)
+        }
+    }
+
+    static func parseInvite(_ item: XMLNode) -> Invite? {
+        guard let start = item.child("Start")?.stringValue.flatMap(isoDate.date),
+              let end = item.child("End")?.stringValue.flatMap(isoDate.date) else { return nil }
+        let attendees = { (tag: String) in (item.child(tag)?.children("Attendee") ?? []).compactMap { $0.child("Mailbox").map(contact) } }
+        return Invite(start: start, end: end, location: item.child("Location")?.stringValue ?? "",
+                      isAllDay: item.child("IsAllDayEvent")?.stringValue == "true",
+                      organizer: item.child("Organizer")?.child("Mailbox").map(contact),
+                      required: attendees("RequiredAttendees"), optional: attendees("OptionalAttendees"))
+    }
+
     // MARK: Write-back
+
+    public func respond(_ remoteID: String, _ response: InviteResponse) async throws {
+        _ = try await client.call(Self.respondRequest(remoteID, response))
+    }
+
+    static func respondRequest(_ id: String, _ r: InviteResponse) -> String {
+        let tag = switch r {
+        case .accept: "AcceptItem"
+        case .tentative: "TentativelyAcceptItem"
+        case .decline: "DeclineItem"
+        }
+        return "<m:CreateItem MessageDisposition=\"SendAndSaveCopy\"><m:Items><t:\(tag)>"
+            + "<t:ReferenceItemId Id=\"\(xmlEscape(id))\"/></t:\(tag)></m:Items></m:CreateItem>"
+    }
 
     public func setRead(_ ids: [String], _ read: Bool) async throws {
         _ = try await client.call(Self.updateRequest(ids, field: "message:IsRead", value: "<t:IsRead>\(read)</t:IsRead>"))
@@ -193,7 +251,8 @@ public struct EWSBackend: MailBackend {
                        isRead: item.text("IsRead") == "true",
                        flag: item.child("Flag")?.text("FlagStatus") == "Flagged" ? .red : nil,
                        remoteID: rid, hasAttachments: item.text("HasAttachments") == "true",
-                       serverPreview: item.child("Preview")?.stringValue ?? "", bodyLoaded: false)
+                       serverPreview: item.child("Preview")?.stringValue ?? "", bodyLoaded: false,
+                       isInvite: item.localName == "MeetingRequest")
     }
 
     static func parseBody(_ item: XMLNode) -> MessageBody {
@@ -203,7 +262,7 @@ public struct EWSBackend: MailBackend {
         return MessageBody(text: item.child("Body")?.stringValue ?? "", attachments: attachments,
                            from: item.child("From").map(contact),
                            to: item.child("ToRecipients").map(mailboxes) ?? [],
-                           cc: item.child("CcRecipients").map(mailboxes) ?? [])
+                           cc: item.child("CcRecipients").map(mailboxes) ?? [], invite: parseInvite(item))
     }
 
     static func contact(_ n: XMLNode) -> Contact {

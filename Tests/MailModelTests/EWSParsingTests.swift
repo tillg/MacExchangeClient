@@ -108,6 +108,61 @@ struct EWSParsingTests {
         #expect(EWSClient.mapError(URLError(.notConnectedToInternet), credentialsRejected: true) is URLError)
     }
 
+    @Test func meetingRequestBodyCarriesTheInvite() throws {
+        let d = try doc("""
+            <t:MeetingRequest><t:ItemId Id="M1"/><t:Body BodyType="Text">Agenda</t:Body>
+            <t:Start>2026-11-23T11:30:00Z</t:Start><t:End>2026-11-23T12:00:00Z</t:End><t:Location>Room 2.33</t:Location>
+            <t:Organizer><t:Mailbox><t:Name>Org</t:Name><t:EmailAddress>org@x.com</t:EmailAddress></t:Mailbox></t:Organizer>
+            <t:RequiredAttendees><t:Attendee><t:Mailbox><t:Name>Ann</t:Name><t:EmailAddress>ann@x.com</t:EmailAddress></t:Mailbox>
+            <t:ResponseType>Unknown</t:ResponseType></t:Attendee></t:RequiredAttendees>
+            <t:OptionalAttendees><t:Attendee><t:Mailbox><t:Name>Bob</t:Name><t:EmailAddress>bob@x.com</t:EmailAddress></t:Mailbox>
+            </t:Attendee></t:OptionalAttendees><t:ConflictingMeetingCount>2</t:ConflictingMeetingCount></t:MeetingRequest>
+            """)
+        let item = try #require(d.first("MeetingRequest"))
+        let invite = try #require(EWSBackend.parseBody(item).invite)
+        #expect(invite.start == ISO8601DateFormatter().date(from: "2026-11-23T11:30:00Z"))
+        #expect(invite.end.timeIntervalSince(invite.start) == 1800)
+        #expect(invite.location == "Room 2.33")
+        #expect(invite.organizer?.email == "org@x.com")
+        #expect(invite.required.map(\.name) == ["Ann"])
+        #expect(invite.optional.map(\.name) == ["Bob"])
+        #expect(!invite.isAllDay)
+        #expect(EWSBackend.message(item)?.isInvite == true)
+        let plain = try #require(try doc(summary).first("Message"))
+        #expect(EWSBackend.parseBody(plain).invite == nil)
+        #expect(EWSBackend.message(plain)?.isInvite == false)
+    }
+
+    @Test func calendarViewEvents() throws {
+        let d = try doc("""
+            <m:Items><t:CalendarItem><t:ItemId Id="C1"/><t:Subject>Standup</t:Subject><t:Start>2026-11-23T08:00:00Z</t:Start>
+            <t:End>2026-11-23T08:15:00Z</t:End><t:IsAllDayEvent>false</t:IsAllDayEvent><t:LegacyFreeBusyStatus>Tentative</t:LegacyFreeBusyStatus></t:CalendarItem>
+            <t:CalendarItem><t:ItemId Id="C2"/><t:Subject>Holiday</t:Subject><t:Start>2026-11-23T00:00:00Z</t:Start>
+            <t:End>2026-11-24T00:00:00Z</t:End><t:IsAllDayEvent>true</t:IsAllDayEvent><t:LegacyFreeBusyStatus>Free</t:LegacyFreeBusyStatus></t:CalendarItem></m:Items>
+            """)
+        let e = EWSBackend.parseEvents(d)
+        #expect(e.map(\.subject) == ["Standup", "Holiday"])
+        #expect(e.map(\.busy) == [.tentative, .free])
+        #expect(e.map(\.isAllDay) == [false, true])
+    }
+
+    @Test func calendarViewRequestAsksForOneDay() throws {
+        let from = ISO8601DateFormatter().date(from: "2026-11-23T00:00:00Z")!
+        let d = try request(EWSBackend.calendarViewRequest(from: from, to: from.addingTimeInterval(86400)))
+        let view = try #require(d.first("CalendarView"))
+        #expect(view.attr("StartDate") == "2026-11-23T00:00:00Z")
+        #expect(view.attr("EndDate") == "2026-11-24T00:00:00Z")
+        #expect(d.first("DistinguishedFolderId")?.attr("Id") == "calendar")
+    }
+
+    @Test func inviteAnswersAreSentToTheOrganizer() throws {
+        for (r, tag) in [(InviteResponse.accept, "AcceptItem"), (.tentative, "TentativelyAcceptItem"), (.decline, "DeclineItem")] {
+            let d = try request(EWSBackend.respondRequest("M&1", r))
+            #expect(d.first("CreateItem")?.attr("MessageDisposition") == "SendAndSaveCopy")
+            #expect(d.first(tag)?.child("ReferenceItemId")?.attr("Id") == "M&1")
+        }
+    }
+
     // MARK: Write requests
 
     /// Parses a request as the server would, to check its structure.

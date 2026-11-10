@@ -61,7 +61,31 @@ enum SampleData {
                     subject: "Offsite venue options", body: "Three options attached, my vote is the lake house.",
                     date: ago(400), isRead: true).with(.archive),
         ]
-        return MailStore(accounts: [icloud, work], messages: msgs)
+        // A made-up meeting invite for tomorrow, with a made-up day around it.
+        let cal = Calendar.current
+        let tomorrow = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: .now))!
+        func at(_ h: Double) -> Date { tomorrow.addingTimeInterval(h * 3600) }
+        let inviteSubject = "Q4 numbers review"
+        let invite = Message(
+            accountID: work.id, from: c("Priya Raman", "priya@northwind.example"), to: meWork,
+            subject: inviteSubject, body: "Let's go through the Q4 numbers before the board meeting.\n\nPriya",
+            date: ago(0.8),
+            invite: Invite(start: at(12.5), end: at(13), location: "Room 2.33 – Harbour View",
+                           organizer: c("Priya Raman", "priya@northwind.example"),
+                           required: [c("Alex Morgan", work.address), c("Jonas Weber", "jonas@northwind.example"),
+                                      c("Elena Petrova", "elena@northwind.example"), c("Sam Okafor", "sam@northwind.example")],
+                           optional: [c("Mia Chen", "mia@northwind.example")]))
+        let store = MailStore(accounts: [icloud, work], messages: msgs + [invite])
+        store.setDayEvents([
+            CalendarEvent(subject: "Company offsite week", start: tomorrow, end: at(24), isAllDay: true, busy: .free),
+            CalendarEvent(subject: "Weekly sync", start: at(9), end: at(10)),
+            CalendarEvent(subject: "Management prep", start: at(10), end: at(13)),
+            CalendarEvent(subject: "Budget check-in", start: at(12), end: at(12.5), busy: .tentative),
+            CalendarEvent(subject: inviteSubject, start: at(12.5), end: at(13), busy: .tentative),
+            CalendarEvent(subject: "1:1 Jonas", start: at(14), end: at(15)),
+            CalendarEvent(subject: "Focus time", start: at(15.5), end: at(17), busy: .free),
+        ], for: invite.id)
+        return store
     }
 }
 

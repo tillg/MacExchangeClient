@@ -10,7 +10,9 @@ struct DebugSnapshot: ViewModifier {
     func body(content: Content) -> some View {
         content.task {
             guard let out = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT"] else { return }
-            if let first = store.visibleMessages.first { store.selection = [first.id] }
+            // MAIL_SNAPSHOT_SUBJECT picks a message by subject; otherwise the first one.
+            let wanted = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_SUBJECT"]
+            if let m = store.visibleMessages.first(where: { wanted == nil || $0.subject == wanted }) { store.selection = [m.id] }
             if let f = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_PROGRESS"].flatMap(Double.init) {
                 store.progress = SyncProgress(text: "Checking for Mail…", fraction: f)
             }

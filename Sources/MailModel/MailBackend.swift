@@ -11,8 +11,10 @@ public protocol MailBackend: Sendable {
     func newest(in folder: RemoteFolder, limit: Int) async throws -> [Message]
     /// Changes since `token` (nil = from scratch). The token is opaque: an EWS SyncState or a Graph deltaLink.
     func sync(_ folder: RemoteFolder, token: String?) async throws -> SyncResult
-    /// Full text and attachment names of one message.
+    /// Full text and attachment names of one message, and the invite if it is one.
     func body(remoteID: String) async throws -> MessageBody
+    /// Calendar entries between two times, for the day next to an invite.
+    func events(from: Date, to: Date) async throws -> [CalendarEvent]
 
     // Write-back. IDs are `remoteID`s; batches stay small (`MailStore.batchSize`).
     func setRead(_ ids: [String], _ read: Bool) async throws
@@ -24,6 +26,8 @@ public protocol MailBackend: Sendable {
     func delete(_ ids: [String]) async throws
     func send(_ draft: Draft) async throws
     func saveDraft(_ draft: Draft) async throws
+    /// Answers a meeting invite; the server sends the answer to the organizer and updates the calendar.
+    func respond(_ remoteID: String, _ response: InviteResponse) async throws
 }
 
 /// A local change waiting to be written to the server.
@@ -34,6 +38,7 @@ public enum ServerChange: Hashable, Codable, Sendable {
     case delete([String])
     case send(Draft)
     case saveDraft(Draft)
+    case respond(String, InviteResponse)
 
     func renamed(_ map: [String: String]) -> ServerChange {
         let r = { (ids: [String]) in ids.map { map[$0] ?? $0 } }
@@ -42,6 +47,7 @@ public enum ServerChange: Hashable, Codable, Sendable {
         case let .setFlagged(ids, v): .setFlagged(r(ids), v)
         case let .move(ids, box): .move(r(ids), to: box)
         case let .delete(ids): .delete(r(ids))
+        case let .respond(id, r): .respond(map[id] ?? id, r)
         case .send, .saveDraft: self
         }
     }
@@ -49,6 +55,7 @@ public enum ServerChange: Hashable, Codable, Sendable {
     var remoteIDs: [String] {
         switch self {
         case let .setRead(ids, _), let .setFlagged(ids, _), let .move(ids, _), let .delete(ids): ids
+        case let .respond(id, _): [id]
         case .send, .saveDraft: []
         }
     }
@@ -94,8 +101,10 @@ public struct MessageBody: Sendable {
     public var from: Contact?
     public var to: [Contact]?
     public var cc: [Contact]?
-    public init(text: String, attachments: [String], from: Contact? = nil, to: [Contact]? = nil, cc: [Contact]? = nil) {
-        self.text = text; self.attachments = attachments; self.from = from; self.to = to; self.cc = cc
+    public var invite: Invite?
+    public init(text: String, attachments: [String], from: Contact? = nil, to: [Contact]? = nil, cc: [Contact]? = nil,
+                invite: Invite? = nil) {
+        self.text = text; self.attachments = attachments; self.from = from; self.to = to; self.cc = cc; self.invite = invite
     }
 }
 

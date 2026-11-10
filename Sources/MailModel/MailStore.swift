@@ -344,7 +344,9 @@ public final class MailStore {
                 let old = ms[i]
                 m.id = old.id
                 if old.flag != nil && m.flag != nil { m.flag = old.flag }  // the server has no colours
-                if old.bodyLoaded && !m.bodyLoaded { m.body = old.body; m.attachments = old.attachments; m.bodyLoaded = true }
+                if old.bodyLoaded && !m.bodyLoaded {
+                    m.body = old.body; m.attachments = old.attachments; m.invite = old.invite; m.bodyLoaded = true
+                }
                 if pending.contains(rid) { m.isRead = old.isRead; m.flag = old.flag; m.mailbox = old.mailbox }
                 ms[i] = m
             } else {
@@ -416,6 +418,7 @@ public final class MailStore {
                     messages[i].mailbox = old.mailbox
                     messages[i].isRead = old.isRead
                     messages[i].flag = old.flag
+                    messages[i].invite = old.invite
                 } else {
                     messages.append(old)
                 }
@@ -442,7 +445,9 @@ public final class MailStore {
             } catch where pauseIfSignInFailed(error, account: p.account) {
                 continue
             } catch let e as URLError {
+                // A send or an answer that timed out may have gone out; never repeat it.
                 if case .send = p.change { failed(p, e.localizedDescription); continue }
+                if case .respond = p.change { failed(p, e.localizedDescription); continue }
                 status = "Offline – changes will be sent to Exchange later"
                 return
             } catch {
@@ -476,6 +481,7 @@ public final class MailStore {
         case let .delete(ids): try await b.delete(ids)
         case let .send(d): try await b.send(d)
         case let .saveDraft(d): try await b.saveDraft(d)
+        case let .respond(id, r): try await b.respond(id, r)
         }
     }
 
@@ -488,7 +494,37 @@ public final class MailStore {
         if let f = b.from { messages[i].from = f }
         if let to = b.to { messages[i].to = to }
         if let cc = b.cc { messages[i].cc = cc }
+        if let invite = b.invite { messages[i].invite = invite; messages[i].isInvite = true }
     }
+
+    // MARK: Invites
+
+    /// The calendar day of each invite on screen, keyed by message. Not cached: the calendar changes.
+    public private(set) var dayEvents: [Message.ID: [CalendarEvent]] = [:]
+
+    /// Fetches the local calendar day around an invite, for its day column and conflict note.
+    public func loadDay(for id: Message.ID) async {
+        guard let m = message(id), let invite = m.invite, let backend = backends[m.accountID], !paused.contains(m.accountID)
+        else { return }
+        let from = Calendar.current.startOfDay(for: invite.start)
+        let to = Calendar.current.date(byAdding: .day, value: 1, to: from) ?? from.addingTimeInterval(86400)
+        do { dayEvents[id] = try await backend.events(from: from, to: to) } catch {
+            if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load the calendar: \(error.localizedDescription)" }
+        }
+    }
+
+    /// Answers an invite: shown at once, then sent. Exchange tells the organizer and updates the calendar.
+    public func respond(_ r: InviteResponse, to id: Message.ID) {
+        guard let i = messages.firstIndex(where: { $0.id == id }), messages[i].invite != nil else { return }
+        let old = messages[i]
+        messages[i].invite?.response = r
+        guard let rid = old.remoteID else { return }
+        outbox.append(PendingChange(account: old.accountID, change: .respond(rid, r), previous: [old]))
+        scheduleFlush()
+    }
+
+    /// For sample data and tests: a day of made-up calendar entries next to an invite.
+    public func setDayEvents(_ events: [CalendarEvent], for id: Message.ID) { dayEvents[id] = events }
 
     /// Fetches the body of a server message the first time it is shown.
     public func loadBody(_ id: Message.ID) async {

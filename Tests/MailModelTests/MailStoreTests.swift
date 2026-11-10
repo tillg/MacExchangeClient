@@ -548,6 +548,24 @@ struct MailStoreTests {
         #expect(s.outbox.count == 1)
     }
 
+    @Test func answeringAnInviteQueuesTheResponseAndUndoesOnFailure() {
+        var m = remote("M")
+        m.invite = Invite(start: .now, end: .now.addingTimeInterval(1800))
+        let s = store([])
+        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "t", more: false), account: work.id, mailbox: .inbox)
+        let id = id(s, "M")
+        s.respond(.tentative, to: id)
+        #expect(s.message(id)?.invite?.response == .tentative)
+        #expect(s.outbox.map(\.change) == [.respond("M", .tentative)])
+        s.failed(s.outbox[0], "Denied")
+        #expect(s.message(id)?.invite?.response == nil)
+        #expect(s.status != nil)
+        // Changing one's mind before the first answer went out: both go out, in order, as in Outlook.
+        s.respond(.accept, to: id)
+        s.respond(.decline, to: id)
+        #expect(s.outbox.map(\.change) == [.respond("M", .accept), .respond("M", .decline)])
+    }
+
     @Test func markAllRead() {
         let s = store([msg(work), msg(work), msg(home)])
         s.markAllRead(in: .account(work.id, .inbox))

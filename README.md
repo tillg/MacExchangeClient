@@ -15,6 +15,13 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 
 - **Exchange accounts over EWS:** sign in under Settings ▸ Accounts with email, `DOMAIN\user`, password and server, as in iOS Mail. Inbox, Drafts, Sent, Junk, Deleted Items and Archive are synced. What you look at drives the order, as described under [How mail is fetched](#how-mail-is-fetched). The password is kept in the Keychain
 
+- **Meeting invites, as in Outlook:** for each invite you see:
+  - when and where, with the required and optional attendees;
+  - Accept, Tentative and Decline buttons, which send the answer to the organizer;
+  - "Please respond" until you have answered, and a yellow note when the meeting overlaps other events;
+  - the invite's day from your Exchange calendar next to the text, with overlapping events side by side and the invite's slot hatched.
+
+  Attendee answer icons and Propose New Time are missing: your copy of an invite reports every attendee's answer as unknown.
 - **Three-column window** with a mailboxes sidebar, a message list and a message view, using Mail's toolbar layout and SF Symbols
 - **Favorites and smart mailboxes:** All Inboxes, VIPs, Flagged, Unread, then each account's Inbox, Drafts, Sent, Junk, Trash and Archive, with unread badges
 - **Categories:** Primary, Transactions, Updates and Promotions in the Inbox (⌥⌘1–4)
@@ -93,7 +100,7 @@ Sources/
   EWS/              MailBackend over Exchange Web Services, Keychain and account settings
   MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (75 tests, plus live tests against a real server)
+  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (84 tests, plus live tests against a real server)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```
@@ -102,7 +109,7 @@ Views stay thin. Every action is a method on `MailStore`, and each one has a tes
 
 `MailStore` talks to servers only through the `MailBackend` protocol: folders, newest messages, sync with an opaque token, and message bodies. EWS is one implementation; Microsoft Graph will be another, with the token holding a Graph delta link. The data store doesn't change.
 
-The live EWS tests run only with `EWS_USER` (`DOMAIN\user`) and `EWS_SERVER` set and the password in the Keychain (service `MailReplica-EWS`, account = username). Otherwise they are skipped. The read test only reads. The write test also needs `EWS_WRITE_TEST=1`. It works only inside the folder `MailReplica-Test` (created if missing), on a message it creates there itself, and never sends mail. `EWS_DEBUG=1` logs which sign-in method was used. `EWS_TIMING=1` prints read-only timings and folder sizes, never mail content. Run the live tests on their own (`--filter EWSLive`): the performance tests hold the main thread and would skew their timings.
+The live EWS tests run only with `EWS_USER` (`DOMAIN\user`) and `EWS_SERVER` set and the password in the Keychain (service `MailReplica-EWS`, account = username). Otherwise they are skipped. The read test only reads. The write test also needs `EWS_WRITE_TEST=1`. It works only inside the folder `MailReplica-Test` (created if missing), on a message it creates there itself, and never sends mail. `EWS_DEBUG=1` logs which sign-in method was used. `EWS_PROBE=1` lists which fields a real invite carries, never values. `EWS_TIMING=1` prints read-only timings and folder sizes, never mail content. Run the live tests on their own (`--filter EWSLive`): the performance tests hold the main thread and would skew their timings.
 
 ### Screenshots without screen recording
 
@@ -112,6 +119,8 @@ The app can save a PNG of its window and quit. This checks the UI without screen
 MAIL_SNAPSHOT=$PWD/tmp/snap.png .build/debug/MailReplica
 MAIL_SNAPSHOT=$PWD/tmp/snap-dark.png MAIL_SNAPSHOT_DARK=1 .build/debug/MailReplica
 ```
+
+`MAIL_SNAPSHOT_SUBJECT="Q4 numbers review"` selects a message by subject (here the sample invite). `MAIL_SNAPSHOT_PROGRESS=0.3` shows the progress bar. Use `MAIL_SAMPLE_DATA=1` so no real mail ends up in a screenshot.
 
 ## How faithful is it?
 
