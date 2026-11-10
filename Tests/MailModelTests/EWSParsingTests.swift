@@ -102,6 +102,12 @@ struct EWSParsingTests {
         #expect(d.text("s") == "x\u{FFFD}y\u{FFFD}z\u{FFFD}\t\n\r &#8;")
     }
 
+    @Test func rejectedPasswordIsASignInFailureNotOffline() {
+        #expect(EWSClient.mapError(URLError(.cancelled), credentialsRejected: true) is AuthenticationError)
+        #expect(EWSClient.mapError(URLError(.cancelled), credentialsRejected: false) is URLError)
+        #expect(EWSClient.mapError(URLError(.notConnectedToInternet), credentialsRejected: true) is URLError)
+    }
+
     // MARK: Write requests
 
     /// Parses a request as the server would, to check its structure.

@@ -33,6 +33,11 @@ public final class MailStore {
     private var historyTask: Task<Void, Never>?
     /// Folders whose history sync failed this session; retried after a relaunch.
     private var historyFailed: Set<String> = []
+    /// Accounts whose sign-in failed. Nothing is sent for them until the app is relaunched.
+    private var paused: Set<UUID> = []
+    private var historyError: String?
+    /// Folders whose newest 200 the history already fetched this session.
+    private var newestLoaded: Set<String> = []
     /// Accounts whose messages live on a server (they have a backend or received a sync).
     private var serverAccounts: Set<UUID> = []
     /// Local changes not yet written to the server, oldest first.
@@ -413,7 +418,7 @@ public final class MailStore {
     }
 
     private func scheduleFlush() {
-        guard flushTask == nil, outbox.contains(where: { backends[$0.account] != nil }) else { return }
+        guard flushTask == nil, outbox.contains(where: canSend) else { return }
         flushTask = Task {
             await drain()
             flushTask = nil
@@ -423,10 +428,12 @@ public final class MailStore {
     /// Writes queued changes in order. When offline, changes stay queued for the next refresh;
     /// a send is never retried, because a timed-out send may have gone out.
     private func drain() async {
-        while let p = outbox.first(where: { backends[$0.account] != nil }), let backend = backends[p.account] {
+        while let p = outbox.first(where: canSend), let backend = backends[p.account] {
             do {
                 try await perform(p, backend)
                 outbox.removeAll { $0.id == p.id }
+            } catch where pauseIfSignInFailed(error, account: p.account) {
+                continue
             } catch let e as URLError {
                 if case .send = p.change { failed(p, e.localizedDescription); continue }
                 status = "Offline – changes will be sent to Exchange later"
@@ -436,6 +443,19 @@ public final class MailStore {
             }
         }
     }
+
+    private func canSend(_ p: PendingChange) -> Bool { backends[p.account] != nil && !paused.contains(p.account) }
+
+    /// Stops all requests for an account whose sign-in failed. Returns false for any other error.
+    func pauseIfSignInFailed(_ error: Error, account acct: UUID) -> Bool {
+        guard error is AuthenticationError else { return false }
+        paused.insert(acct)
+        status = "Sign-in to “\(account(acct)?.name ?? "")” failed. Update the password in the Keychain "
+            + "(MailReplica-EWS), then relaunch. Nothing is sent until then."
+        return true
+    }
+
+    public func isPaused(_ acct: UUID) -> Bool { paused.contains(acct) }
 
     private func perform(_ p: PendingChange, _ b: any MailBackend) async throws {
         switch p.change {
@@ -465,8 +485,11 @@ public final class MailStore {
 
     /// Fetches the body of a server message the first time it is shown.
     public func loadBody(_ id: Message.ID) async {
-        guard let m = message(id), !m.bodyLoaded, let rid = m.remoteID, let backend = backends[m.accountID] else { return }
-        do { setBody(try await backend.body(remoteID: rid), for: id) } catch { status = "Couldn't load message: \(error.localizedDescription)" }
+        guard let m = message(id), !m.bodyLoaded, let rid = m.remoteID, let backend = backends[m.accountID],
+              !paused.contains(m.accountID) else { return }
+        do { setBody(try await backend.body(remoteID: rid), for: id) } catch {
+            if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load message: \(error.localizedDescription)" }
+        }
     }
 
     /// Newest messages fetched for a folder whose full sync hasn't finished: about one screenful.
@@ -482,7 +505,7 @@ public final class MailStore {
         // Write first, so the check doesn't briefly bring back the old state.
         scheduleFlush()
         await flushTask?.value
-        for (acct, backend) in backends {
+        for (acct, backend) in backends where !paused.contains(acct) {
             do {
                 if remoteFolders[acct] == nil { remoteFolders[acct] = try await backend.folders() }
                 for role in quickCheckRoles(acct) {
@@ -498,7 +521,8 @@ public final class MailStore {
                         merge(try await backend.newest(in: folder, limit: Self.firstScreen), account: acct, mailbox: role)
                     }
                 }
-                status = nil
+                status = historyError
+            } catch where pauseIfSignInFailed(error, account: acct) {
             } catch {
                 status = "\(account(acct)?.name ?? "Account"): \(error.localizedDescription)"
             }
@@ -547,29 +571,61 @@ public final class MailStore {
     /// effect at once. A failing folder doesn't stop the others; offline, the history waits for the next check.
     public func syncHistory() async {
         defer { progress = nil }
-        for (acct, backend) in backends {
-            for role in historyOrder(acct, (remoteFolders[acct] ?? []).map(\.role)) where !isComplete(acct, role) {
+        for (acct, backend) in backends where !paused.contains(acct) {
+            for role in historyOrder(acct, (remoteFolders[acct] ?? []).map(\.role))
+            where !isComplete(acct, role) && !historyFailed.contains(key(acct, role)) && !newestLoaded.contains(key(acct, role)) {
                 guard let folder = remoteFolders[acct]?.first(where: { $0.role == role }) else { continue }
                 showHistoryProgress(acct)
-                do { merge(try await backend.newest(in: folder, limit: 200), account: acct, mailbox: role) } catch { break }
+                do {
+                    merge(try await backend.newest(in: folder, limit: 200), account: acct, mailbox: role)
+                    newestLoaded.insert(key(acct, role))
+                } catch {
+                    _ = pauseIfSignInFailed(error, account: acct)
+                    break
+                }
             }
         }
         while let (acct, backend, folder) = nextHistoryFolder() {
             showHistoryProgress(acct)
             do {
                 apply(try await backend.sync(folder, token: syncToken(acct, folder.role)), account: acct, mailbox: folder.role)
+            } catch where pauseIfSignInFailed(error, account: acct) {
             } catch is URLError {
                 return
             } catch {
                 historyFailed.insert(key(acct, folder.role))
-                status = "\(folder.role.title): \(error.localizedDescription)"
+                historyError = "\(folder.role.title): \(error.localizedDescription)"
+                status = historyError
+            }
+        }
+        progress = nil
+        // History is done: bring the complete folders that aren't on screen up to date (one small request each).
+        for (acct, backend) in backends where !paused.contains(acct) {
+            for role in backgroundDeltaRoles(acct, (remoteFolders[acct] ?? []).map(\.role)) {
+                guard let folder = remoteFolders[acct]?.first(where: { $0.role == role }) else { continue }
+                do {
+                    var more = true
+                    while more {
+                        let r = try await backend.sync(folder, token: syncToken(acct, role))
+                        apply(r, account: acct, mailbox: role)
+                        more = r.more
+                    }
+                } catch {
+                    if pauseIfSignInFailed(error, account: acct) || error is URLError { break }
+                }
             }
         }
     }
 
+    /// Complete folders the quick check doesn't cover.
+    func backgroundDeltaRoles(_ acct: UUID, _ roles: [MailboxKind]) -> [MailboxKind] {
+        let quick = quickCheckRoles(acct)
+        return Self.historyPriority.filter { roles.contains($0) && isComplete(acct, $0) && !quick.contains($0) }
+    }
+
     private func nextHistoryFolder() -> (UUID, any MailBackend, RemoteFolder)? {
         for acct in accounts.map(\.id) {
-            guard let backend = backends[acct], let folders = remoteFolders[acct] else { continue }
+            guard let backend = backends[acct], let folders = remoteFolders[acct], !paused.contains(acct) else { continue }
             for role in historyOrder(acct, folders.map(\.role))
             where !isComplete(acct, role) && !historyFailed.contains(key(acct, role)) {
                 if let f = folders.first(where: { $0.role == role }) { return (acct, backend, f) }

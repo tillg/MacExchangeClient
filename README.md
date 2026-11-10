@@ -52,7 +52,7 @@ Changes to Exchange mail show at once and are then written to the server in orde
 - Offline, changes wait until the next refresh. A message that fails to send is never resent automatically. It is kept in Drafts on this Mac instead.
 - Exchange messages can't be dragged to another account yet.
 
-Exchange mail, sync positions and unsent changes are cached in `~/Library/Application Support/MailReplica/Cache.json` (readable only by you). The cache is saved after each check for mail and on quit. A launch shows the cached mail at once and fetches only what changed. Sample data is never cached. Delete the file to start fresh.
+Exchange mail, sync positions and unsent changes are cached in `~/Library/Application Support/MailReplica/Cache.json`, readable only by you. It is loaded in the background at launch, about 0.6s for 70,000 messages, before the first check, so only changes are fetched. It is saved at most once a minute after changes, off the main thread, and on quit. Sample data is never cached. Delete the file to start fresh.
 
 `MAIL_SAMPLE_DATA=1 ./run.sh` shows the sample data even when an account is set up.
 
@@ -63,6 +63,10 @@ What's on screen comes first:
 1. **Quick check:** every 15 seconds, and at once when you select a mailbox. It covers only the Inbox and the selected mailbox. A fully synced folder is asked only for changes, one small request of about 0.05s. A folder still syncing gets its newest 50 messages, about 0.1s.
 2. **Bodies:** loaded when you open a message.
 3. **History, in the background:** first the newest 200 messages of every folder. Then each folder's full contents, one page of 512 at a time. The selected mailbox goes first and Sent comes last. While it runs, the sidebar shows "Synchronizing “Exchange”" with a progress bar based on the server's message counts. It never holds up the quick check.
+
+4. **Folders not on screen:** once history is done, fully synced folders are also asked for changes, one small request each.
+
+If Exchange rejects the password, the app stops sending requests for that account until you relaunch, because repeated wrong passwords lock domain accounts. A folder whose history fails is skipped, and the error stays under the window title.
 
 A change you made that hasn't reached the server yet is kept when a sync reports the old state. Sidebar counts and the message list are computed once per change, so a mailbox with 70,000 messages stays smooth.
 
@@ -86,7 +90,7 @@ Sources/
   EWS/              MailBackend over Exchange Web Services, Keychain and account settings
   MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (71 tests, plus live tests against a real server)
+  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (75 tests, plus live tests against a real server)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```

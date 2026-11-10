@@ -518,6 +518,28 @@ struct MailStoreTests {
         #expect(s.unreadCount(.smart(.vip)) == 0)
     }
 
+    @Test func completeFoldersOffScreenGetADeltaPass() {
+        let s = synced([])
+        for box in [MailboxKind.sent, .drafts, .trash] {
+            s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], token: "t", more: box == .trash), account: work.id, mailbox: box)
+        }
+        s.selectedMailbox = .account(work.id, .sent)
+        // Inbox and Sent are covered by the quick check; Trash is still in history.
+        #expect(s.backgroundDeltaRoles(work.id, MailboxKind.allCases) == [.drafts])
+    }
+
+    @Test func failedSignInPausesTheAccountUntilRelaunch() {
+        let s = synced(["A"])
+        #expect(!s.pauseIfSignInFailed(MailError("Other"), account: work.id))
+        #expect(!s.isPaused(work.id))
+        #expect(s.pauseIfSignInFailed(AuthenticationError(), account: work.id))
+        #expect(s.isPaused(work.id))
+        #expect(s.status?.contains("password") == true)
+        // Changes still apply locally and wait in the outbox.
+        s.toggleRead([id(s, "A")])
+        #expect(s.outbox.count == 1)
+    }
+
     @Test func markAllRead() {
         let s = store([msg(work), msg(work), msg(home)])
         s.markAllRead(in: .account(work.id, .inbox))

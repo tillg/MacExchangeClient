@@ -1,4 +1,5 @@
 import Foundation
+import MailModel
 
 public struct EWSError: Error, LocalizedError, Sendable {
     public let code: String
@@ -10,12 +11,12 @@ public struct EWSError: Error, LocalizedError, Sendable {
 /// with the account's credentials. Never logs requests, responses or the password.
 public final class EWSClient: Sendable {
     public let url: URL
-    private let auth: AuthDelegate
+    private let credential: URLCredential
     private let session: URLSession
 
     public init(url: URL, username: String, password: String) {
         self.url = url
-        auth = AuthDelegate(URLCredential(user: username, password: password, persistence: .forSession))
+        credential = URLCredential(user: username, password: password, persistence: .forSession)
         session = URLSession(configuration: .ephemeral)
     }
 
@@ -26,13 +27,19 @@ public final class EWSClient: Sendable {
         req.httpMethod = "POST"
         req.setValue("text/xml; charset=utf-8", forHTTPHeaderField: "Content-Type")
         req.httpBody = Data(Self.envelope(body).utf8)
-        let (data, response) = try await session.data(for: req, delegate: auth)
+        // One delegate per request, so it can tell whether this request's credentials were rejected.
+        let auth = AuthDelegate(credential)
+        let data: Data, response: URLResponse
+        do { (data, response) = try await session.data(for: req, delegate: auth) } catch {
+            throw Self.mapError(error, credentialsRejected: auth.rejected)
+        }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if status == 401 { throw AuthenticationError() }
         let doc: XMLDocument
         do { doc = try XMLDocument(data: Self.sanitize(data)) } catch {
             // The parser's message names line and column only, never content.
-            throw EWSError(code: "HTTP \(status)", message: status == 401 ? "Sign-in failed"
-                           : "Unreadable EWS response (\(data.count) bytes): \(error.localizedDescription)")
+            throw EWSError(code: "HTTP \(status)",
+                           message: "Unreadable EWS response (\(data.count) bytes): \(error.localizedDescription)")
         }
         if let fault = doc.first("Fault") {
             throw EWSError(code: fault.text("ResponseCode") ?? "SOAP fault", message: fault.text("faultstring") ?? "Server error")
@@ -57,6 +64,11 @@ public final class EWSClient: Sendable {
     nonisolated(unsafe) static let invalidCharRef = try! NSRegularExpression(
         pattern: "&#(?:x0*(?:[0-8bcef]|1[0-9a-f])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));", options: .caseInsensitive)
 
+    /// A request cancelled because the server rejected the password is a sign-in failure, not a network error.
+    static func mapError(_ error: Error, credentialsRejected: Bool) -> Error {
+        credentialsRejected && (error as? URLError)?.code == .cancelled ? AuthenticationError() : error
+    }
+
     static func envelope(_ body: String) -> String {
         """
         <?xml version="1.0" encoding="utf-8"?>
@@ -72,6 +84,10 @@ public final class EWSClient: Sendable {
 
 private final class AuthDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     let credential: URLCredential
+    private let lock = NSLock()
+    private var _rejected = false
+    /// The server asked again after the credentials were sent once: the password is wrong.
+    var rejected: Bool { lock.withLock { _rejected } }
     init(_ credential: URLCredential) { self.credential = credential }
 
     func urlSession(_ session: URLSession, task: URLSessionTask,
@@ -87,10 +103,15 @@ private final class AuthDelegate: NSObject, URLSessionTaskDelegate, @unchecked S
             (.rejectProtectionSpace, nil)
         case NSURLAuthenticationMethodHTTPBasic, NSURLAuthenticationMethodNTLM:
             // One attempt per request: retrying a wrong password could lock the domain account.
-            challenge.previousFailureCount == 0 ? (.useCredential, credential) : (.cancelAuthenticationChallenge, nil)
+            challenge.previousFailureCount == 0 ? (.useCredential, credential) : reject()
         default:
             (.performDefaultHandling, nil)
         }
+    }
+
+    private func reject() -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        lock.withLock { _rejected = true }
+        return (.cancelAuthenticationChallenge, nil)
     }
 }
 

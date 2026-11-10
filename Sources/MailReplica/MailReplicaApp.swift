@@ -44,6 +44,7 @@ struct MailReplicaApp: App {
     /// sync runs on its own in the background. Off while taking a snapshot.
     private func pollForMail() async {
         guard ProcessInfo.processInfo.environment["MAIL_SNAPSHOT"] == nil else { return }
+        await AppSetup.loadCache(into: store)  // before the first check, so it only fetches what changed
         while !Task.isCancelled {
             await store.refresh()
             AppSetup.saveCache(store)

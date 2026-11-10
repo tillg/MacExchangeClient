@@ -9,9 +9,19 @@ enum AppSetup {
         guard usesServer else { return SampleData.store() }
         let store = MailStore(accounts: [], messages: [])
         for a in ExchangeAccount.saved() { connect(a, to: store) }
-        if let cache = MailCache.load() { store.restore(cache) }
         return store
     }
+
+    /// Reads the cache off the main thread (tens of MB for a big mailbox), so the window shows at once.
+    static func loadCache(into store: MailStore) async {
+        defer { cacheReady = true }
+        guard usesServer, let cache = await Task.detached(priority: .userInitiated, operation: { MailCache.load() }).value
+        else { return }
+        store.restore(cache)
+    }
+
+    /// Saving before the load finished would overwrite the cache with an almost empty one.
+    private static var cacheReady = false
 
     /// False while showing sample data; the disk cache is then neither read nor written.
     static var usesServer: Bool {
@@ -23,7 +33,7 @@ enum AppSetup {
     /// Saves at most once a minute and only after a change. Encoding tens of thousands of messages takes
     /// a moment, so it happens off the main thread, except on quit (`now`).
     static func saveCache(_ store: MailStore, now: Bool = false) {
-        guard usesServer else { return }
+        guard usesServer, cacheReady else { return }
         guard now || (store.changeCount != lastSave.change && Date().timeIntervalSince(lastSave.at) > 60) else { return }
         lastSave = (store.changeCount, .now)
         let snapshot = store.cache()

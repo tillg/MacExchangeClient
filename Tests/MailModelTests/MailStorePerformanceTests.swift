@@ -58,4 +58,25 @@ struct MailStorePerformanceTests {
         print(String(format: "PERF merge 512 into 70k %.3fs", t))
         #expect(t < Self.limit)
     }
+
+    @Test func cacheSaveAndLoadAt70kMessages() throws {
+        let s = bigStore()
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], token: "t", more: false), account: work.id, mailbox: .inbox)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("MailPerf-\(UUID())/cache.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let snapshot = s.cache()
+        var start = Date()
+        try snapshot.save(to: url)
+        let save = Date().timeIntervalSince(start)
+        start = Date()
+        let loaded = try #require(MailCache.load(from: url))
+        let load = Date().timeIntervalSince(start)
+        start = Date()
+        let fresh = MailStore(accounts: [work], messages: [])
+        fresh.restore(loaded)
+        let restore = Date().timeIntervalSince(start)
+        let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
+        print(String(format: "PERF cache 70k: save %.2fs, load %.2fs, restore %.2fs, %.1f MB", save, load, restore, Double(size) / 1e6))
+        #expect(fresh.messages.count == s.messages.count)
+    }
 }

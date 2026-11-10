@@ -105,3 +105,10 @@ public struct SyncProgress: Equatable, Sendable {
     public var fraction: Double
     public init(text: String, fraction: Double) { self.text = text; self.fraction = fraction }
 }
+
+/// The server rejected the credentials. Backends throw this so the store stops retrying: repeated
+/// wrong passwords lock domain accounts.
+public struct AuthenticationError: Error, LocalizedError {
+    public init() {}
+    public var errorDescription: String? { "Sign-in failed" }
+}
