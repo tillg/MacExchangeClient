@@ -18,9 +18,21 @@ enum AppSetup {
         !ExchangeAccount.saved().isEmpty && ProcessInfo.processInfo.environment["MAIL_SAMPLE_DATA"] == nil
     }
 
-    static func saveCache(_ store: MailStore) {
+    private static var lastSave = (change: -1, at: Date.distantPast)
+
+    /// Saves at most once a minute and only after a change. Encoding tens of thousands of messages takes
+    /// a moment, so it happens off the main thread, except on quit (`now`).
+    static func saveCache(_ store: MailStore, now: Bool = false) {
         guard usesServer else { return }
-        do { try store.cache().save() } catch { store.status = "Couldn't save the mail cache: \(error.localizedDescription)" }
+        guard now || (store.changeCount != lastSave.change && Date().timeIntervalSince(lastSave.at) > 60) else { return }
+        lastSave = (store.changeCount, .now)
+        let snapshot = store.cache()
+        if now { try? snapshot.save(); return }
+        Task.detached(priority: .utility) {
+            do { try snapshot.save() } catch {
+                await MainActor.run { store.status = "Couldn't save the mail cache: \(error.localizedDescription)" }
+            }
+        }
     }
 
     static func connect(_ a: ExchangeAccount, to store: MailStore) {

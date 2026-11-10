@@ -24,16 +24,17 @@ public struct EWSBackend: MailBackend {
     public func folders() async throws -> [RemoteFolder] {
         let ids = Self.distinguished.map { "<t:DistinguishedFolderId Id=\"\($0.1)\"/>" }.joined()
         let doc = try await client.call(
-            "<m:GetFolder><m:FolderShape><t:BaseShape>IdOnly</t:BaseShape></m:FolderShape><m:FolderIds>\(ids)</m:FolderIds></m:GetFolder>",
+            "<m:GetFolder><m:FolderShape><t:BaseShape>IdOnly</t:BaseShape>\(Self.countProp)</m:FolderShape><m:FolderIds>\(ids)</m:FolderIds></m:GetFolder>",
             strict: false)
         var result = Self.parseGetFolder(doc)
         // Outlook's Archive folder is a normal folder; there is no distinguished ID for it.
         let found = try await client.call("""
             <m:FindFolder Traversal="Shallow"><m:FolderShape><t:BaseShape>IdOnly</t:BaseShape>\
-            <t:AdditionalProperties><t:FieldURI FieldURI="folder:DisplayName"/></t:AdditionalProperties></m:FolderShape>\
+            <t:AdditionalProperties><t:FieldURI FieldURI="folder:DisplayName"/><t:FieldURI FieldURI="folder:TotalCount"/>\
+            </t:AdditionalProperties></m:FolderShape>\
             <m:ParentFolderIds><t:DistinguishedFolderId Id="msgfolderroot"/></m:ParentFolderIds></m:FindFolder>
             """)
-        if let archive = Self.archiveFolderID(found) { result.append(RemoteFolder(role: .archive, id: archive)) }
+        if let archive = Self.archiveFolder(found) { result.append(archive) }
         return result
     }
 
@@ -146,18 +147,21 @@ public struct EWSBackend: MailBackend {
 
     // MARK: Parsing
 
+    static let countProp = "<t:AdditionalProperties><t:FieldURI FieldURI=\"folder:TotalCount\"/></t:AdditionalProperties>"
+
     static func parseGetFolder(_ doc: XMLDocument) -> [RemoteFolder] {
         let replies = doc.all("GetFolderResponseMessage")
         return zip(distinguished, replies).compactMap { pair, reply in
             guard reply.attr("ResponseClass") == "Success", let id = reply.first("FolderId")?.attr("Id") else { return nil }
-            return RemoteFolder(role: pair.0, id: id)
+            return RemoteFolder(role: pair.0, id: id, totalCount: Int(reply.text("TotalCount") ?? "") ?? 0)
         }
     }
 
-    static func archiveFolderID(_ doc: XMLDocument) -> String? {
+    static func archiveFolder(_ doc: XMLDocument) -> RemoteFolder? {
         let names: Set<String> = ["archive", "archiv"]
-        return doc.all("Folder").first { names.contains(($0.text("DisplayName") ?? "").lowercased()) }?
-            .child("FolderId")?.attr("Id")
+        guard let f = doc.all("Folder").first(where: { names.contains(($0.text("DisplayName") ?? "").lowercased()) }),
+              let id = f.child("FolderId")?.attr("Id") else { return nil }
+        return RemoteFolder(role: .archive, id: id, totalCount: Int(f.text("TotalCount") ?? "") ?? 0)
     }
 
     static func parseSync(_ doc: XMLDocument) -> SyncResult {

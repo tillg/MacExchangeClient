@@ -75,16 +75,17 @@ struct EWSParsingTests {
     @Test func archiveFolderFoundByLocalizedName() throws {
         let d = try doc("""
             <m:Folders><t:Folder><t:FolderId Id="F1"/><t:DisplayName>Posteingang</t:DisplayName></t:Folder>
-            <t:Folder><t:FolderId Id="F2"/><t:DisplayName>Archiv</t:DisplayName></t:Folder></m:Folders>
+            <t:Folder><t:FolderId Id="F2"/><t:DisplayName>Archiv</t:DisplayName><t:TotalCount>30</t:TotalCount></t:Folder></m:Folders>
             """)
-        #expect(EWSBackend.archiveFolderID(d) == "F2")
+        #expect(EWSBackend.archiveFolder(d) == RemoteFolder(role: .archive, id: "F2", totalCount: 30))
     }
 
     @Test func getFolderSkipsMissingFolders() throws {
-        let ok = #"<m:GetFolderResponseMessage ResponseClass="Success"><m:Folders><t:Folder><t:FolderId Id="X"/></t:Folder></m:Folders></m:GetFolderResponseMessage>"#
+        let ok = #"<m:GetFolderResponseMessage ResponseClass="Success"><m:Folders><t:Folder><t:FolderId Id="X"/><t:TotalCount>7</t:TotalCount></t:Folder></m:Folders></m:GetFolderResponseMessage>"#
         let bad = #"<m:GetFolderResponseMessage ResponseClass="Error"><m:ResponseCode>ErrorFolderNotFound</m:ResponseCode></m:GetFolderResponseMessage>"#
         let d = try doc("<m:GetFolderResponse><m:ResponseMessages>" + ok + bad + ok + ok + ok + "</m:ResponseMessages></m:GetFolderResponse>")
         #expect(EWSBackend.parseGetFolder(d).map(\.role) == [.inbox, .sent, .junk, .trash])
+        #expect(EWSBackend.parseGetFolder(d).allSatisfy { $0.totalCount == 7 })
     }
 
     @Test func serverFieldAcceptsHostOrURL() {

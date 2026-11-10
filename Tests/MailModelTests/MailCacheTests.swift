@@ -40,6 +40,7 @@ struct MailCacheTests {
         #expect(a2.flag == .orange)
         #expect(fresh.syncToken(work.id, .inbox) == "in1")
         #expect(fresh.syncToken(work.id, .sent) == "sent1")
+        #expect(fresh.isComplete(work.id, .inbox))
         #expect(fresh.outbox.map(\.change) == [.setFlagged(["A"], true)])
         #expect(fresh.outbox.map(\.id) == s.outbox.map(\.id))
     }

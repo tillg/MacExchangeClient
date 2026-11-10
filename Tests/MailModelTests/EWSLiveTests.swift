@@ -37,4 +37,19 @@ struct EWSLiveTests {
         #expect(body.from != nil)
         #expect(body.from?.email.contains("@") == true || body.from?.email.isEmpty == false)
     }
+
+    /// The store's quick check on the real server: Inbox titles within seconds, no history sync.
+    @MainActor @Test(.enabled(if: EWSLiveTests.backend != nil)) func quickCheckFillsTheInboxFast() async throws {
+        let store = MailStore(accounts: [], messages: [])
+        let acct = Account(name: "Exchange", address: "")
+        store.add(acct, backend: try #require(Self.backend))
+        let start = Date()
+        await store.refresh(history: false)
+        let took = Date().timeIntervalSince(start)
+        print(String(format: "TIMING quick check %.2fs, %d inbox messages", took, store.count(.account(acct.id, .inbox))))
+        #expect(store.status == nil)
+        #expect(store.count(.account(acct.id, .inbox)) == MailStore.firstScreen)
+        #expect(store.progress == nil)
+        #expect(took < 5)
+    }
 }

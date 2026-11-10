@@ -24,6 +24,8 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        // What the user looks at drives retrieval: a newly selected mailbox is checked at once.
+        .onChange(of: store.selectedMailbox) { Task { await store.refresh() } }
         .safeAreaInset(edge: .bottom) {
             if let p = store.progress { ActivityView(progress: p) }
         }

@@ -36,12 +36,16 @@ struct EWSLiveTimingTests {
         var pages = 1
         let full = Date()
         var more = page.more
-        while more && pages < 5 {
+        while more && pages < 20 {
             let r = try await b.sync(inbox, token: token)
             token = r.token; more = r.more; pages += 1
         }
         print(String(format: "TIMING %d sync pages total              %6.2fs (more=%@)", pages, Date().timeIntervalSince(full), more ? "true" : "false"))
-        _ = try await time("delta check, token from page 1") { try await b.sync(inbox, token: page.token) }
+        if !more {
+            let d = try await time("delta check after full Inbox sync") { try await b.sync(inbox, token: token) }
+            print("DELTA upserts=\(d.upserts.count) deleted=\(d.deletedRemoteIDs.count) reads=\(d.readChanges.count)")
+            _ = try await time("delta check again") { try await b.sync(inbox, token: d.token) }
+        }
         let ids = top.prefix(10).compactMap(\.remoteID)
         _ = try await time("body x1") { try await b.body(remoteID: ids[0]) }
         _ = try await time("body x10 sequential") { for id in ids { _ = try await b.body(remoteID: id) } }

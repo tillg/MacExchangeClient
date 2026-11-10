@@ -45,6 +45,13 @@ public enum ServerChange: Hashable, Codable, Sendable {
         case .send, .saveDraft: self
         }
     }
+
+    var remoteIDs: [String] {
+        switch self {
+        case let .setRead(ids, _), let .setFlagged(ids, _), let .move(ids, _), let .delete(ids): ids
+        case .send, .saveDraft: []
+        }
+    }
 }
 
 public struct PendingChange: Hashable, Codable, Sendable {
@@ -58,7 +65,11 @@ public struct PendingChange: Hashable, Codable, Sendable {
 public struct RemoteFolder: Hashable, Sendable {
     public var role: MailboxKind
     public var id: String
-    public init(role: MailboxKind, id: String) { self.role = role; self.id = id }
+    /// Messages in the folder on the server, for the history progress bar.
+    public var totalCount: Int
+    public init(role: MailboxKind, id: String, totalCount: Int = 0) {
+        self.role = role; self.id = id; self.totalCount = totalCount
+    }
 }
 
 public struct SyncResult: Sendable {

@@ -11,7 +11,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 
 ## Features
 
-- **Exchange accounts over EWS:** sign in under Settings ▸ Accounts with email, `DOMAIN\user`, password and server, as in iOS Mail. Inbox, Drafts, Sent, Junk, Deleted Items and Archive are synced. The newest 200 messages show first, then a full sync runs; new mail is checked every minute. While checking, a progress bar with "Checking for Mail…" shows at the bottom of the sidebar, as in Mail. Bodies load when a message is opened. The password is kept in the Keychain
+- **Exchange accounts over EWS:** sign in under Settings ▸ Accounts with email, `DOMAIN\user`, password and server, as in iOS Mail. Inbox, Drafts, Sent, Junk, Deleted Items and Archive are synced. What you look at drives the order, as described under [How mail is fetched](#how-mail-is-fetched). The password is kept in the Keychain
 
 - **Three-column window** with a mailboxes sidebar, a message list and a message view, using Mail's toolbar layout and SF Symbols
 - **Favorites and smart mailboxes:** All Inboxes, VIPs, Flagged, Unread, then each account's Inbox, Drafts, Sent, Junk, Trash and Archive, with unread badges
@@ -56,6 +56,16 @@ Exchange mail, sync positions and unsent changes are cached in `~/Library/Applic
 
 `MAIL_SAMPLE_DATA=1 ./run.sh` shows the sample data even when an account is set up.
 
+### How mail is fetched
+
+What's on screen comes first:
+
+1. **Quick check:** every 15 seconds, and at once when you select a mailbox. It covers only the Inbox and the selected mailbox. A fully synced folder is asked only for changes, one small request of about 0.05s. A folder still syncing gets its newest 50 messages, about 0.1s.
+2. **Bodies:** loaded when you open a message.
+3. **History, in the background:** first the newest 200 messages of every folder. Then each folder's full contents, one page of 512 at a time. The selected mailbox goes first and Sent comes last. While it runs, the sidebar shows "Synchronizing “Exchange”" with a progress bar based on the server's message counts. It never holds up the quick check.
+
+A change you made that hasn't reached the server yet is kept when a sync reports the old state. Sidebar counts and the message list are computed once per change, so a mailbox with 70,000 messages stays smooth.
+
 ### Keyboard shortcuts
 
 | Action | Keys | | Action | Keys |
@@ -76,7 +86,7 @@ Sources/
   EWS/              MailBackend over Exchange Web Services, Keychain and account settings
   MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (59 tests, plus two live tests against a real server)
+  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (71 tests, plus live tests against a real server)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```
@@ -85,7 +95,7 @@ Views stay thin. Every action is a method on `MailStore`, and each one has a tes
 
 `MailStore` talks to servers only through the `MailBackend` protocol: folders, newest messages, sync with an opaque token, and message bodies. EWS is one implementation; Microsoft Graph will be another, with the token holding a Graph delta link. The data store doesn't change.
 
-The live EWS tests run only with `EWS_USER` (`DOMAIN\user`) and `EWS_SERVER` set and the password in the Keychain (service `MailReplica-EWS`, account = username). Otherwise they are skipped. The read test only reads. The write test also needs `EWS_WRITE_TEST=1`. It works only inside the folder `MailReplica-Test` (created if missing), on a message it creates there itself, and never sends mail. `EWS_DEBUG=1` logs which sign-in method was used.
+The live EWS tests run only with `EWS_USER` (`DOMAIN\user`) and `EWS_SERVER` set and the password in the Keychain (service `MailReplica-EWS`, account = username). Otherwise they are skipped. The read test only reads. The write test also needs `EWS_WRITE_TEST=1`. It works only inside the folder `MailReplica-Test` (created if missing), on a message it creates there itself, and never sends mail. `EWS_DEBUG=1` logs which sign-in method was used. `EWS_TIMING=1` prints read-only timings and folder sizes, never mail content. Run the live tests on their own (`--filter EWSLive`): the performance tests hold the main thread and would skew their timings.
 
 ### Screenshots without screen recording
 
@@ -120,7 +130,7 @@ The details come from Mail.app's own resources in `/System/Applications/Mail.app
 - [x] `MailBackend` protocol under `MailStore`
 - [x] Reading mail from on-prem Exchange over EWS
 - [x] Flags, read state, moves, deletes and sending written back to Exchange
-- [ ] Push for new mail (EWS notifications) instead of checking every minute
+- [ ] Push for new mail (EWS notifications) instead of the 15-second quick check
 - [x] Local cache on disk, so a launch doesn't sync everything again
 - [ ] HTML message view and opening attachments
 - [ ] Custom folders (only the standard folders are shown now)

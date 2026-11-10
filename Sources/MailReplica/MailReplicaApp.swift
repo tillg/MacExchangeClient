@@ -23,7 +23,7 @@ struct MailReplicaApp: App {
                 .frame(minWidth: 900, minHeight: 500)
                 .task { await pollForMail() }
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-                    AppSetup.saveCache(store)
+                    AppSetup.saveCache(store, now: true)
                 }
         }
         .defaultSize(width: 1280, height: 800)
@@ -40,13 +40,14 @@ struct MailReplicaApp: App {
         }
     }
 
-    /// Checks for new mail every minute (push comes later). Off while taking a snapshot.
+    /// Quick check every 15 seconds: one small request per folder on screen (push comes later). The history
+    /// sync runs on its own in the background. Off while taking a snapshot.
     private func pollForMail() async {
         guard ProcessInfo.processInfo.environment["MAIL_SNAPSHOT"] == nil else { return }
         while !Task.isCancelled {
             await store.refresh()
             AppSetup.saveCache(store)
-            try? await Task.sleep(for: .seconds(60))
+            try? await Task.sleep(for: .seconds(15))
         }
     }
 }

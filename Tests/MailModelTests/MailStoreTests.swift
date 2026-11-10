@@ -342,7 +342,16 @@ struct MailStoreTests {
         s.setFlag(.red, for: [a])
         s.setFlag(.blue, for: [a])
         #expect(s.outbox.map(\.change) == [.setFlagged(["A"], true)])
+    }
+
+    @Test func serverFlagKeepsTheLocalColourUntilTheServerUnflags() {
+        // Flagged on the server, recoloured here: a colour change queues nothing.
         var flagged = remote("A"); flagged.flag = .red
+        let s = store([])
+        s.apply(SyncResult(upserts: [flagged], deletedRemoteIDs: [], token: "t1", more: false), account: work.id, mailbox: .inbox)
+        let a = id(s, "A")
+        s.setFlag(.blue, for: [a])
+        #expect(s.outbox.isEmpty)
         s.apply(SyncResult(upserts: [flagged], deletedRemoteIDs: [], token: "t2", more: false), account: work.id, mailbox: .inbox)
         #expect(s.message(a)?.flag == .blue)
         s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "t3", more: false), account: work.id, mailbox: .inbox)
@@ -427,20 +436,86 @@ struct MailStoreTests {
         #expect(s.outbox.flatMap { if case let .setRead(ids, true) = $0.change { ids } else { [] } }.count == 250)
     }
 
-    @Test func checkingProgressGrowsAcrossAccountsFoldersAndPages() {
-        let f = MailStore.checkingFraction
-        #expect(f(0, 2, 0, 6, 0) == 0)
-        #expect(f(1, 2, 0, 6, 0) == 0.5)
-        let steps = [f(0, 2, 0, 6, 0), f(0, 2, 0, 6, 1), f(0, 2, 0, 6, 5), f(0, 2, 1, 6, 0), f(0, 2, 5, 6, 9), f(1, 2, 0, 6, 0), f(1, 2, 5, 6, 40)]
-        #expect(steps == steps.sorted())
-        #expect(steps.allSatisfy { $0 >= 0 && $0 < 1 })
-        #expect(f(0, 0, 0, 0, 0) == 0)
-    }
-
     @Test func noProgressWhenIdle() async {
         let s = synced([])
         await s.refresh()
         #expect(s.progress == nil)
+    }
+
+    // MARK: View-driven retrieval
+
+    @Test func quickCheckCoversInboxAndTheSelectedMailbox() {
+        let s = synced([])
+        #expect(s.quickCheckRoles(work.id) == [.inbox])
+        s.selectedMailbox = .account(work.id, .sent)
+        #expect(s.quickCheckRoles(work.id) == [.inbox, .sent])
+        #expect(s.quickCheckRoles(home.id) == [.inbox])
+        s.selectedMailbox = .account(work.id, .inbox)
+        #expect(s.quickCheckRoles(work.id) == [.inbox])
+    }
+
+    @Test func historyStartsWithWhatTheUserLooksAtAndLeavesSentForLast() {
+        let s = synced([])
+        let all = MailboxKind.allCases
+        #expect(s.historyOrder(work.id, all) == [.inbox, .drafts, .archive, .junk, .trash, .sent])
+        s.selectedMailbox = .account(work.id, .trash)
+        #expect(s.historyOrder(work.id, all) == [.trash, .inbox, .drafts, .archive, .junk, .sent])
+        s.selectedMailbox = .smart(.flagged)
+        #expect(s.historyOrder(work.id, all).first == .inbox)
+    }
+
+    @Test func newestMergeLeavesTheSyncPositionAlone() {
+        let s = synced([])
+        s.merge([remote("A")], account: work.id, mailbox: .sent)
+        #expect(s.count(.account(work.id, .sent)) == 1)
+        #expect(s.syncToken(work.id, .sent) == nil)
+        #expect(!s.isComplete(work.id, .sent))
+    }
+
+    @Test func folderIsCompleteOnceTheLastPageArrived() {
+        let s = synced([])
+        s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "p1", more: true), account: work.id, mailbox: .sent)
+        #expect(!s.isComplete(work.id, .sent))
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], token: "p2", more: false), account: work.id, mailbox: .sent)
+        #expect(s.isComplete(work.id, .sent))
+    }
+
+    @Test func pendingChangesSurviveASyncThatRacesThem() {
+        let s = synced(["A", "B"])
+        let a = id(s, "A"), b = id(s, "B")
+        s.toggleRead([a])
+        s.archive([b])
+        // The server hasn't seen the changes yet and reports the old state.
+        s.apply(SyncResult(upserts: [remote("A"), remote("B")], deletedRemoteIDs: [], token: "t2", more: false),
+                account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.isRead == true)
+        #expect(s.message(b)?.mailbox == .archive)
+        // The move went through and the inbox sync reports B gone before the new ID arrived.
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: ["B"], token: "t3", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(b) != nil)
+    }
+
+    @Test func historyProgressCountsMessagesAgainstServerTotals() {
+        let s = synced(["A", "B"])
+        let folders = [RemoteFolder(role: .inbox, id: "i", totalCount: 4), RemoteFolder(role: .sent, id: "s", totalCount: 6)]
+        // The inbox is complete (counts in full: 4), Sent has 0 of 6.
+        #expect(s.historyFraction(work.id, folders) == 0.4)
+        #expect(s.historyFraction(work.id, []) == 0)
+    }
+
+    @Test func sidebarCountsMatchTheMailboxRules() {
+        var msgs = [msg(work), msg(work, read: true), msg(work, .trash, flag: .red), msg(home, flag: .blue),
+                    msg(home, .sent), msg(home, .archive, flag: .green)]
+        msgs[0].isVIP = true
+        let s = store(msgs)
+        let refs: [MailboxRef] = SmartMailbox.allCases.map { .smart($0) }
+            + [work, home].flatMap { a in MailboxKind.allCases.map { .account(a.id, $0) } }
+        for r in refs {
+            #expect(s.count(r) == s.messages.filter { s.contains(r, $0) }.count)
+            #expect(s.unreadCount(r) == s.messages.filter { !$0.isRead && s.contains(r, $0) }.count)
+        }
+        s.toggleRead([s.messages[0].id])
+        #expect(s.unreadCount(.smart(.vip)) == 0)
     }
 
     @Test func markAllRead() {

@@ -7,6 +7,8 @@ public struct MailCache: Codable, Sendable {
         public var messages: [Message]
         public var syncTokens: [MailboxKind: String]
         public var outbox: [PendingChange]
+        /// Folders whose full sync has finished. Optional, so caches from before it existed still load.
+        public var complete: [MailboxKind]?
     }
 
     public var accounts: [UUID: AccountState]
