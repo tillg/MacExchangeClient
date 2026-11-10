@@ -20,6 +20,13 @@ public final class MailStore {
     private var backends: [UUID: any MailBackend] = [:]
     private var remoteFolders: [UUID: [RemoteFolder]] = [:]
     private var syncTokens: [String: String] = [:]
+    /// Accounts whose messages live on a server (they have a backend or received a sync).
+    private var serverAccounts: Set<UUID> = []
+    /// Local changes not yet written to the server, oldest first.
+    public private(set) var outbox: [PendingChange] = []
+    private var flushTask: Task<Void, Never>?
+    /// IDs per server request, so "Mark All as Read" on a big inbox doesn't send one huge request.
+    public static let batchSize = 100
 
     public init(accounts: [Account], messages: [Message]) {
         self.accounts = accounts
@@ -82,26 +89,69 @@ public final class MailStore {
 
     // MARK: Mutations
 
-    /// Every local action goes through here or `delete`. Server messages stay unchanged
-    /// until changes are written back to the server.
+    /// Every local action goes through here or `delete`. Server messages change locally at once and
+    /// the change is queued for the server.
     private func update(_ ids: Set<Message.ID>, _ f: (inout Message) -> Void) {
-        let ids = localOnly(ids)
-        for i in messages.indices where ids.contains(messages[i].id) { f(&messages[i]) }
+        var changed: [(old: Message, new: Message)] = []
+        for i in messages.indices where ids.contains(messages[i].id) {
+            let old = messages[i]
+            f(&messages[i])
+            guard old.remoteID != nil, messages[i] != old else { continue }
+            if messages[i].accountID != old.accountID {
+                messages[i] = old
+                status = "Exchange messages can't be moved to another account yet"
+                continue
+            }
+            changed.append((old, messages[i]))
+        }
+        queue(changed)
     }
 
-    private func localOnly(_ ids: Set<Message.ID>) -> Set<Message.ID> {
-        let remote = Set(messages.filter { ids.contains($0.id) && $0.remoteID != nil }.map(\.id))
-        if !remote.isEmpty { status = "Changes to Exchange messages aren't saved to the server yet" }
-        return ids.subtracting(remote)
+    private enum ChangeKind: Hashable { case read(Bool), flagged(Bool), move(MailboxKind) }
+
+    /// Groups changed server messages into batched server changes, in a stable order.
+    private func queue(_ changed: [(old: Message, new: Message)]) {
+        var order: [(UUID, ChangeKind)] = []
+        var groups: [String: [Message]] = [:]
+        func add(_ acct: UUID, _ k: ChangeKind, _ old: Message) {
+            let key = "\(acct)/\(k)"
+            if groups[key] == nil { order.append((acct, k)) }
+            groups[key, default: []].append(old)
+        }
+        for (old, new) in changed {
+            if old.isRead != new.isRead { add(old.accountID, .read(new.isRead), old) }
+            if (old.flag != nil) != (new.flag != nil) { add(old.accountID, .flagged(new.flag != nil), old) }
+            if old.mailbox != new.mailbox { add(old.accountID, .move(new.mailbox), old) }
+        }
+        for (acct, k) in order {
+            enqueue(groups["\(acct)/\(k)"]!, account: acct) { ids in
+                switch k {
+                case let .read(v): .setRead(ids, v)
+                case let .flagged(v): .setFlagged(ids, v)
+                case let .move(box): .move(ids, to: box)
+                }
+            }
+        }
+    }
+
+    private func enqueue(_ olds: [Message], account: UUID, _ make: ([String]) -> ServerChange) {
+        for start in stride(from: 0, to: olds.count, by: Self.batchSize) {
+            let chunk = Array(olds[start..<min(start + Self.batchSize, olds.count)])
+            outbox.append(PendingChange(account: account, change: make(chunk.compactMap(\.remoteID)), previous: chunk))
+        }
+        scheduleFlush()
     }
 
     public func move(_ ids: Set<Message.ID>, to box: MailboxKind) { update(ids) { $0.mailbox = box } }
 
     public func delete(_ ids: Set<Message.ID>) {
-        let ids = localOnly(ids)
-        let erase = Set(messages.filter { ids.contains($0.id) && $0.mailbox == .trash }.map(\.id))
-        messages.removeAll { erase.contains($0.id) }
-        move(ids.subtracting(erase), to: .trash)
+        let erase = messages.filter { ids.contains($0.id) && $0.mailbox == .trash }
+        let eraseIDs = Set(erase.map(\.id))
+        messages.removeAll { eraseIDs.contains($0.id) }
+        for (acct, group) in Dictionary(grouping: erase.filter { $0.remoteID != nil }, by: \.accountID) {
+            enqueue(group, account: acct) { .delete($0) }
+        }
+        move(ids.subtracting(eraseIDs), to: .trash)
     }
 
     public func archive(_ ids: Set<Message.ID>) { move(ids, to: .archive) }
@@ -157,7 +207,12 @@ public final class MailStore {
     @discardableResult
     public func drop(_ ids: Set<Message.ID>, on ref: MailboxRef) -> Bool {
         guard canDrop(on: ref) else { return false }
-        let moving = Set(messages.filter { ids.contains($0.id) && !contains(ref, $0) }.map(\.id))
+        var moving = Set(messages.filter { ids.contains($0.id) && !contains(ref, $0) }.map(\.id))
+        if case let .account(acct, _) = ref {
+            let blocked = messages.filter { moving.contains($0.id) && $0.remoteID != nil && $0.accountID != acct }
+            if !blocked.isEmpty { status = "Exchange messages can't be moved to another account yet" }
+            moving.subtract(blocked.map(\.id))
+        }
         guard !moving.isEmpty else { return false }
         let apply: (Set<Message.ID>) -> Void = { ids in
             self.update(ids) { m in
@@ -179,6 +234,7 @@ public final class MailStore {
     public func add(_ account: Account, backend: any MailBackend) {
         accounts.append(account)
         backends[account.id] = backend
+        serverAccounts.insert(account.id)
     }
 
     /// Drops accounts without a server (the sample data) and their local messages.
@@ -210,6 +266,7 @@ public final class MailStore {
             if let rid = m.remoteID, let i = index[rid] {
                 let old = messages[i]
                 m.id = old.id
+                if old.flag != nil && m.flag != nil { m.flag = old.flag }  // the server has no colours
                 if old.bodyLoaded && !m.bodyLoaded { m.body = old.body; m.attachments = old.attachments; m.bodyLoaded = true }
                 messages[i] = m
             } else {
@@ -223,6 +280,83 @@ public final class MailStore {
             }
         }
         syncTokens[key(account, mailbox)] = r.token
+        serverAccounts.insert(account)
+    }
+
+    // MARK: Write-back
+
+    /// Exchange gives moved items new IDs. Updates the messages and the changes still queued.
+    public func renameRemote(_ map: [String: String], account: UUID) {
+        for i in messages.indices where messages[i].accountID == account {
+            if let rid = messages[i].remoteID, let new = map[rid] { messages[i].remoteID = new }
+        }
+        for i in outbox.indices where outbox[i].account == account { outbox[i].change = outbox[i].change.renamed(map) }
+    }
+
+    /// The server refused a change: undo it locally. A message that couldn't be sent is kept in Drafts.
+    public func failed(_ p: PendingChange, _ error: String) {
+        outbox.removeAll { $0.id == p.id }
+        switch p.change {
+        case let .send(d), let .saveDraft(d):
+            let acct = account(d.accountID)
+            messages.append(Message(accountID: d.accountID, mailbox: .drafts,
+                                    from: Contact(name: acct?.name ?? "", email: acct?.address ?? ""),
+                                    to: Contact.parseList(d.to), cc: Contact.parseList(d.cc),
+                                    subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
+                                    body: d.body, date: .now, isRead: true))
+            status = "Couldn't send “\(d.subject)”: \(error). It's in Drafts on this Mac."
+        default:
+            for old in p.previous {
+                if let i = messages.firstIndex(where: { $0.id == old.id }) {
+                    messages[i].mailbox = old.mailbox
+                    messages[i].isRead = old.isRead
+                    messages[i].flag = old.flag
+                } else {
+                    messages.append(old)
+                }
+            }
+            status = "Exchange refused a change: \(error)"
+        }
+    }
+
+    private func scheduleFlush() {
+        guard flushTask == nil, outbox.contains(where: { backends[$0.account] != nil }) else { return }
+        flushTask = Task {
+            await drain()
+            flushTask = nil
+        }
+    }
+
+    /// Writes queued changes in order. When offline, changes stay queued for the next refresh;
+    /// a send is never retried, because a timed-out send may have gone out.
+    private func drain() async {
+        while let p = outbox.first(where: { backends[$0.account] != nil }), let backend = backends[p.account] {
+            do {
+                try await perform(p, backend)
+                outbox.removeAll { $0.id == p.id }
+            } catch let e as URLError {
+                if case .send = p.change { failed(p, e.localizedDescription); continue }
+                status = "Offline – changes will be sent to Exchange later"
+                return
+            } catch {
+                failed(p, error.localizedDescription)
+            }
+        }
+    }
+
+    private func perform(_ p: PendingChange, _ b: any MailBackend) async throws {
+        switch p.change {
+        case let .setRead(ids, v): try await b.setRead(ids, v)
+        case let .setFlagged(ids, v): try await b.setFlagged(ids, v)
+        case let .move(ids, box):
+            guard let folder = remoteFolders[p.account]?.first(where: { $0.role == box }) else {
+                throw MailError("There is no \(box.title) folder on the server")
+            }
+            renameRemote(try await b.move(ids, to: folder), account: p.account)
+        case let .delete(ids): try await b.delete(ids)
+        case let .send(d): try await b.send(d)
+        case let .saveDraft(d): try await b.saveDraft(d)
+        }
     }
 
     public func setBody(_ b: MessageBody, for id: Message.ID) {
@@ -247,6 +381,9 @@ public final class MailStore {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
+        // Write first, so the sync doesn't briefly bring back the old state.
+        scheduleFlush()
+        await flushTask?.value
         for (acct, backend) in backends {
             do {
                 if remoteFolders[acct] == nil { remoteFolders[acct] = try await backend.folders() }
@@ -296,7 +433,10 @@ public final class MailStore {
 
     public func send(_ d: Draft) {
         let acct = account(d.accountID) ?? accounts[0]
-        guard backends[acct.id] == nil else { status = "Sending from Exchange accounts isn't supported yet"; return }
+        if serverAccounts.contains(acct.id) {
+            outbox.append(PendingChange(account: acct.id, change: .send(d), previous: []))
+            return scheduleFlush()
+        }
         messages.append(Message(accountID: acct.id, mailbox: .sent, from: Contact(name: acct.name, email: acct.address),
                                 to: Contact.parseList(d.to), cc: Contact.parseList(d.cc), subject: d.subject,
                                 body: d.body, date: .now, isRead: true))
@@ -304,9 +444,17 @@ public final class MailStore {
 
     public func saveDraft(_ d: Draft) {
         let acct = account(d.accountID) ?? accounts[0]
-        guard backends[acct.id] == nil else { status = "Saving drafts to Exchange isn't supported yet"; return }
+        if serverAccounts.contains(acct.id) {
+            outbox.append(PendingChange(account: acct.id, change: .saveDraft(d), previous: []))
+            return scheduleFlush()
+        }
         messages.append(Message(accountID: acct.id, mailbox: .drafts, from: Contact(name: acct.name, email: acct.address),
                                 to: Contact.parseList(d.to), subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
                                 body: d.body, date: .now, isRead: true))
     }
+}
+
+struct MailError: LocalizedError {
+    let errorDescription: String?
+    init(_ text: String) { errorDescription = text }
 }

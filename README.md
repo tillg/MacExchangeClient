@@ -7,7 +7,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
   <img alt="Three-column mail window: mailboxes sidebar, message list with category bar, message view" src="docs/screenshots/light.png">
 </picture>
 
-> **Status:** reads mail from on-prem Exchange over EWS (read-only for now). Without an account it shows built-in sample messages. See [Roadmap](#roadmap).
+> **Status:** reads and changes mail on on-prem Exchange over EWS. Without an account it shows built-in sample messages. See [Roadmap](#roadmap).
 
 ## Features
 
@@ -46,7 +46,13 @@ In the macOS 27 SDK, `@State` is a macro whose plugin (`SwiftUIMacros`) ships on
 
 Open Settings (⌘,) ▸ Accounts and sign in. The server can be a host name (`mail.example.com`, expanded to `https://mail.example.com/EWS/Exchange.asmx`) or a full EWS URL. The app checks the credentials before saving anything.
 
-Exchange mail is **read-only for now**: flagging, moving, deleting and marking as read only work on the sample data, and Send is off for Exchange accounts. Nothing is cached on disk yet, so every launch syncs again.
+Changes to Exchange mail show at once and are then written to the server in order: read state (without sending read receipts), flags, moves (Archive, Junk, Trash, drag & drop), deleting from Trash (recoverable on the server, like Outlook), Send and Save Draft.
+- Exchange knows only *flagged*, so flag colours stay on this Mac.
+- If the server refuses a change, it is undone and the reason shows under the window title.
+- Offline, changes wait until the next refresh. A message that fails to send is never resent automatically. It is kept in Drafts on this Mac instead.
+- Exchange messages can't be dragged to another account yet.
+
+Nothing is cached on disk yet, so every launch syncs again.
 
 `MAIL_SAMPLE_DATA=1 ./run.sh` shows the sample data even when an account is set up.
 
@@ -70,7 +76,7 @@ Sources/
   EWS/              MailBackend over Exchange Web Services, Keychain and account settings
   MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suites for MailStore, the drag payload and EWS parsing (37 tests)
+  MailModelTests/   Swift Testing suites for MailStore, the drag payload and EWS requests and parsing (54 tests, plus two live tests against a real server)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```
@@ -79,7 +85,7 @@ Views stay thin. Every action is a method on `MailStore`, and each one has a tes
 
 `MailStore` talks to servers only through the `MailBackend` protocol: folders, newest messages, sync with an opaque token, and message bodies. EWS is one implementation; Microsoft Graph will be another, with the token holding a Graph delta link. The data store doesn't change.
 
-The live EWS test only reads, and runs only with `EWS_USER` (`DOMAIN\user`) and `EWS_SERVER` set and the password in the Keychain (service `MailReplica-EWS`, account = username). Otherwise it is skipped.
+The live EWS tests run only with `EWS_USER` (`DOMAIN\user`) and `EWS_SERVER` set and the password in the Keychain (service `MailReplica-EWS`, account = username). Otherwise they are skipped. The read test only reads. The write test also needs `EWS_WRITE_TEST=1`. It works only inside the folder `MailReplica-Test` (created if missing), on a message it creates there itself, and never sends mail. `EWS_DEBUG=1` logs which sign-in method was used.
 
 ### Screenshots without screen recording
 
@@ -113,7 +119,7 @@ The details come from Mail.app's own resources in `/System/Applications/Mail.app
 - [x] Drag & drop between mailboxes and accounts
 - [x] `MailBackend` protocol under `MailStore`
 - [x] Reading mail from on-prem Exchange over EWS
-- [ ] Flags, read state, moves, deletes and sending written back to Exchange
+- [x] Flags, read state, moves, deletes and sending written back to Exchange
 - [ ] Push for new mail (EWS notifications) instead of checking every minute
 - [ ] Local cache on disk, so a launch doesn't sync everything again
 - [ ] HTML message view and opening attachments

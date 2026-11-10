@@ -71,6 +71,79 @@ public struct EWSBackend: MailBackend {
         return Self.parseBody(item)
     }
 
+    // MARK: Write-back
+
+    public func setRead(_ ids: [String], _ read: Bool) async throws {
+        _ = try await client.call(Self.updateRequest(ids, field: "message:IsRead", value: "<t:IsRead>\(read)</t:IsRead>"))
+    }
+
+    public func setFlagged(_ ids: [String], _ flagged: Bool) async throws {
+        _ = try await client.call(Self.flagRequest(ids, flagged: flagged))
+    }
+
+    public func move(_ ids: [String], to folder: RemoteFolder) async throws -> [String: String] {
+        Self.parseMove(try await client.call(Self.moveRequest(ids, to: folder.id)), ids: ids)
+    }
+
+    public func delete(_ ids: [String]) async throws { _ = try await client.call(Self.deleteRequest(ids)) }
+
+    public func send(_ draft: Draft) async throws { _ = try await client.call(Self.createRequest(draft, send: true)) }
+
+    public func saveDraft(_ draft: Draft) async throws { _ = try await client.call(Self.createRequest(draft, send: false)) }
+
+    static func itemIDs(_ ids: [String]) -> String {
+        ids.map { "<t:ItemId Id=\"\(xmlEscape($0))\"/>" }.joined()
+    }
+
+    /// Sets one field on each item. AlwaysOverwrite needs no ChangeKey; opening a message must not send a read receipt.
+    static func updateRequest(_ ids: [String], field: String, value: String) -> String {
+        let changes = ids.map {
+            "<t:ItemChange><t:ItemId Id=\"\(xmlEscape($0))\"/><t:Updates><t:SetItemField><t:FieldURI FieldURI=\"\(field)\"/>"
+                + "<t:Message>\(value)</t:Message></t:SetItemField></t:Updates></t:ItemChange>"
+        }.joined()
+        return "<m:UpdateItem MessageDisposition=\"SaveOnly\" ConflictResolution=\"AlwaysOverwrite\" SuppressReadReceipts=\"true\">"
+            + "<m:ItemChanges>\(changes)</m:ItemChanges></m:UpdateItem>"
+    }
+
+    static func flagRequest(_ ids: [String], flagged: Bool) -> String {
+        updateRequest(ids, field: "item:Flag",
+                      value: "<t:Flag><t:FlagStatus>\(flagged ? "Flagged" : "NotFlagged")</t:FlagStatus></t:Flag>")
+    }
+
+    static func moveRequest(_ ids: [String], to folderID: String) -> String {
+        "<m:MoveItem><m:ToFolderId><t:FolderId Id=\"\(xmlEscape(folderID))\"/></m:ToFolderId>"
+            + "<m:ItemIds>\(itemIDs(ids))</m:ItemIds><m:ReturnNewItemIds>true</m:ReturnNewItemIds></m:MoveItem>"
+    }
+
+    /// One response message per requested item, in request order.
+    static func parseMove(_ doc: XMLDocument, ids: [String]) -> [String: String] {
+        var map: [String: String] = [:]
+        for (old, reply) in zip(ids, doc.all("MoveItemResponseMessage")) {
+            if let new = reply.first("ItemId")?.attr("Id") { map[old] = new }
+        }
+        return map
+    }
+
+    /// SoftDelete: into Recoverable Items, like Outlook's delete from Deleted Items.
+    static func deleteRequest(_ ids: [String]) -> String {
+        "<m:DeleteItem DeleteType=\"SoftDelete\"><m:ItemIds>\(itemIDs(ids))</m:ItemIds></m:DeleteItem>"
+    }
+
+    static func createRequest(_ d: Draft, send: Bool) -> String {
+        func recipients(_ tag: String, _ list: String) -> String {
+            let boxes = Contact.parseList(list).map {
+                "<t:Mailbox><t:Name>\(xmlEscape($0.name))</t:Name><t:EmailAddress>\(xmlEscape($0.email))</t:EmailAddress></t:Mailbox>"
+            }
+            return boxes.isEmpty ? "" : "<t:\(tag)>\(boxes.joined())</t:\(tag)>"
+        }
+        let disposition = send ? "SendAndSaveCopy" : "SaveOnly"
+        return "<m:CreateItem MessageDisposition=\"\(disposition)\"><m:SavedItemFolderId>"
+            + "<t:DistinguishedFolderId Id=\"\(send ? "sentitems" : "drafts")\"/></m:SavedItemFolderId><m:Items><t:Message>"
+            + "<t:Subject>\(xmlEscape(d.subject))</t:Subject><t:Body BodyType=\"Text\">\(xmlEscape(d.body))</t:Body>"
+            + recipients("ToRecipients", d.to) + recipients("CcRecipients", d.cc)
+            + "</t:Message></m:Items></m:CreateItem>"
+    }
+
     // MARK: Parsing
 
     static func parseGetFolder(_ doc: XMLDocument) -> [RemoteFolder] {

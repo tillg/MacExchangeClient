@@ -305,20 +305,126 @@ struct MailStoreTests {
         #expect(s.messages[0].preview == "Real body")
     }
 
-    @Test func serverMessagesAreReadOnlyUntilSyncBackExists() {
-        let local = msg(work)
-        let s = store([local])
-        s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "t", more: false),
-                account: work.id, mailbox: .inbox)
-        let r = s.messages.first { $0.remoteID == "A" }!.id
-        s.setFlag(.red, for: [r, local.id])
-        s.delete([r])
-        s.toggleRead([r])
-        #expect(s.message(r)?.flag == nil)
-        #expect(s.message(r)?.mailbox == .inbox)
-        #expect(s.message(r)?.isRead == false)
-        #expect(s.message(local.id)?.flag == .red)
+    // MARK: Write-back
+
+    func synced(_ rids: [String], in box: MailboxKind = .inbox) -> MailStore {
+        let s = store([msg(work)])
+        s.apply(SyncResult(upserts: rids.map { remote($0) }, deletedRemoteIDs: [], token: "t", more: false),
+                account: work.id, mailbox: box)
+        return s
+    }
+
+    func id(_ s: MailStore, _ rid: String) -> Message.ID { s.messages.first { $0.remoteID == rid }!.id }
+
+    @Test func serverChangesApplyLocallyAndQueueForTheServer() {
+        let s = synced(["A", "B"])
+        let a = id(s, "A"), b = id(s, "B")
+        s.toggleRead([a, b])
+        s.setFlag(.orange, for: [a])
+        s.archive([b])
+        #expect(s.message(a)?.isRead == true)
+        #expect(s.message(a)?.flag == .orange)
+        #expect(s.message(b)?.mailbox == .archive)
+        #expect(s.outbox.map(\.change) == [.setRead(["A", "B"], true), .setFlagged(["A"], true), .move(["B"], to: .archive)])
+        #expect(s.outbox.allSatisfy { $0.account == work.id })
+    }
+
+    @Test func localMessagesDontQueueServerChanges() {
+        let s = synced([])
+        s.toggleRead([s.messages[0].id])
+        #expect(s.messages[0].isRead)
+        #expect(s.outbox.isEmpty)
+    }
+
+    @Test func flagColourChangeIsLocalOnlyAndSurvivesSync() {
+        let s = synced(["A"])
+        let a = id(s, "A")
+        s.setFlag(.red, for: [a])
+        s.setFlag(.blue, for: [a])
+        #expect(s.outbox.map(\.change) == [.setFlagged(["A"], true)])
+        var flagged = remote("A"); flagged.flag = .red
+        s.apply(SyncResult(upserts: [flagged], deletedRemoteIDs: [], token: "t2", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.flag == .blue)
+        s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "t3", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.flag == nil)
+    }
+
+    @Test func deleteMovesToTrashThenErasesOnServer() {
+        let s = synced(["A"])
+        let a = id(s, "A")
+        s.delete([a])
+        s.delete([a])
+        #expect(s.message(a) == nil)
+        #expect(s.outbox.map(\.change) == [.move(["A"], to: .trash), .delete(["A"])])
+    }
+
+    @Test func junkToggleAndDropQueueMoves() {
+        let s = synced(["A", "B"])
+        s.toggleJunk([id(s, "A")])
+        s.drop([id(s, "B")], on: .account(work.id, .sent))
+        #expect(s.outbox.map(\.change) == [.move(["A"], to: .junk), .move(["B"], to: .sent)])
+    }
+
+    @Test func serverMessagesCantMoveToAnotherAccount() {
+        let s = synced(["A"])
+        let a = id(s, "A")
+        #expect(!s.drop([a], on: .account(home.id, .inbox)))
+        #expect(s.message(a)?.accountID == work.id)
+        #expect(s.outbox.isEmpty)
         #expect(s.status != nil)
+    }
+
+    @Test func movedMessagesTakeTheirNewServerIDs() {
+        let s = synced(["A", "B"])
+        let a = id(s, "A")
+        s.archive([a])
+        s.setFlag(.red, for: [a])
+        s.renameRemote(["A": "A2"], account: work.id)
+        #expect(s.message(a)?.remoteID == "A2")
+        #expect(s.outbox.map(\.change) == [.move(["A2"], to: .archive), .setFlagged(["A2"], true)])
+        // The source folder's sync then reports the old ID as deleted; the moved message stays.
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: ["A"], token: "t2", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.mailbox == .archive)
+    }
+
+    @Test func rejectedChangeIsUndoneLocally() {
+        let s = synced(["A"])
+        let a = id(s, "A")
+        s.archive([a])
+        s.failed(s.outbox[0], "No archive")
+        #expect(s.message(a)?.mailbox == .inbox)
+        #expect(s.outbox.isEmpty)
+        #expect(s.status != nil)
+        s.delete([a]); s.delete([a])
+        s.failed(s.outbox[1], "Denied")
+        #expect(s.message(a)?.mailbox == .trash)
+    }
+
+    @Test func failedSendKeepsTheTextAsALocalDraft() {
+        let s = synced([])
+        let d = Draft(accountID: work.id, to: "ann@x.com", subject: "S", body: "B")
+        s.send(d)
+        s.failed(s.outbox[0], "Timeout")
+        #expect(s.outbox.isEmpty)
+        let draft = s.messages.first { $0.mailbox == .drafts }
+        #expect(draft?.body == "B")
+        #expect(draft?.remoteID == nil)
+    }
+
+    @Test func sendFromServerAccountQueuesAndAddsNothingLocally() {
+        let s = synced([])
+        let d = Draft(accountID: work.id, to: "ann@x.com", subject: "S", body: "B")
+        s.send(d)
+        s.saveDraft(d)
+        #expect(s.outbox.map(\.change) == [.send(d), .saveDraft(d)])
+        #expect(s.messages.count == 1)
+    }
+
+    @Test func markAllReadQueuesInChunks() {
+        let s = synced((0..<250).map { "R\($0)" })
+        s.markAllRead(in: .account(work.id, .inbox))
+        #expect(s.outbox.count == 3)
+        #expect(s.outbox.flatMap { if case let .setRead(ids, true) = $0.change { ids } else { [] } }.count == 250)
     }
 
     @Test func markAllRead() {

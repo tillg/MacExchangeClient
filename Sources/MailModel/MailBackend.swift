@@ -13,6 +13,46 @@ public protocol MailBackend: Sendable {
     func sync(_ folder: RemoteFolder, token: String?) async throws -> SyncResult
     /// Full text and attachment names of one message.
     func body(remoteID: String) async throws -> MessageBody
+
+    // Write-back. IDs are `remoteID`s; batches stay small (`MailStore.batchSize`).
+    func setRead(_ ids: [String], _ read: Bool) async throws
+    /// Servers know flagged/not flagged only; the colour stays local.
+    func setFlagged(_ ids: [String], _ flagged: Bool) async throws
+    /// Returns the new IDs (old → new): Exchange gives a moved item a new ID.
+    func move(_ ids: [String], to folder: RemoteFolder) async throws -> [String: String]
+    /// Erases from Trash, recoverably where the server supports it.
+    func delete(_ ids: [String]) async throws
+    func send(_ draft: Draft) async throws
+    func saveDraft(_ draft: Draft) async throws
+}
+
+/// A local change waiting to be written to the server.
+public enum ServerChange: Hashable, Sendable {
+    case setRead([String], Bool)
+    case setFlagged([String], Bool)
+    case move([String], to: MailboxKind)
+    case delete([String])
+    case send(Draft)
+    case saveDraft(Draft)
+
+    func renamed(_ map: [String: String]) -> ServerChange {
+        let r = { (ids: [String]) in ids.map { map[$0] ?? $0 } }
+        return switch self {
+        case let .setRead(ids, v): .setRead(r(ids), v)
+        case let .setFlagged(ids, v): .setFlagged(r(ids), v)
+        case let .move(ids, box): .move(r(ids), to: box)
+        case let .delete(ids): .delete(r(ids))
+        case .send, .saveDraft: self
+        }
+    }
+}
+
+public struct PendingChange: Hashable, Sendable {
+    public let id = UUID()
+    public let account: UUID
+    public var change: ServerChange
+    /// The messages as they were before, to undo the local change if the server refuses it.
+    public var previous: [Message]
 }
 
 public struct RemoteFolder: Hashable, Sendable {
