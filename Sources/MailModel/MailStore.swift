@@ -16,6 +16,8 @@ public final class MailStore {
     /// Last sync problem or notice, shown under the window title.
     public var status: String?
     public private(set) var isRefreshing = false
+    /// Shown at the bottom of the sidebar while checking for mail, like Mail's activity view.
+    public var progress: SyncProgress?
 
     private var backends: [UUID: any MailBackend] = [:]
     private var remoteFolders: [UUID: [RemoteFolder]] = [:]
@@ -412,10 +414,17 @@ public final class MailStore {
         // Write first, so the sync doesn't briefly bring back the old state.
         scheduleFlush()
         await flushTask?.value
-        for (acct, backend) in backends {
+        defer { progress = nil }
+        let all = Array(backends)
+        for (a, (acct, backend)) in all.enumerated() {
             do {
+                progress = SyncProgress(text: "Checking for Mail…", fraction: Self.checkingFraction(a, all.count, 0, 1, 0))
                 if remoteFolders[acct] == nil { remoteFolders[acct] = try await backend.folders() }
-                for folder in remoteFolders[acct] ?? [] {
+                let folders = remoteFolders[acct] ?? []
+                for (f, folder) in folders.enumerated() {
+                    var pages = 0
+                    func step() { progress?.fraction = Self.checkingFraction(a, all.count, f, folders.count, pages) }
+                    step()
                     if syncToken(acct, folder.role) == nil {
                         let first = try await backend.newest(in: folder, limit: 200)
                         apply(SyncResult(upserts: first, deletedRemoteIDs: [], token: "", more: false),
@@ -427,6 +436,8 @@ public final class MailStore {
                         let r = try await backend.sync(folder, token: syncToken(acct, folder.role))
                         apply(r, account: acct, mailbox: folder.role)
                         more = r.more
+                        pages += 1
+                        step()
                     }
                 }
                 status = nil
@@ -434,6 +445,14 @@ public final class MailStore {
                 status = "\(account(acct)?.name ?? "Account"): \(error.localizedDescription)"
             }
         }
+    }
+
+    /// Account by account, folder by folder. A folder's full sync has no known length, so each page
+    /// covers half of what is left of that folder's share.
+    nonisolated static func checkingFraction(_ account: Int, _ accounts: Int, _ folder: Int, _ folders: Int, _ pages: Int) -> Double {
+        guard accounts > 0, folders > 0 else { return 0 }
+        let inFolder = 1 - pow(0.5, Double(pages))
+        return (Double(account) + (Double(folder) + inFolder) / Double(folders)) / Double(accounts)
     }
 
     // MARK: Compose

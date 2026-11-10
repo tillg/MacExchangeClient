@@ -87,3 +87,10 @@ public struct MessageBody: Sendable {
         self.text = text; self.attachments = attachments; self.from = from; self.to = to; self.cc = cc
     }
 }
+
+/// Progress of a check for mail.
+public struct SyncProgress: Equatable, Sendable {
+    public var text: String
+    public var fraction: Double
+    public init(text: String, fraction: Double) { self.text = text; self.fraction = fraction }
+}

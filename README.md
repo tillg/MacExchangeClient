@@ -11,7 +11,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 
 ## Features
 
-- **Exchange accounts over EWS:** sign in under Settings ▸ Accounts with email, `DOMAIN\user`, password and server, as in iOS Mail. Inbox, Drafts, Sent, Junk, Deleted Items and Archive are synced. The newest 200 messages show first, then a full sync runs; new mail is checked every minute. Bodies load when a message is opened. The password is kept in the Keychain
+- **Exchange accounts over EWS:** sign in under Settings ▸ Accounts with email, `DOMAIN\user`, password and server, as in iOS Mail. Inbox, Drafts, Sent, Junk, Deleted Items and Archive are synced. The newest 200 messages show first, then a full sync runs; new mail is checked every minute. While checking, a progress bar with "Checking for Mail…" shows at the bottom of the sidebar, as in Mail. Bodies load when a message is opened. The password is kept in the Keychain
 
 - **Three-column window** with a mailboxes sidebar, a message list and a message view, using Mail's toolbar layout and SF Symbols
 - **Favorites and smart mailboxes:** All Inboxes, VIPs, Flagged, Unread, then each account's Inbox, Drafts, Sent, Junk, Trash and Archive, with unread badges
@@ -76,7 +76,7 @@ Sources/
   EWS/              MailBackend over Exchange Web Services, Keychain and account settings
   MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (57 tests, plus two live tests against a real server)
+  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (59 tests, plus two live tests against a real server)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```

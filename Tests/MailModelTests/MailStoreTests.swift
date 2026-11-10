@@ -427,6 +427,22 @@ struct MailStoreTests {
         #expect(s.outbox.flatMap { if case let .setRead(ids, true) = $0.change { ids } else { [] } }.count == 250)
     }
 
+    @Test func checkingProgressGrowsAcrossAccountsFoldersAndPages() {
+        let f = MailStore.checkingFraction
+        #expect(f(0, 2, 0, 6, 0) == 0)
+        #expect(f(1, 2, 0, 6, 0) == 0.5)
+        let steps = [f(0, 2, 0, 6, 0), f(0, 2, 0, 6, 1), f(0, 2, 0, 6, 5), f(0, 2, 1, 6, 0), f(0, 2, 5, 6, 9), f(1, 2, 0, 6, 0), f(1, 2, 5, 6, 40)]
+        #expect(steps == steps.sorted())
+        #expect(steps.allSatisfy { $0 >= 0 && $0 < 1 })
+        #expect(f(0, 0, 0, 0, 0) == 0)
+    }
+
+    @Test func noProgressWhenIdle() async {
+        let s = synced([])
+        await s.refresh()
+        #expect(s.progress == nil)
+    }
+
     @Test func markAllRead() {
         let s = store([msg(work), msg(work), msg(home)])
         s.markAllRead(in: .account(work.id, .inbox))

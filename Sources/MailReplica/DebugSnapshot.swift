@@ -11,6 +11,9 @@ struct DebugSnapshot: ViewModifier {
         content.task {
             guard let out = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT"] else { return }
             if let first = store.visibleMessages.first { store.selection = [first.id] }
+            if let f = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_PROGRESS"].flatMap(Double.init) {
+                store.progress = SyncProgress(text: "Checking for Mail…", fraction: f)
+            }
             try? await Task.sleep(for: .seconds(2))
             guard let win = NSApp.windows.first(where: { $0.isVisible && $0.title != "New Message" }),
                   let view = win.contentView?.superview else { exit(2) }

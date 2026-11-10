@@ -24,6 +24,9 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom) {
+            if let p = store.progress { ActivityView(progress: p) }
+        }
         .contextMenu(forSelectionType: MailboxRef.self) { refs in
             if let ref = refs.first {
                 Button("Mark All Messages as Read") { store.markAllRead(in: ref) }
@@ -52,5 +55,23 @@ struct SidebarView: View {
                 dropTarget == ref && store.canDrop(on: ref)
                     ? RoundedRectangle(cornerRadius: 5).strokeBorder(Color.accentColor, lineWidth: 2) : nil
             )
+    }
+}
+
+/// Mail's activity view at the bottom of the sidebar: a thin bar with the task below it.
+struct ActivityView: View {
+    let progress: SyncProgress
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ProgressView(value: progress.fraction)
+                .progressViewStyle(.linear)
+                .controlSize(.small)
+            Text(progress.text)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
     }
 }
