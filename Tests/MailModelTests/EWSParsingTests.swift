@@ -94,6 +94,13 @@ struct EWSParsingTests {
                 == "x.example.com")
     }
 
+    @Test func controlCharacterReferencesDontBreakParsing() throws {
+        let raw = "<a><s>x&#8;y&#x1F;z&#X0b;&#9;&#10;&#13;&#32;&amp;#8;</s></a>"
+        #expect((try? XMLDocument(data: Data(raw.utf8))) == nil)
+        let d = try XMLDocument(data: EWSClient.sanitize(Data(raw.utf8)))
+        #expect(d.text("s") == "x\u{FFFD}y\u{FFFD}z\u{FFFD}\t\n\r &#8;")
+    }
+
     // MARK: Write requests
 
     /// Parses a request as the server would, to check its structure.

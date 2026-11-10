@@ -28,8 +28,11 @@ public final class EWSClient: Sendable {
         req.httpBody = Data(Self.envelope(body).utf8)
         let (data, response) = try await session.data(for: req, delegate: auth)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard let doc = try? XMLDocument(data: data) else {
-            throw EWSError(code: "HTTP \(status)", message: status == 401 ? "Sign-in failed" : "No EWS response")
+        let doc: XMLDocument
+        do { doc = try XMLDocument(data: Self.sanitize(data)) } catch {
+            // The parser's message names line and column only, never content.
+            throw EWSError(code: "HTTP \(status)", message: status == 401 ? "Sign-in failed"
+                           : "Unreadable EWS response (\(data.count) bytes): \(error.localizedDescription)")
         }
         if let fault = doc.first("Fault") {
             throw EWSError(code: fault.text("ResponseCode") ?? "SOAP fault", message: fault.text("faultstring") ?? "Server error")
@@ -40,6 +43,19 @@ public final class EWSClient: Sendable {
         }
         return doc
     }
+
+    /// Exchange writes control characters from old mails as references like `&#8;`, which XML 1.0 forbids
+    /// and `XMLDocument` rejects, failing the whole page. They become U+FFFD instead.
+    static func sanitize(_ data: Data) -> Data {
+        guard data.range(of: Data("&#".utf8)) != nil else { return data }
+        let s = String(decoding: data, as: UTF8.self)
+        let range = NSRange(s.startIndex..., in: s)
+        guard invalidCharRef.firstMatch(in: s, range: range) != nil else { return data }
+        return Data(invalidCharRef.stringByReplacingMatches(in: s, range: range, withTemplate: "&#xFFFD;").utf8)
+    }
+
+    nonisolated(unsafe) static let invalidCharRef = try! NSRegularExpression(
+        pattern: "&#(?:x0*(?:[0-8bcef]|1[0-9a-f])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));", options: .caseInsensitive)
 
     static func envelope(_ body: String) -> String {
         """
