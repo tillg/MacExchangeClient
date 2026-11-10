@@ -28,7 +28,7 @@ struct MailCommands: Commands {
             }
         }
         CommandMenu("Mailbox") {
-            Button("Get New Mail") {}.keyboardShortcut("n", modifiers: [.command, .shift])
+            Button("Get New Mail") { Task { await store.refresh() } }.keyboardShortcut("n", modifiers: [.command, .shift])
             Divider()
             Button("Mark All Messages as Read") { store.markAllRead(in: store.selectedMailbox) }
             Divider()

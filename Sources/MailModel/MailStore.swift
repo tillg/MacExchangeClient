@@ -13,6 +13,13 @@ public final class MailStore {
     public var category: MailCategory = .primary
     public var showCategories = true
     public var searchText = ""
+    /// Last sync problem or notice, shown under the window title.
+    public var status: String?
+    public private(set) var isRefreshing = false
+
+    private var backends: [UUID: any MailBackend] = [:]
+    private var remoteFolders: [UUID: [RemoteFolder]] = [:]
+    private var syncTokens: [String: String] = [:]
 
     public init(accounts: [Account], messages: [Message]) {
         self.accounts = accounts
@@ -75,13 +82,23 @@ public final class MailStore {
 
     // MARK: Mutations
 
+    /// Every local action goes through here or `delete`. Server messages stay unchanged
+    /// until changes are written back to the server.
     private func update(_ ids: Set<Message.ID>, _ f: (inout Message) -> Void) {
+        let ids = localOnly(ids)
         for i in messages.indices where ids.contains(messages[i].id) { f(&messages[i]) }
+    }
+
+    private func localOnly(_ ids: Set<Message.ID>) -> Set<Message.ID> {
+        let remote = Set(messages.filter { ids.contains($0.id) && $0.remoteID != nil }.map(\.id))
+        if !remote.isEmpty { status = "Changes to Exchange messages aren't saved to the server yet" }
+        return ids.subtracting(remote)
     }
 
     public func move(_ ids: Set<Message.ID>, to box: MailboxKind) { update(ids) { $0.mailbox = box } }
 
     public func delete(_ ids: Set<Message.ID>) {
+        let ids = localOnly(ids)
         let erase = Set(messages.filter { ids.contains($0.id) && $0.mailbox == .trash }.map(\.id))
         messages.removeAll { erase.contains($0.id) }
         move(ids.subtracting(erase), to: .trash)
@@ -103,7 +120,7 @@ public final class MailStore {
     public func markSelectionRead() { update(selection) { $0.isRead = true } }
 
     public func markAllRead(in ref: MailboxRef) {
-        for i in messages.indices where contains(ref, messages[i]) { messages[i].isRead = true }
+        update(Set(messages.filter { contains(ref, $0) }.map(\.id))) { $0.isRead = true }
     }
 
     /// Runs `action` on the selection, then selects the message that followed it in the list – as Mail does.
@@ -156,6 +173,87 @@ public final class MailStore {
         return true
     }
 
+    // MARK: Server sync
+
+    /// Adds a server account. Its mail arrives with the next `refresh()`.
+    public func add(_ account: Account, backend: any MailBackend) {
+        accounts.append(account)
+        backends[account.id] = backend
+    }
+
+    public func syncToken(_ account: UUID, _ box: MailboxKind) -> String? { syncTokens[key(account, box)] }
+
+    private func key(_ account: UUID, _ box: MailboxKind) -> String { "\(account)/\(box.rawValue)" }
+
+    /// Merges server changes into one mailbox. Known messages keep their local ID, selection and loaded body.
+    public func apply(_ r: SyncResult, account: UUID, mailbox: MailboxKind) {
+        let gone = Set(r.deletedRemoteIDs)
+        if !gone.isEmpty {
+            let ids = Set(messages.filter { $0.accountID == account && $0.remoteID.map(gone.contains) == true }.map(\.id))
+            messages.removeAll { ids.contains($0.id) }
+            selection.subtract(ids)
+        }
+        var index = [String: Int]()
+        for (i, m) in messages.enumerated() where m.accountID == account { if let r = m.remoteID { index[r] = i } }
+        for var m in r.upserts {
+            m.accountID = account
+            m.mailbox = mailbox
+            if let rid = m.remoteID, let i = index[rid] {
+                let old = messages[i]
+                m.id = old.id
+                if old.bodyLoaded && !m.bodyLoaded { m.body = old.body; m.attachments = old.attachments; m.bodyLoaded = true }
+                messages[i] = m
+            } else {
+                messages.append(m)
+                if let rid = m.remoteID { index[rid] = messages.count - 1 }
+            }
+        }
+        syncTokens[key(account, mailbox)] = r.token
+    }
+
+    public func setBody(_ b: MessageBody, for id: Message.ID) {
+        guard let i = messages.firstIndex(where: { $0.id == id }) else { return }
+        messages[i].body = b.text
+        messages[i].attachments = b.attachments
+        messages[i].hasAttachments = !b.attachments.isEmpty
+        messages[i].bodyLoaded = true
+    }
+
+    /// Fetches the body of a server message the first time it is shown.
+    public func loadBody(_ id: Message.ID) async {
+        guard let m = message(id), !m.bodyLoaded, let rid = m.remoteID, let backend = backends[m.accountID] else { return }
+        do { setBody(try await backend.body(remoteID: rid), for: id) } catch { status = "Couldn't load message: \(error.localizedDescription)" }
+    }
+
+    /// Pulls changes for every server account. The first run shows the newest messages first, then syncs fully.
+    public func refresh() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+        for (acct, backend) in backends {
+            do {
+                if remoteFolders[acct] == nil { remoteFolders[acct] = try await backend.folders() }
+                for folder in remoteFolders[acct] ?? [] {
+                    if syncToken(acct, folder.role) == nil {
+                        let first = try await backend.newest(in: folder, limit: 200)
+                        apply(SyncResult(upserts: first, deletedRemoteIDs: [], token: "", more: false),
+                              account: acct, mailbox: folder.role)
+                        syncTokens[key(acct, folder.role)] = nil
+                    }
+                    var more = true
+                    while more {
+                        let r = try await backend.sync(folder, token: syncToken(acct, folder.role))
+                        apply(r, account: acct, mailbox: folder.role)
+                        more = r.more
+                    }
+                }
+                status = nil
+            } catch {
+                status = "\(account(acct)?.name ?? "Account"): \(error.localizedDescription)"
+            }
+        }
+    }
+
     // MARK: Compose
 
     public func draft(_ kind: ReplyKind, to id: Message.ID) -> Draft {
@@ -181,6 +279,7 @@ public final class MailStore {
 
     public func send(_ d: Draft) {
         let acct = account(d.accountID) ?? accounts[0]
+        guard backends[acct.id] == nil else { status = "Sending from Exchange accounts isn't supported yet"; return }
         messages.append(Message(accountID: acct.id, mailbox: .sent, from: Contact(name: acct.name, email: acct.address),
                                 to: Contact.parseList(d.to), cc: Contact.parseList(d.cc), subject: d.subject,
                                 body: d.body, date: .now, isRead: true))
@@ -188,6 +287,7 @@ public final class MailStore {
 
     public func saveDraft(_ d: Draft) {
         let acct = account(d.accountID) ?? accounts[0]
+        guard backends[acct.id] == nil else { status = "Saving drafts to Exchange isn't supported yet"; return }
         messages.append(Message(accountID: acct.id, mailbox: .drafts, from: Contact(name: acct.name, email: acct.address),
                                 to: Contact.parseList(d.to), subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
                                 body: d.body, date: .now, isRead: true))

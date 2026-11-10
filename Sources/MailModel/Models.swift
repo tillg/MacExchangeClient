@@ -119,7 +119,7 @@ public struct Contact: Hashable, Sendable {
 }
 
 public struct Message: Identifiable, Hashable, Sendable {
-    public let id: UUID
+    public internal(set) var id: UUID
     public var accountID: UUID
     public var mailbox: MailboxKind
     public var from: Contact
@@ -133,19 +133,31 @@ public struct Message: Identifiable, Hashable, Sendable {
     public var category: MailCategory
     public var isVIP: Bool
     public var attachments: [String]
+    /// Set for messages that live on a server; nil for local sample data.
+    public var remoteID: String?
+    /// Servers report this before the attachment names are fetched with the body.
+    public var hasAttachments: Bool
+    /// Preview text from the server, shown until the body is loaded.
+    public var serverPreview: String?
+    /// False while only the summary has been fetched from the server.
+    public var bodyLoaded: Bool
 
     public init(id: UUID = UUID(), accountID: UUID, mailbox: MailboxKind = .inbox, from: Contact, to: [Contact],
                 cc: [Contact] = [], subject: String, body: String, date: Date, isRead: Bool = false,
                 flag: FlagColor? = nil, category: MailCategory = .primary, isVIP: Bool = false,
-                attachments: [String] = []) {
+                attachments: [String] = [], remoteID: String? = nil, hasAttachments: Bool? = nil,
+                serverPreview: String? = nil, bodyLoaded: Bool = true) {
         self.id = id; self.accountID = accountID; self.mailbox = mailbox; self.from = from; self.to = to
         self.cc = cc; self.subject = subject; self.body = body; self.date = date; self.isRead = isRead
         self.flag = flag; self.category = category; self.isVIP = isVIP; self.attachments = attachments
+        self.remoteID = remoteID; self.hasAttachments = hasAttachments ?? !attachments.isEmpty
+        self.serverPreview = serverPreview; self.bodyLoaded = bodyLoaded
     }
 
     /// First lines of the body, as shown under the subject in the list.
     public var preview: String {
-        body.split(whereSeparator: \.isNewline).filter { !$0.hasPrefix(">") }
+        if !bodyLoaded, let serverPreview { return serverPreview }
+        return body.split(whereSeparator: \.isNewline).filter { !$0.hasPrefix(">") }
             .joined(separator: " ").trimmingCharacters(in: .whitespaces)
     }
 }

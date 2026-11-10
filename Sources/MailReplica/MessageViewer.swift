@@ -32,6 +32,7 @@ struct MessageViewer: View {
     }
 
     private var subtitle: String {
+        if let status = store.status { return status }
         let n = store.count(store.selectedMailbox), u = store.unreadCount(store.selectedMailbox)
         return u > 0 ? "\(n) messages, \(u) unread" : "\(n) messages"
     }

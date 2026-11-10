@@ -7,6 +7,7 @@ struct MessageDetailView: View {
     var body: some View {
         if let m = store.selectedMessage {
             MessageContent(message: m)
+                .task(id: m.id) { await store.loadBody(m.id) }
         } else if store.selection.count > 1 {
             ContentUnavailableView("\(store.selection.count) messages selected", systemImage: "envelope.stack")
         } else {
@@ -25,7 +26,7 @@ struct MessageContent: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 14)
                 Divider()
-                Text(message.body)
+                Text(message.bodyLoaded ? message.body : message.preview)
                     .font(.system(size: 13))
                     .lineSpacing(3)
                     .textSelection(.enabled)

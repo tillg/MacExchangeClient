@@ -91,7 +91,7 @@ struct MessageRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(message.subject).font(.system(size: 12)).lineLimit(1)
                     Spacer(minLength: 4)
-                    if !message.attachments.isEmpty {
+                    if message.hasAttachments {
                         Image(systemName: "paperclip").font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                     if let f = message.flag {

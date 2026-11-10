@@ -219,6 +219,83 @@ struct MailStoreTests {
         #expect(s.selection == [m.id])
     }
 
+    // MARK: Sync from a backend
+
+    func remote(_ rid: String, subject: String = "Hi", read: Bool = false, minutesAgo: Double = 0) -> Message {
+        // Like a server summary: no body yet.
+        var m = msg(work, subject: subject, read: read, minutesAgo: minutesAgo)
+        m.remoteID = rid
+        m.body = ""
+        m.bodyLoaded = false
+        return m
+    }
+
+    @Test func applyInsertsAndStoresToken() {
+        let s = store([])
+        s.apply(SyncResult(upserts: [remote("A"), remote("B")], deletedRemoteIDs: [], token: "t1", more: false),
+                account: work.id, mailbox: .inbox)
+        #expect(s.count(.account(work.id, .inbox)) == 2)
+        #expect(s.syncToken(work.id, .inbox) == "t1")
+        #expect(s.syncToken(work.id, .sent) == nil)
+    }
+
+    @Test func applyUpdatePreservesLocalIDSelectionAndLoadedBody() {
+        let s = store([])
+        s.apply(SyncResult(upserts: [remote("A", subject: "old")], deletedRemoteIDs: [], token: "t1", more: false),
+                account: work.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        s.selection = [id]
+        s.setBody(MessageBody(text: "Full text", attachments: ["a.pdf"]), for: id)
+        s.apply(SyncResult(upserts: [remote("A", subject: "new", read: true)], deletedRemoteIDs: [], token: "t2", more: false),
+                account: work.id, mailbox: .inbox)
+        #expect(s.messages.count == 1)
+        #expect(s.messages[0].id == id)
+        #expect(s.messages[0].subject == "new")
+        #expect(s.messages[0].isRead)
+        #expect(s.messages[0].body == "Full text")
+        #expect(s.messages[0].attachments == ["a.pdf"])
+        #expect(s.selection == [id])
+    }
+
+    @Test func applyDeletesByRemoteIDAndDropsFromSelection() {
+        let s = store([])
+        s.apply(SyncResult(upserts: [remote("A"), remote("B")], deletedRemoteIDs: [], token: "t1", more: false),
+                account: work.id, mailbox: .inbox)
+        let a = s.messages.first { $0.remoteID == "A" }!.id
+        s.selection = [a]
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: ["A"], token: "t2", more: false),
+                account: work.id, mailbox: .inbox)
+        #expect(s.messages.map(\.remoteID) == ["B"])
+        #expect(s.selection.isEmpty)
+    }
+
+    @Test func serverMessageShowsServerPreviewUntilBodyLoaded() {
+        var m = remote("A")
+        m.body = ""; m.bodyLoaded = false; m.serverPreview = "From the server"
+        #expect(m.preview == "From the server")
+        let s = store([])
+        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "t", more: false), account: work.id, mailbox: .inbox)
+        s.setBody(MessageBody(text: "Real body", attachments: []), for: s.messages[0].id)
+        #expect(s.messages[0].bodyLoaded)
+        #expect(s.messages[0].preview == "Real body")
+    }
+
+    @Test func serverMessagesAreReadOnlyUntilSyncBackExists() {
+        let local = msg(work)
+        let s = store([local])
+        s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "t", more: false),
+                account: work.id, mailbox: .inbox)
+        let r = s.messages.first { $0.remoteID == "A" }!.id
+        s.setFlag(.red, for: [r, local.id])
+        s.delete([r])
+        s.toggleRead([r])
+        #expect(s.message(r)?.flag == nil)
+        #expect(s.message(r)?.mailbox == .inbox)
+        #expect(s.message(r)?.isRead == false)
+        #expect(s.message(local.id)?.flag == .red)
+        #expect(s.status != nil)
+    }
+
     @Test func markAllRead() {
         let s = store([msg(work), msg(work), msg(home)])
         s.markAllRead(in: .account(work.id, .inbox))
