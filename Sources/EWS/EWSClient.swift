@@ -60,8 +60,16 @@ private final class AuthDelegate: NSObject, URLSessionTaskDelegate, @unchecked S
 
     func urlSession(_ session: URLSession, task: URLSessionTask,
                     didReceive challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
-        switch challenge.protectionSpace.authenticationMethod {
-        case NSURLAuthenticationMethodHTTPBasic, NSURLAuthenticationMethodNTLM, NSURLAuthenticationMethodNegotiate:
+        let method = challenge.protectionSpace.authenticationMethod
+        if ProcessInfo.processInfo.environment["EWS_DEBUG"] != nil {
+            let status = (challenge.failureResponse as? HTTPURLResponse)?.statusCode ?? 0
+            FileHandle.standardError.write(Data("EWS auth: \(method) failures=\(challenge.previousFailureCount) status=\(status)\n".utf8))
+        }
+        return switch method {
+        case NSURLAuthenticationMethodNegotiate:
+            // Kerberos with DOMAIN\user and a password fails off the domain; let the server fall back to NTLM.
+            (.rejectProtectionSpace, nil)
+        case NSURLAuthenticationMethodHTTPBasic, NSURLAuthenticationMethodNTLM:
             // One attempt per request: retrying a wrong password could lock the domain account.
             challenge.previousFailureCount == 0 ? (.useCredential, credential) : (.cancelAuthenticationChallenge, nil)
         default:
