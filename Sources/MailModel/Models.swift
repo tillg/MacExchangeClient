@@ -10,7 +10,7 @@ public struct Account: Identifiable, Hashable, Sendable {
 }
 
 /// Standard per-account mailboxes, in Mail's sidebar order.
-public enum MailboxKind: String, CaseIterable, Hashable, Sendable {
+public enum MailboxKind: String, CaseIterable, Hashable, Codable, Sendable {
     case inbox, drafts, sent, junk, trash, archive
 
     public var title: String {
@@ -74,13 +74,13 @@ public enum MailboxRef: Hashable, Sendable {
 }
 
 /// Flag colours, in Mail's Message ▸ Flag menu order.
-public enum FlagColor: String, CaseIterable, Hashable, Sendable {
+public enum FlagColor: String, CaseIterable, Hashable, Codable, Sendable {
     case red, orange, yellow, green, blue, purple, gray
     public var title: String { rawValue.capitalized }
 }
 
 /// Mail Categories (Inbox top bar).
-public enum MailCategory: String, CaseIterable, Hashable, Sendable {
+public enum MailCategory: String, CaseIterable, Hashable, Codable, Sendable {
     case primary, transactions, updates, promotions
     public var title: String { rawValue.capitalized }
     public var symbol: String {
@@ -93,7 +93,7 @@ public enum MailCategory: String, CaseIterable, Hashable, Sendable {
     }
 }
 
-public struct Contact: Hashable, Sendable {
+public struct Contact: Hashable, Codable, Sendable {
     public var name: String
     public var email: String
     public init(name: String, email: String) { self.name = name; self.email = email }
@@ -118,7 +118,7 @@ public struct Contact: Hashable, Sendable {
     }
 }
 
-public struct Message: Identifiable, Hashable, Sendable {
+public struct Message: Identifiable, Hashable, Codable, Sendable {
     public internal(set) var id: UUID
     public var accountID: UUID
     public var mailbox: MailboxKind

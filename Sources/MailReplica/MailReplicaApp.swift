@@ -22,6 +22,9 @@ struct MailReplicaApp: App {
                 .environment(store)
                 .frame(minWidth: 900, minHeight: 500)
                 .task { await pollForMail() }
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                    AppSetup.saveCache(store)
+                }
         }
         .defaultSize(width: 1280, height: 800)
         .commands { MailCommands(store: store) }
@@ -42,6 +45,7 @@ struct MailReplicaApp: App {
         guard ProcessInfo.processInfo.environment["MAIL_SNAPSHOT"] == nil else { return }
         while !Task.isCancelled {
             await store.refresh()
+            AppSetup.saveCache(store)
             try? await Task.sleep(for: .seconds(60))
         }
     }

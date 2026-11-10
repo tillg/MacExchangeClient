@@ -52,7 +52,7 @@ Changes to Exchange mail show at once and are then written to the server in orde
 - Offline, changes wait until the next refresh. A message that fails to send is never resent automatically. It is kept in Drafts on this Mac instead.
 - Exchange messages can't be dragged to another account yet.
 
-Nothing is cached on disk yet, so every launch syncs again.
+Exchange mail, sync positions and unsent changes are cached in `~/Library/Application Support/MailReplica/Cache.json` (readable only by you). The cache is saved after each check for mail and on quit. A launch shows the cached mail at once and fetches only what changed. Sample data is never cached. Delete the file to start fresh.
 
 `MAIL_SAMPLE_DATA=1 ./run.sh` shows the sample data even when an account is set up.
 
@@ -76,7 +76,7 @@ Sources/
   EWS/              MailBackend over Exchange Web Services, Keychain and account settings
   MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suites for MailStore, the drag payload and EWS requests and parsing (54 tests, plus two live tests against a real server)
+  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (57 tests, plus two live tests against a real server)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```
@@ -121,7 +121,7 @@ The details come from Mail.app's own resources in `/System/Applications/Mail.app
 - [x] Reading mail from on-prem Exchange over EWS
 - [x] Flags, read state, moves, deletes and sending written back to Exchange
 - [ ] Push for new mail (EWS notifications) instead of checking every minute
-- [ ] Local cache on disk, so a launch doesn't sync everything again
+- [x] Local cache on disk, so a launch doesn't sync everything again
 - [ ] HTML message view and opening attachments
 - [ ] Custom folders (only the standard folders are shown now)
 - [ ] Microsoft Graph backend, once the mailbox is reachable there

@@ -283,6 +283,34 @@ public final class MailStore {
         serverAccounts.insert(account)
     }
 
+    // MARK: Disk cache
+
+    /// Server mail, sync positions and unsent changes of every server account. Sample data isn't cached.
+    public func cache() -> MailCache {
+        var out: [UUID: MailCache.AccountState] = [:]
+        for acct in serverAccounts {
+            var tokens: [MailboxKind: String] = [:]
+            for box in MailboxKind.allCases { tokens[box] = syncTokens[key(acct, box)] }
+            out[acct] = MailCache.AccountState(messages: messages.filter { $0.accountID == acct && $0.remoteID != nil },
+                                               syncTokens: tokens, outbox: outbox.filter { $0.account == acct })
+        }
+        return MailCache(accounts: out)
+    }
+
+    /// Loads cached mail for the accounts this store has, before the first sync, so a launch starts
+    /// where the last one stopped and syncs only what changed since.
+    public func restore(_ c: MailCache) {
+        for acct in accounts.map(\.id) {
+            guard let state = c.accounts[acct] else { continue }
+            let known = Set(messages.compactMap { $0.accountID == acct ? $0.remoteID : nil })
+            messages += state.messages.filter { !known.contains($0.remoteID ?? "") }
+            for (box, token) in state.syncTokens { syncTokens[key(acct, box)] = token }
+            outbox += state.outbox
+            serverAccounts.insert(acct)
+        }
+        scheduleFlush()
+    }
+
     // MARK: Write-back
 
     /// Exchange gives moved items new IDs. Updates the messages and the changes still queued.

@@ -6,11 +6,21 @@ import SwiftUI
 enum AppSetup {
     /// Exchange accounts if any are configured, otherwise the sample data. `MAIL_SAMPLE_DATA=1` forces samples.
     static func makeStore() -> MailStore {
-        let saved = ExchangeAccount.saved()
-        if saved.isEmpty || ProcessInfo.processInfo.environment["MAIL_SAMPLE_DATA"] != nil { return SampleData.store() }
+        guard usesServer else { return SampleData.store() }
         let store = MailStore(accounts: [], messages: [])
-        for a in saved { connect(a, to: store) }
+        for a in ExchangeAccount.saved() { connect(a, to: store) }
+        if let cache = MailCache.load() { store.restore(cache) }
         return store
+    }
+
+    /// False while showing sample data; the disk cache is then neither read nor written.
+    static var usesServer: Bool {
+        !ExchangeAccount.saved().isEmpty && ProcessInfo.processInfo.environment["MAIL_SAMPLE_DATA"] == nil
+    }
+
+    static func saveCache(_ store: MailStore) {
+        guard usesServer else { return }
+        do { try store.cache().save() } catch { store.status = "Couldn't save the mail cache: \(error.localizedDescription)" }
     }
 
     static func connect(_ a: ExchangeAccount, to store: MailStore) {

@@ -27,7 +27,7 @@ public protocol MailBackend: Sendable {
 }
 
 /// A local change waiting to be written to the server.
-public enum ServerChange: Hashable, Sendable {
+public enum ServerChange: Hashable, Codable, Sendable {
     case setRead([String], Bool)
     case setFlagged([String], Bool)
     case move([String], to: MailboxKind)
@@ -47,8 +47,8 @@ public enum ServerChange: Hashable, Sendable {
     }
 }
 
-public struct PendingChange: Hashable, Sendable {
-    public let id = UUID()
+public struct PendingChange: Hashable, Codable, Sendable {
+    public var id = UUID()
     public let account: UUID
     public var change: ServerChange
     /// The messages as they were before, to undo the local change if the server refuses it.
