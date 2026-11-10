@@ -60,8 +60,10 @@ struct MessageListView: View {
             }
             .onDeleteCommand { store.deleteSelection() }
             .onChange(of: store.selection) {
-                // Mail marks a message read as soon as it is displayed.
-                if store.selection.count == 1 { store.markSelectionRead() }
+                // Mail marks a message read as soon as it is displayed. One main-loop turn later: changing the
+                // rows while the table is still reporting the click is a reentrant table update (AppKit warns).
+                guard store.selection.count == 1 else { return }
+                Task { @MainActor in store.markSelectionRead() }
             }
         }
     }

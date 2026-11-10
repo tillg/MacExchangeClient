@@ -61,7 +61,7 @@ public final class EWSClient: Sendable {
         return Data(invalidCharRef.stringByReplacingMatches(in: s, range: range, withTemplate: "&#xFFFD;").utf8)
     }
 
-    nonisolated(unsafe) static let invalidCharRef = try! NSRegularExpression(
+    static let invalidCharRef = try! NSRegularExpression(
         pattern: "&#(?:x0*(?:[0-8bcef]|1[0-9a-f])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));", options: .caseInsensitive)
 
     /// A request cancelled because the server rejected the password is a sign-in failure, not a network error.
