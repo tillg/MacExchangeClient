@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // A bare SwiftPM executable starts as a background process; make it a real app.
         NSApp.setActivationPolicy(.regular)
+        AppIcon.install()
         NSApp.activate(ignoringOtherApps: true)
     }
 }

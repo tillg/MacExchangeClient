@@ -1,5 +1,7 @@
 # MacExchangeClient
 
+<img src="docs/icon.png" width="128" alt="App icon: a white envelope on a pink rounded square">
+
 A native macOS mail client in SwiftUI. It starts as a faithful replica of the Apple Mail main window, and the goal is to connect it to real mail servers.
 
 <picture>
@@ -23,6 +25,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 - **Swipe actions:** swipe right for Unread, left for Trash or Flag
 - **Menu bar and shortcuts** taken from Mail's own `MainMenu.nib`
 - **Light and dark mode**
+- **Own app icon:** a white envelope on pink, drawn in code (`AppIcon.swift`). `MAIL_ICON_EXPORT=icon.png` writes it as a PNG
 
 ## Getting started
 
