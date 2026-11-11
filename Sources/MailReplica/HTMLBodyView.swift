@@ -8,10 +8,11 @@ import WebKit
 struct HTMLBodyView: View {
     let html: String
     let allowRemote: Bool
+    var inline: [String: InlineImage] = [:]
     @State private var height: CGFloat = 1
 
     var body: some View {
-        MailWebView(html: html, allowRemote: allowRemote, height: $height)
+        MailWebView(html: html, allowRemote: allowRemote, inline: inline, height: $height)
             .frame(maxWidth: .infinity)
             .frame(height: height)
     }
@@ -20,7 +21,11 @@ struct HTMLBodyView: View {
 private struct MailWebView: NSViewRepresentable {
     let html: String
     let allowRemote: Bool
+    let inline: [String: InlineImage]
     @Binding var height: CGFloat
+
+    /// What the page is built from. Compared instead of the page, which can be megabytes with images in it.
+    struct Inputs: Equatable { var html: String; var allowRemote: Bool; var inline: Set<String> }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -40,16 +45,16 @@ private struct MailWebView: NSViewRepresentable {
 
     func updateNSView(_ v: BodyWebView, context: Context) {
         context.coordinator.parent = self
-        let page = HTMLPage.document(html, allowRemote: allowRemote)
+        let inputs = Inputs(html: html, allowRemote: allowRemote, inline: Set(inline.keys))
         // updateNSView runs on every store change; reloading would flicker and reset the page.
-        guard context.coordinator.loaded != page else { return }
-        context.coordinator.loaded = page
-        v.loadHTMLString(page, baseURL: nil)
+        guard context.coordinator.loaded != inputs else { return }
+        context.coordinator.loaded = inputs
+        v.loadHTMLString(HTMLPage.document(html, allowRemote: allowRemote, inline: inline), baseURL: nil)
     }
 
     @MainActor final class Coordinator: NSObject, WKNavigationDelegate {
         var parent: MailWebView
-        var loaded: String?
+        var loaded: Inputs?
         init(_ parent: MailWebView) { self.parent = parent }
 
         func measure(_ v: WKWebView) {

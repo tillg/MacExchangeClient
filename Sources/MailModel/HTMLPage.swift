@@ -6,7 +6,12 @@ public enum HTMLPage {
     /// The element whose height is the message's height.
     public static let bodyID = "mail-replica-body"
 
-    public static func document(_ html: String, allowRemote: Bool) -> String {
+    /// `inline` replaces `cid:` references with the message's own images, as `data:` URIs the policy allows.
+    /// References without an image stay `cid:` and hidden.
+    public static func document(_ html: String, allowRemote: Bool, inline: [String: InlineImage] = [:]) -> String {
+        let html = inline.isEmpty ? html : replacingContentIDs(in: html) { id in
+            inline[id].map { "data:\($0.contentType);base64,\($0.data.base64EncodedString())" }
+        }
         let csp = allowRemote
             ? "default-src 'none'; style-src * 'unsafe-inline'; img-src * data:; font-src * data:"
             : "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
@@ -27,6 +32,31 @@ public enum HTMLPage {
             </style>
             <div id="\(bodyID)">\(html)</div>
             """
+    }
+
+    /// The content IDs the HTML refers to with `cid:` (in `src`, `background` or CSS `url()`).
+    public static func contentIDs(in html: String) -> Set<String> {
+        var ids = Set<String>()
+        _ = replacingContentIDs(in: html) { ids.insert($0); return nil }
+        return ids
+    }
+
+    /// A reference runs to the closing quote, bracket or space, so `cid:a@x` never matches inside `cid:a@x2`.
+    private static let cidReference = try! NSRegularExpression(pattern: #"cid:([^"'\s)>]+)"#, options: .caseInsensitive)
+
+    /// Calls `replacement` with each referenced content ID (unescaped, without `<>`); nil keeps the reference.
+    private static func replacingContentIDs(in html: String, _ replacement: (String) -> String?) -> String {
+        let ns = html as NSString
+        var out = html
+        for m in cidReference.matches(in: html, range: NSRange(location: 0, length: ns.length)).reversed() {
+            var id = ns.substring(with: m.range(at: 1)).replacingOccurrences(of: "&lt;", with: "<")
+                .replacingOccurrences(of: "&gt;", with: ">")
+            id = id.removingPercentEncoding ?? id
+            id = id.trimmingCharacters(in: CharacterSet(charactersIn: "<>"))
+            guard let new = replacement(id), let r = Range(m.range, in: out) else { continue }
+            out.replaceSubrange(r, with: new)
+        }
+        return out
     }
 
     /// Clicked links open elsewhere only for the web and mail. Other schemes (smb:, file:, app handlers) could
@@ -71,4 +101,11 @@ public enum RemoteImages: String, CaseIterable, Sendable {
         let d = email[email.index(after: at)...]
         return d.isEmpty ? nil : String(d)
     }
+}
+
+/// An image attached to a message and shown in its HTML through `cid:`.
+public struct InlineImage: Hashable, Sendable {
+    public var contentType: String
+    public var data: Data
+    public init(contentType: String, data: Data) { self.contentType = contentType; self.data = data }
 }

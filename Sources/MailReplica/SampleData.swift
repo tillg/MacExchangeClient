@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import MailModel
 
 @MainActor
@@ -49,7 +49,7 @@ enum SampleData {
             Message(accountID: work.id, from: c("Elena Petrova", "elena@client.example"), to: meWork,
                     subject: "Contract draft v3",
                     body: "Alex, attached is v3 with legal's edits on sections 4 and 7. Can we sign off this week?\n\nBest,\nElena",
-                    date: ago(120), isRead: true, attachments: ["Contract_v3.docx"]),
+                    date: ago(120), isRead: true, attachments: ["Contract_v3.docx"]).withHTML(elenaHTML),
             Message(accountID: icloud.id, from: me[0], to: [c("Sam Lee", "sam.lee@me.com")], subject: "Re: Concert tickets",
                     body: "Got them! Row 12.", date: ago(80), isRead: true).with(.sent),
             Message(accountID: work.id, from: meWork[0], to: [c("Priya Raman", "priya@northwind.example")],
@@ -85,7 +85,25 @@ enum SampleData {
             CalendarEvent(subject: "1:1 Jonas", start: at(14), end: at(15)),
             CalendarEvent(subject: "Focus time", start: at(15.5), end: at(17), busy: .free),
         ], for: invite.id)
+        // The signature logo of Elena's mail, an image attached to the message (cid:).
+        if let elena = store.messages.first(where: { $0.subject == "Contract draft v3" }) {
+            store.setInlineImages(["logo@client.example": InlineImage(contentType: "image/png", data: logo())], for: elena.id)
+        }
         return store
+    }
+
+    /// A made-up company logo, drawn in code.
+    private static func logo() -> Data {
+        let image = NSImage(size: NSSize(width: 150, height: 40), flipped: false) { r in
+            NSColor(red: 0.13, green: 0.36, blue: 0.47, alpha: 1).setFill()
+            NSBezierPath(roundedRect: r, xRadius: 6, yRadius: 6).fill()
+            let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 16, weight: .semibold),
+                                                        .foregroundColor: NSColor.white]
+            NSAttributedString(string: "Client & Co.", attributes: attrs).draw(at: NSPoint(x: 22, y: 10))
+            return true
+        }
+        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return Data() }
+        return rep.representation(using: .png, properties: [:]) ?? Data()
     }
 }
 
@@ -112,4 +130,12 @@ private let tidewaterHTML = """
     <tr><td style="padding:16px 28px;color:#7a8a93;font-size:11px;border-top:1px solid #e3e9ec">
     You get this because you signed up at tidewater.example. <a href="https://tidewater.example/unsubscribe" style="color:#7a8a93">Unsubscribe</a>
     </td></tr></table></td></tr></table>
+    """
+
+/// A plain business mail with the logo in the signature as an attached image.
+private let elenaHTML = """
+    <p>Alex, attached is v3 with legal's edits on sections 4 and 7. Can we sign off this week?</p>
+    <p>Best,<br>Elena</p>
+    <p style="color:#666;font-size:12px">Elena Petrova · Legal Counsel<br>
+    <img src="cid:logo@client.example" width="150" height="40" alt="Client &amp; Co."></p>
     """

@@ -9,6 +9,7 @@ struct MessageDetailView: View {
             MessageContent(message: m)
                 .task(id: m.id) {
                     await store.loadBody(m.id)
+                    await store.loadInlineImages(for: m.id)
                     await store.loadDay(for: m.id)
                 }
         } else if store.selection.count > 1 {
@@ -63,7 +64,7 @@ extension MessageContent {
                 if message.hasRemoteContent && !allowed {
                     RemoteContentBanner { remoteAllowed.insert(message.id) }
                 }
-                HTMLBodyView(html: html, allowRemote: allowed)
+                HTMLBodyView(html: html, allowRemote: allowed, inline: store.inlineImages(for: message.id))
             } else {
                 Text(message.bodyLoaded ? message.body : message.preview)
                     .font(.system(size: 13))

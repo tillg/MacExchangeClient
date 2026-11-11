@@ -78,6 +78,46 @@ public struct EWSBackend: MailBackend {
         """
     }
 
+    public func inlineImages(remoteID: String, contentIDs: Set<String>) async throws -> [String: InlineImage] {
+        let doc = try await client.call("""
+            <m:GetItem><m:ItemShape><t:BaseShape>IdOnly</t:BaseShape>\
+            <t:AdditionalProperties><t:FieldURI FieldURI="item:Attachments"/></t:AdditionalProperties></m:ItemShape>\
+            <m:ItemIds><t:ItemId Id="\(xmlEscape(remoteID))"/></m:ItemIds></m:GetItem>
+            """)
+        guard let item = doc.first("Items")?.elementChildren.first else { return [:] }
+        let ids = Self.inlineAttachmentIDs(item, wanted: contentIDs)
+        guard !ids.isEmpty else { return [:] }
+        // Not strict: one attachment that fails shouldn't lose the others.
+        return Self.parseInlineImages(try await client.call(Self.attachmentRequest(ids), strict: false))
+    }
+
+    /// Image attachments the HTML refers to, whether or not Exchange marks them inline.
+    static func inlineAttachmentIDs(_ item: XMLNode, wanted: Set<String>) -> [String] {
+        (item.child("Attachments")?.children("FileAttachment") ?? []).compactMap { a in
+            guard a.text("ContentType")?.lowercased().hasPrefix("image/") == true,
+                  let cid = a.text("ContentId").map(contentID), wanted.contains(cid) else { return nil }
+            return a.child("AttachmentId")?.attr("Id")
+        }
+    }
+
+    static func attachmentRequest(_ ids: [String]) -> String {
+        "<m:GetAttachment><m:AttachmentShape/><m:AttachmentIds>"
+            + ids.map { "<t:AttachmentId Id=\"\(xmlEscape($0))\"/>" }.joined()
+            + "</m:AttachmentIds></m:GetAttachment>"
+    }
+
+    static func parseInlineImages(_ doc: XMLDocument) -> [String: InlineImage] {
+        var images = [String: InlineImage]()
+        for a in doc.all("FileAttachment") {
+            guard let cid = a.text("ContentId").map(contentID), let type = a.text("ContentType"),
+                  let b64 = a.text("Content"), let data = Data(base64Encoded: b64, options: .ignoreUnknownCharacters) else { continue }
+            images[cid] = InlineImage(contentType: type, data: data)
+        }
+        return images
+    }
+
+    static func contentID(_ s: String) -> String { s.trimmingCharacters(in: CharacterSet(charactersIn: "<> ")) }
+
     /// Asked of every item when its body loads; only meeting requests return them (checked on the real server).
     static let inviteProps = ["calendar:Start", "calendar:End", "calendar:Location", "calendar:IsAllDayEvent",
                               "calendar:Organizer", "calendar:RequiredAttendees", "calendar:OptionalAttendees"]

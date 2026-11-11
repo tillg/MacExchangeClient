@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import MailModel
 
@@ -42,6 +43,24 @@ struct HTMLPageTests {
     /// Some notification mails put avatars in zero-width boxes; `max-width: 100%` shrank them to nothing. Mail has no such rule.
     @Test func imagesAreNotLimitedToTheirContainer() {
         #expect(!HTMLPage.document("<p>Hi</p>", allowRemote: true).contains("max-width"))
+    }
+
+    // MARK: Inline images (cid:)
+
+    @Test func contentIDsReferencedByTheHTML() {
+        let html = #"<img src="cid:image001.png@01DA0001.2B3C4D50"><img src='cid:part1.abc'>"#
+            + #"<td style="background:url(cid:bg%40x)"><img src="cid:&lt;angle@x&gt;"><a href="cid:not-an-image">"#
+        #expect(HTMLPage.contentIDs(in: html) == ["image001.png@01DA0001.2B3C4D50", "part1.abc", "bg@x", "angle@x", "not-an-image"])
+        #expect(HTMLPage.contentIDs(in: "<p>No images</p>").isEmpty)
+    }
+
+    @Test func inlineImagesBecomeDataURIs() {
+        let png = InlineImage(contentType: "image/png", data: Data([1, 2, 3]))
+        let html = #"<img src="cid:image001.png@x"><img src="cid:image001.png@x2"><img src="cid:unknown@x">"#
+        let page = HTMLPage.document(html, allowRemote: false, inline: ["image001.png@x": png])
+        #expect(page.contains(#"<img src="data:image/png;base64,AQID">"#))
+        #expect(page.contains(#"<img src="cid:image001.png@x2">"#))  // a longer ID that starts the same is not this image
+        #expect(page.contains(#"<img src="cid:unknown@x">"#))         // stays, and stays hidden
     }
 
     @Test func onlyWebAndMailLinksAreOpened() {

@@ -23,7 +23,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
   - the invite's day from your Exchange calendar next to the text, with overlapping events side by side and the invite's slot hatched.
 
   Attendee answer icons are missing: your copy of an invite reports every attendee's answer as unknown.
-- **HTML mail:** shown as the sender laid it out, on a white page also in dark mode. Mail without its own fonts uses Mail's default, Helvetica 14, with Mail's margins. Images, styles and fonts from the web follow Outlook's "Download external images" (Settings ▸ Privacy): by default they load for senders in your organisation (your account's mail domain and its subdomains). Other mail shows Load Remote Content first, so opening it doesn't tell the sender. Images load straight from the sender's server, with no privacy relay like Mail's. The app runs no JavaScript in mail, and links open in your browser. Inline images (`cid:`) are hidden for now. The list, search and replies use the plain-text version, which Exchange sends along
+- **HTML mail:** shown as the sender laid it out, on a white page also in dark mode. Mail without its own fonts uses Mail's default, Helvetica 14, with Mail's margins. Images, styles and fonts from the web follow Outlook's "Download external images" (Settings ▸ Privacy): by default they load for senders in your organisation (your account's mail domain and its subdomains). Other mail shows Load Remote Content first, so opening it doesn't tell the sender. Images load straight from the sender's server, with no privacy relay like Mail's. The app runs no JavaScript in mail, and links open in your browser. Images attached to the message and shown in its text (`cid:`, such as signature logos) load from Exchange when you open the message; they are kept in memory only, not in the cache. The list, search and replies use the plain-text version, which Exchange sends along
 - **Three-column window** with a mailboxes sidebar, a message list and a message view, using Mail's toolbar layout and SF Symbols
 - **Favorites and smart mailboxes:** All Inboxes, VIPs, Flagged, Unread, then each account's Inbox, Drafts, Sent, Junk, Trash and Archive, with unread badges
 - **Categories:** Primary, Transactions, Updates and Promotions in the Inbox (⌥⌘1–4)
@@ -104,7 +104,7 @@ Sources/
   EWS/              MailBackend over Exchange Web Services, Keychain and account settings
   MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (108 tests, plus live tests against a real server)
+  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (113 tests, plus live tests against a real server)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```
@@ -153,7 +153,8 @@ The details come from Mail.app's own resources in `/System/Applications/Mail.app
 - [ ] Push for new mail (EWS notifications) instead of the 15-second quick check
 - [x] Local cache on disk, so a launch doesn't sync everything again
 - [x] HTML message view
-- [ ] Inline images in HTML mail, opening attachments
+- [x] Inline images in HTML mail
+- [ ] Opening attachments
 - [ ] Custom folders (only the standard folders are shown now)
 - [ ] Microsoft Graph backend, once the mailbox is reachable there
 

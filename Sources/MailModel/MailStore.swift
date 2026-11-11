@@ -544,6 +544,27 @@ public final class MailStore {
         scheduleFlush()
     }
 
+    // MARK: Inline images
+
+    /// The `cid:` images of the message on screen. Only one message's, and never cached: they can be megabytes.
+    private var inline: (id: Message.ID, images: [String: InlineImage])?
+
+    public func inlineImages(for id: Message.ID) -> [String: InlineImage] { inline?.id == id ? inline!.images : [:] }
+
+    /// For sample data and tests; replaces the images of any other message.
+    public func setInlineImages(_ images: [String: InlineImage], for id: Message.ID) { inline = (id, images) }
+
+    /// Fetches the images the shown HTML body refers to with `cid:`. A failure leaves the body as it is.
+    public func loadInlineImages(for id: Message.ID) async {
+        guard inline?.id != id, let m = message(id), let html = m.html, let rid = m.remoteID,
+              let backend = backends[m.accountID], !paused.contains(m.accountID) else { return }
+        let ids = HTMLPage.contentIDs(in: html)
+        guard !ids.isEmpty else { return }
+        do { setInlineImages(try await backend.inlineImages(remoteID: rid, contentIDs: ids), for: id) } catch {
+            if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load images: \(error.localizedDescription)" }
+        }
+    }
+
     /// For sample data and tests: a day of made-up calendar entries next to an invite.
     public func setDayEvents(_ events: [CalendarEvent], for id: Message.ID) { dayEvents[id] = events }
 

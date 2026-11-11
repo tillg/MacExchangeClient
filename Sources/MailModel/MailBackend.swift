@@ -13,6 +13,8 @@ public protocol MailBackend: Sendable {
     func sync(_ folder: RemoteFolder, token: String?) async throws -> SyncResult
     /// Full text and attachment names of one message, and the invite if it is one.
     func body(remoteID: String) async throws -> MessageBody
+    /// The message's attached images with these content IDs, keyed by content ID (without `<>`).
+    func inlineImages(remoteID: String, contentIDs: Set<String>) async throws -> [String: InlineImage]
     /// Calendar entries between two times, for the day next to an invite.
     func events(from: Date, to: Date) async throws -> [CalendarEvent]
 

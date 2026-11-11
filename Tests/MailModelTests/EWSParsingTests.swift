@@ -106,6 +106,42 @@ struct EWSParsingTests {
         #expect(d.first("ItemId")?.attr("Id") == "ID&1")
     }
 
+    @Test func inlineImagesAreTheReferencedImageAttachments() throws {
+        let d = try doc("""
+            <t:Message><t:ItemId Id="ID1"/><t:Attachments>
+            <t:FileAttachment><t:AttachmentId Id="A1"/><t:Name>image001.png</t:Name><t:ContentType>image/png</t:ContentType>\
+            <t:ContentId>image001.png@01DA</t:ContentId><t:IsInline>true</t:IsInline></t:FileAttachment>
+            <t:FileAttachment><t:AttachmentId Id="A2"/><t:Name>logo.gif</t:Name><t:ContentType>image/gif</t:ContentType>\
+            <t:ContentId>&lt;logo@x&gt;</t:ContentId><t:IsInline>false</t:IsInline></t:FileAttachment>
+            <t:FileAttachment><t:AttachmentId Id="A3"/><t:Name>unused.png</t:Name><t:ContentType>image/png</t:ContentType>\
+            <t:ContentId>unused@x</t:ContentId></t:FileAttachment>
+            <t:FileAttachment><t:AttachmentId Id="A4"/><t:Name>run.sh</t:Name><t:ContentType>text/x-sh</t:ContentType>\
+            <t:ContentId>script@x</t:ContentId></t:FileAttachment>
+            <t:FileAttachment><t:AttachmentId Id="A5"/><t:Name>report.pdf</t:Name><t:ContentType>application/pdf</t:ContentType></t:FileAttachment>
+            </t:Attachments></t:Message>
+            """)
+        let item = try #require(d.first("Message"))
+        let wanted: Set = ["image001.png@01DA", "logo@x", "script@x"]
+        #expect(EWSBackend.inlineAttachmentIDs(item, wanted: wanted) == ["A1", "A2"])
+    }
+
+    @Test func attachmentRequestAndContent() throws {
+        let req = try request(EWSBackend.attachmentRequest(["A&1", "A2"]))
+        #expect(req.first("GetAttachment")?.elementChildren.map(\.localName) == ["AttachmentShape", "AttachmentIds"])
+        #expect(req.first("AttachmentIds")?.children("AttachmentId").compactMap { $0.attr("Id") } == ["A&1", "A2"])
+        let d = try doc("""
+            <m:GetAttachmentResponse><m:ResponseMessages>
+            <m:GetAttachmentResponseMessage ResponseClass="Success"><m:ResponseCode>NoError</m:ResponseCode><m:Attachments>
+            <t:FileAttachment><t:AttachmentId Id="A1"/><t:Name>image001.png</t:Name><t:ContentType>image/png</t:ContentType>\
+            <t:ContentId>&lt;image001.png@01DA&gt;</t:ContentId><t:Content>AQID</t:Content></t:FileAttachment>
+            </m:Attachments></m:GetAttachmentResponseMessage>
+            <m:GetAttachmentResponseMessage ResponseClass="Error"><m:MessageText>Gone</m:MessageText>\
+            <m:ResponseCode>ErrorItemNotFound</m:ResponseCode></m:GetAttachmentResponseMessage>
+            </m:ResponseMessages></m:GetAttachmentResponse>
+            """)
+        #expect(EWSBackend.parseInlineImages(d) == ["image001.png@01DA": InlineImage(contentType: "image/png", data: Data([1, 2, 3]))])
+    }
+
     @Test func archiveFolderFoundByLocalizedName() throws {
         let d = try doc("""
             <m:Folders><t:Folder><t:FolderId Id="F1"/><t:DisplayName>Posteingang</t:DisplayName></t:Folder>

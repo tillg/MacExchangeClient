@@ -671,6 +671,18 @@ struct MailStoreTests {
                                                                      proposedEnd: Date(timeIntervalSince1970: 9000)))])
     }
 
+    /// Inline images can be megabytes: only the message on screen keeps them, in memory, never in the cache.
+    @Test func inlineImagesAreKeptForTheShownMessageOnly() {
+        let s = store([msg(work), msg(work)])
+        let (a, b) = (s.messages[0].id, s.messages[1].id)
+        let png = InlineImage(contentType: "image/png", data: Data([1]))
+        s.setInlineImages(["x@y": png], for: a)
+        #expect(s.inlineImages(for: a) == ["x@y": png])
+        s.setInlineImages(["z@y": png], for: b)
+        #expect(s.inlineImages(for: a).isEmpty)
+        #expect(s.inlineImages(for: b) == ["z@y": png])
+    }
+
     @Test func markAllRead() {
         let s = store([msg(work), msg(work), msg(home)])
         s.markAllRead(in: .account(work.id, .inbox))
