@@ -150,6 +150,39 @@ struct EWSParsingTests {
         #expect(EWSBackend.archiveFolder(d) == RemoteFolder(role: .archive, id: "F2", totalCount: 30))
     }
 
+    @Test func folderTreeKeepsMailFoldersNestedUnderTheirParents() throws {
+        func f(_ id: String, _ name: String, parent: String, cls: String? = "IPF.Note", tag: String = "Folder",
+               hidden: Bool = false) -> String {
+            "<t:\(tag)><t:FolderId Id=\"\(id)\"/><t:ParentFolderId Id=\"\(parent)\"/>"
+                + (cls.map { "<t:FolderClass>\($0)</t:FolderClass>" } ?? "")
+                + "<t:DisplayName>\(name)</t:DisplayName><t:TotalCount>3</t:TotalCount>"
+                + (hidden ? #"<t:ExtendedProperty><t:ExtendedFieldURI PropertyTag="0x10f4" PropertyType="Boolean"/><t:Value>true</t:Value></t:ExtendedProperty>"# : "")
+                + "</t:\(tag)>"
+        }
+        let d = try doc("<m:FindFolderResponse><m:RootFolder><t:Folders>"
+            + f("I", "Inbox", parent: "R") + f("L", "Launch", parent: "P") + f("P", "Projects", parent: "I")
+            + f("CAL", "Calendar", parent: "R", cls: "IPF.Appointment", tag: "CalendarFolder")
+            + f("H", "Hidden", parent: "R", hidden: true) + f("HC", "Under hidden", parent: "H")
+            + f("RSS", "RSS Feeds", parent: "R", cls: "IPF.Note.OutlookHomepage")
+            + f("O", "Outbox", parent: "R") + f("C", "Clients", parent: "R", cls: nil) + f("AR", "Archive", parent: "R")
+            + "</t:Folders></m:RootFolder></m:FindFolderResponse>")
+        let known = [RemoteFolder(role: .inbox, id: "I"), RemoteFolder(role: .archive, id: "AR")]
+        #expect(EWSBackend.folderTree(d, known: known, skip: ["O"]) == [
+            RemoteFolder(role: .folder("L"), id: "L", totalCount: 3, name: "Launch", parent: .folder("P")),
+            RemoteFolder(role: .folder("P"), id: "P", totalCount: 3, name: "Projects", parent: .inbox),
+            RemoteFolder(role: .folder("C"), id: "C", totalCount: 3, name: "Clients", parent: nil),
+        ])
+    }
+
+    @Test func archiveFolderPrefersTheTopLevelOne() throws {
+        let d = try doc("""
+            <m:Folders><t:Folder><t:FolderId Id="SUB"/><t:ParentFolderId Id="I"/><t:DisplayName>Archive</t:DisplayName></t:Folder>
+            <t:Folder><t:FolderId Id="I"/><t:ParentFolderId Id="R"/><t:DisplayName>Inbox</t:DisplayName></t:Folder>
+            <t:Folder><t:FolderId Id="TOP"/><t:ParentFolderId Id="R"/><t:DisplayName>Archive</t:DisplayName></t:Folder></m:Folders>
+            """)
+        #expect(EWSBackend.archiveFolder(d)?.id == "TOP")
+    }
+
     @Test func getFolderSkipsMissingFolders() throws {
         let ok = #"<m:GetFolderResponseMessage ResponseClass="Success"><m:Folders><t:Folder><t:FolderId Id="X"/><t:TotalCount>7</t:TotalCount></t:Folder></m:Folders></m:GetFolderResponseMessage>"#
         let bad = #"<m:GetFolderResponseMessage ResponseClass="Error"><m:ResponseCode>ErrorFolderNotFound</m:ResponseCode></m:GetFolderResponseMessage>"#

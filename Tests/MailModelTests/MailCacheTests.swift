@@ -17,6 +17,18 @@ struct MailCacheTests {
         FileManager.default.temporaryDirectory.appendingPathComponent("MailCacheTests-\(UUID())/cache.json")
     }
 
+    /// Written by the version before folders of the user's own existed: the format must still load.
+    @Test func cacheFromBeforeFoldersStillLoads() throws {
+        let json = #"{"accounts":["00000000-0000-0000-0000-000000000001",{"complete":["inbox"],"messages":[{"accountID":"00000000-0000-0000-0000-000000000001","attachments":[],"body":"","bodyLoaded":false,"category":"primary","cc":[],"date":-978307200,"from":{"email":"ann@x.com","name":"Ann"},"hasAttachments":false,"id":"00000000-0000-0000-0000-000000000002","isRead":true,"isVIP":false,"mailbox":"archive","remoteID":"R1","subject":"S","to":[]}],"outbox":[{"account":"00000000-0000-0000-0000-000000000001","change":{"move":{"_0":["R1"],"to":"archive"}},"id":"00000000-0000-0000-0000-000000000003","previous":[{"accountID":"00000000-0000-0000-0000-000000000001","attachments":[],"body":"","bodyLoaded":false,"category":"primary","cc":[],"date":-978307200,"from":{"email":"ann@x.com","name":"Ann"},"hasAttachments":false,"id":"00000000-0000-0000-0000-000000000002","isRead":true,"isVIP":false,"mailbox":"archive","remoteID":"R1","subject":"S","to":[]}]}],"syncTokens":["inbox","T1"]}]}"#
+        let c = try JSONDecoder().decode(MailCache.self, from: Data(json.utf8))
+        let state = try #require(c.accounts[UUID(uuidString: "00000000-0000-0000-0000-000000000001")!])
+        #expect(state.syncTokens == [.inbox: "T1"])
+        #expect(state.complete == [.inbox])
+        #expect(state.messages.map(\.mailbox) == [.archive])
+        #expect(state.outbox.map(\.change) == [.move(["R1"], to: .archive)])
+        #expect(state.folders == nil)
+    }
+
     @Test func serverMailTokensAndOutboxSurviveARestart() throws {
         let s = MailStore(accounts: [work, home], messages: [
             Message(accountID: home.id, from: Contact(name: "B", email: "b@x.com"), to: [], subject: "Local", body: "x", date: .now),

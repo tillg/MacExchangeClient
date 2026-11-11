@@ -508,6 +508,23 @@ struct MailStoreTests {
         #expect(!s.isComplete(work.id, .sent))
     }
 
+    /// History pages are merged in one go (one pass over all messages); the result is as if applied one by one.
+    @Test func severalPagesApplyLikeOneAfterTheOther() {
+        let s = synced([])
+        let pages = [
+            SyncResult(upserts: [remote("A"), remote("B")], deletedRemoteIDs: [], token: "p1", more: true),
+            SyncResult(upserts: [remote("C")], deletedRemoteIDs: ["A"], readChanges: ["B": true], token: "p2", more: true),
+            SyncResult(upserts: [remote("A", subject: "Back")], deletedRemoteIDs: ["C"], token: "p3", more: false),
+        ]
+        s.apply(pages, account: work.id, mailbox: .sent)
+        let sent = s.messages.filter { $0.mailbox == .sent }
+        #expect(Set(sent.compactMap(\.remoteID)) == ["A", "B"])
+        #expect(sent.first { $0.remoteID == "A" }?.subject == "Back")
+        #expect(sent.first { $0.remoteID == "B" }?.isRead == true)
+        #expect(s.syncToken(work.id, .sent) == "p3")
+        #expect(s.isComplete(work.id, .sent))
+    }
+
     @Test func folderIsCompleteOnceTheLastPageArrived() {
         let s = synced([])
         s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "p1", more: true), account: work.id, mailbox: .sent)

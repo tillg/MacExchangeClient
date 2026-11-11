@@ -9,6 +9,9 @@ enum SampleData {
         func c(_ n: String, _ e: String) -> Contact { Contact(name: n, email: e) }
         let me = [c("Alex Morgan", icloud.address)], meWork = [c("Alex Morgan", work.address)]
         func ago(_ h: Double) -> Date { Date().addingTimeInterval(-h * 3600) }
+        // Work's own folders: Inbox ▸ Projects ▸ Northwind Launch, Inbox ▸ Receipts, Clients ▸ Contoso.
+        let projects = MailboxKind.folder("projects"), launch = MailboxKind.folder("launch"),
+            receipts = MailboxKind.folder("receipts"), clients = MailboxKind.folder("clients"), contoso = MailboxKind.folder("contoso")
 
         let msgs: [Message] = [
             Message(accountID: work.id, from: c("Priya Raman", "priya@northwind.example"), to: meWork,
@@ -60,6 +63,19 @@ enum SampleData {
             Message(accountID: work.id, from: c("Jonas Weber", "jonas@northwind.example"), to: meWork,
                     subject: "Offsite venue options", body: "Three options attached, my vote is the lake house.",
                     date: ago(400), isRead: true).with(.archive),
+            // Mail in folders of the user's own (the tree below).
+            Message(accountID: work.id, from: c("Mia Chen", "mia@northwind.example"), to: meWork,
+                    subject: "Launch checklist – final", body: "All items are green except the press kit, due Tuesday.",
+                    date: ago(6)).with(launch),
+            Message(accountID: work.id, from: c("Jonas Weber", "jonas@northwind.example"), to: meWork,
+                    subject: "Launch day rota", body: "I've put everyone on the rota; swap with each other if needed.",
+                    date: ago(20)).with(launch),
+            Message(accountID: work.id, from: c("Priya Raman", "priya@northwind.example"), to: meWork,
+                    subject: "Project kickoff notes", body: "Notes from Monday's kickoff are in the shared folder.",
+                    date: ago(100), isRead: true).with(projects),
+            Message(accountID: work.id, from: c("Elena Petrova", "elena@client.example"), to: meWork,
+                    subject: "Invoice 2026-114", body: "Please find our invoice for October attached.",
+                    date: ago(60), attachments: ["Invoice-2026-114.pdf"]).with(contoso),
         ]
         // A made-up meeting invite for tomorrow, with a made-up day around it.
         let cal = Calendar.current
@@ -76,6 +92,11 @@ enum SampleData {
                                       c("Elena Petrova", "elena@northwind.example"), c("Sam Okafor", "sam@northwind.example")],
                            optional: [c("Mia Chen", "mia@northwind.example")]))
         let store = MailStore(accounts: [icloud, work], messages: msgs + [invite])
+        store.setFolders([Folder(box: projects, name: "Projects", parent: .inbox),
+                          Folder(box: launch, name: "Northwind Launch", parent: projects),
+                          Folder(box: receipts, name: "Receipts", parent: .inbox),
+                          Folder(box: clients, name: "Clients"), Folder(box: contoso, name: "Contoso", parent: clients)],
+                         account: work.id)
         store.setDayEvents([
             CalendarEvent(subject: "Company offsite week", start: tomorrow, end: at(24), isAllDay: true, busy: .free),
             CalendarEvent(subject: "Weekly sync", start: at(9), end: at(10)),

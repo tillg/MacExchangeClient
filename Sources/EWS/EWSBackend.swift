@@ -22,20 +22,24 @@ public struct EWSBackend: MailBackend {
     ]
 
     public func folders() async throws -> [RemoteFolder] {
-        let ids = Self.distinguished.map { "<t:DistinguishedFolderId Id=\"\($0.1)\"/>" }.joined()
+        // Outbox is asked for too, only to leave it out of the tree: Mail doesn't show it.
+        let ids = (Self.distinguished.map(\.1) + ["outbox"]).map { "<t:DistinguishedFolderId Id=\"\($0)\"/>" }.joined()
         let doc = try await client.call(
             "<m:GetFolder><m:FolderShape><t:BaseShape>IdOnly</t:BaseShape>\(Self.countProp)</m:FolderShape><m:FolderIds>\(ids)</m:FolderIds></m:GetFolder>",
             strict: false)
         var result = Self.parseGetFolder(doc)
-        // Outlook's Archive folder is a normal folder; there is no distinguished ID for it.
+        let outbox = doc.all("GetFolderResponseMessage").dropFirst(Self.distinguished.count).first?.first("FolderId")?.attr("Id")
+        // Every mail folder, nested. Outlook's Archive folder is a normal top-level folder; there is no distinguished ID for it.
         let found = try await client.call("""
-            <m:FindFolder Traversal="Shallow"><m:FolderShape><t:BaseShape>IdOnly</t:BaseShape>\
+            <m:FindFolder Traversal="Deep"><m:FolderShape><t:BaseShape>IdOnly</t:BaseShape>\
             <t:AdditionalProperties><t:FieldURI FieldURI="folder:DisplayName"/><t:FieldURI FieldURI="folder:TotalCount"/>\
+            <t:FieldURI FieldURI="folder:ParentFolderId"/><t:FieldURI FieldURI="folder:FolderClass"/>\
+            <t:ExtendedFieldURI PropertyTag="0x10F4" PropertyType="Boolean"/>\
             </t:AdditionalProperties></m:FolderShape>\
             <m:ParentFolderIds><t:DistinguishedFolderId Id="msgfolderroot"/></m:ParentFolderIds></m:FindFolder>
             """)
         if let archive = Self.archiveFolder(found) { result.append(archive) }
-        return result
+        return result + Self.folderTree(found, known: result, skip: Set([outbox].compactMap { $0 }))
     }
 
     public func newest(in folder: RemoteFolder, limit: Int) async throws -> [Message] {
@@ -269,11 +273,45 @@ public struct EWSBackend: MailBackend {
         }
     }
 
+    /// A top-level folder named Archive; Outlook creates it under the mailbox root, not in the Inbox.
     static func archiveFolder(_ doc: XMLDocument) -> RemoteFolder? {
         let names: Set<String> = ["archive", "archiv"]
-        guard let f = doc.all("Folder").first(where: { names.contains(($0.text("DisplayName") ?? "").lowercased()) }),
-              let id = f.child("FolderId")?.attr("Id") else { return nil }
+        let folders = doc.all("Folder")
+        let ids = Set(folders.compactMap { $0.child("FolderId")?.attr("Id") })
+        let matches = folders.filter { names.contains(($0.text("DisplayName") ?? "").lowercased()) }
+        let topLevel = matches.first { !ids.contains($0.child("ParentFolderId")?.attr("Id") ?? "") }
+        guard let f = topLevel ?? matches.first, let id = f.child("FolderId")?.attr("Id") else { return nil }
         return RemoteFolder(role: .archive, id: id, totalCount: Int(f.text("TotalCount") ?? "") ?? 0)
+    }
+
+    /// The user's own mail folders from a deep FindFolder, each with its parent. Calendar, contacts and other
+    /// non-mail folders, hidden folders and `skip` (with everything under them) are left out; `known` folders
+    /// keep their standard role. A parent that isn't in the result is the mailbox root: the folder is top-level.
+    static func folderTree(_ doc: XMLDocument, known: [RemoteFolder], skip: Set<String>) -> [RemoteFolder] {
+        struct F { let id: String, parent: String, name: String, count: Int, mail: Bool }
+        // `Folder` elements only: CalendarFolder, ContactsFolder, TasksFolder and SearchFolder are other tags.
+        let all = doc.all("Folder").compactMap { f -> F? in
+            guard let id = f.child("FolderId")?.attr("Id") else { return nil }
+            let cls = f.text("FolderClass")
+            let hidden = f.child("ExtendedProperty")?.text("Value")?.lowercased() == "true"
+            return F(id: id, parent: f.child("ParentFolderId")?.attr("Id") ?? "", name: f.text("DisplayName") ?? "",
+                     count: Int(f.text("TotalCount") ?? "") ?? 0, mail: !hidden && (cls == nil || cls == "IPF.Note"))
+        }
+        let byID = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let roles = Dictionary(known.map { ($0.id, $0.role) }, uniquingKeysWith: { a, _ in a })
+        // Shown only if it and every folder above it is a shown mail folder.
+        func shown(_ f: F) -> Bool {
+            var cur: F? = f, seen = Set<String>()
+            while let c = cur, seen.insert(c.id).inserted {
+                if !c.mail || skip.contains(c.id) { return false }
+                cur = byID[c.parent]
+            }
+            return true
+        }
+        return all.filter { roles[$0.id] == nil && shown($0) }.map { f in
+            let parent: MailboxKind? = byID[f.parent] == nil ? nil : roles[f.parent] ?? .folder(f.parent)
+            return RemoteFolder(role: .folder(f.id), id: f.id, totalCount: f.count, name: f.name, parent: parent)
+        }
     }
 
     static func parseSync(_ doc: XMLDocument) -> SyncResult {

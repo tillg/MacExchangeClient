@@ -25,6 +25,9 @@ public final class MailStore {
     /// Shown at the bottom of the sidebar while checking for mail, like Mail's activity view.
     public var progress: SyncProgress?
 
+    /// Each account's folders of its own, as a tree (see `children(of:account:)`).
+    public private(set) var folders: [UUID: [Folder]] = [:]
+
     private var backends: [UUID: any MailBackend] = [:]
     private var remoteFolders: [UUID: [RemoteFolder]] = [:]
     private var syncTokens: [String: String] = [:]
@@ -57,6 +60,26 @@ public final class MailStore {
 
     public func account(_ id: UUID) -> Account? { accounts.first { $0.id == id } }
 
+    /// The folders directly in `parent` (nil: at the top of the account), by name as Finder sorts.
+    public func children(of parent: MailboxKind?, account: UUID) -> [Folder] {
+        (folders[account] ?? []).filter { $0.parent == parent }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// The mailbox's name: the standard title, or the folder's own.
+    public func name(of box: MailboxKind, in account: UUID) -> String {
+        box.isStandard ? box.title : folders[account]?.first { $0.box == box }?.name ?? ""
+    }
+
+    /// Sets an account's folder tree (for local accounts; server accounts get theirs from the server).
+    public func setFolders(_ f: [Folder], account: UUID) { folders[account] = f }
+
+    /// The server's folder list: the user's own folders become the account's tree.
+    func setRemoteFolders(_ remote: [RemoteFolder], account: UUID) {
+        remoteFolders[account] = remote
+        folders[account] = remote.filter { !$0.role.isStandard }.map { Folder(box: $0.role, name: $0.name, parent: $0.parent) }
+    }
+
     func contains(_ ref: MailboxRef, _ m: Message) -> Bool {
         switch ref {
         case .smart(.allInboxes): m.mailbox == .inbox
@@ -77,12 +100,18 @@ public final class MailStore {
         if let c = countsCache, c.revision == revision { return (c.total, c.unread) }
         // Per account and mailbox first (few keys, cheap to hash), smart mailboxes alongside.
         struct Key: Hashable { let account: UUID; let box: MailboxKind }
-        var box: [Key: (total: Int, unread: Int)] = [:]
+        // Messages of one mailbox mostly sit together, so the key (a string, long for Exchange folders) is
+        // hashed once per run of them, not once per message.
+        var keys: [Key] = [], tally: [(total: Int, unread: Int)] = [], slot: [Key: Int] = [:], last = -1
         var smart: [SmartMailbox: (total: Int, unread: Int)] = [:]
         for m in messages {
             let u = m.isRead ? 0 : 1
-            box[Key(account: m.accountID, box: m.mailbox), default: (0, 0)].total += 1
-            box[Key(account: m.accountID, box: m.mailbox), default: (0, 0)].unread += u
+            if last < 0 || keys[last].account != m.accountID || keys[last].box != m.mailbox {
+                let k = Key(account: m.accountID, box: m.mailbox)
+                if let i = slot[k] { last = i } else { last = keys.count; slot[k] = last; keys.append(k); tally.append((0, 0)) }
+            }
+            tally[last].total += 1
+            tally[last].unread += u
             if m.mailbox == .inbox {
                 smart[.allInboxes, default: (0, 0)].total += 1; smart[.allInboxes, default: (0, 0)].unread += u
                 if m.isVIP { smart[.vip, default: (0, 0)].total += 1; smart[.vip, default: (0, 0)].unread += u }
@@ -93,7 +122,7 @@ public final class MailStore {
             }
         }
         var total: [MailboxRef: Int] = [:], unread: [MailboxRef: Int] = [:]
-        for (k, v) in box { total[.account(k.account, k.box)] = v.total; unread[.account(k.account, k.box)] = v.unread }
+        for (k, v) in zip(keys, tally) { total[.account(k.account, k.box)] = v.total; unread[.account(k.account, k.box)] = v.unread }
         for (k, v) in smart { total[.smart(k)] = v.total; unread[.smart(k)] = v.unread }
         countsCache = (revision, total, unread)
         return (total, unread)
@@ -137,7 +166,7 @@ public final class MailStore {
         switch selectedMailbox {
         case .smart(let s): s == .allInboxes ? "All Inboxes" : s.title
         case let .account(id, kind):
-            kind == .inbox ? "Inbox – \(account(id)?.name ?? "")" : kind.title
+            kind == .inbox ? "Inbox – \(account(id)?.name ?? "")" : name(of: kind, in: id)
         }
     }
 
@@ -314,6 +343,32 @@ public final class MailStore {
         if !r.more { complete.insert(key(account, mailbox)) }
     }
 
+    /// Applies several pages of one folder in one merge, as if one after the other. Each merge goes over every
+    /// message, so a batch of history pages costs one pass instead of one per page.
+    public func apply(_ pages: [SyncResult], account: UUID, mailbox: MailboxKind) {
+        guard let last = pages.last else { return }
+        var upserts: [Message] = [], slot: [String: Int] = [:], deleted = Set<String>(), reads: [String: Bool] = [:]
+        for p in pages {
+            for rid in p.deletedRemoteIDs {
+                slot[rid] = nil  // an earlier page's version is dropped: only messages still in `slot` are merged
+                reads[rid] = nil
+                deleted.insert(rid)
+            }
+            for m in p.upserts {
+                guard let rid = m.remoteID else { continue }  // server messages always have one
+                deleted.remove(rid); reads[rid] = nil
+                if let i = slot[rid] { upserts[i] = m } else { slot[rid] = upserts.count; upserts.append(m) }
+            }
+            for (rid, v) in p.readChanges {
+                if let i = slot[rid] { upserts[i].isRead = v } else { reads[rid] = v }
+            }
+        }
+        merge(slot.sorted { $0.value < $1.value }.map { upserts[$0.value] }, deleted: Array(deleted), reads: reads,
+              account: account, mailbox: mailbox)
+        syncTokens[key(account, mailbox)] = last.token
+        if !last.more { complete.insert(key(account, mailbox)) }
+    }
+
     /// Merges server messages into one mailbox without touching its sync position (used for the newest-N
     /// lookup). Known messages keep their local ID, selection and loaded body. Messages with a change still
     /// waiting for the server keep their local read state, flag and mailbox.
@@ -367,11 +422,12 @@ public final class MailStore {
     public func cache() -> MailCache {
         var out: [UUID: MailCache.AccountState] = [:]
         for acct in serverAccounts {
+            let boxes = MailboxKind.allCases + (folders[acct] ?? []).map(\.box)
             var tokens: [MailboxKind: String] = [:]
-            for box in MailboxKind.allCases { tokens[box] = syncTokens[key(acct, box)] }
+            for box in boxes { tokens[box] = syncTokens[key(acct, box)] }
             out[acct] = MailCache.AccountState(messages: messages.filter { $0.accountID == acct && $0.remoteID != nil },
                                                syncTokens: tokens, outbox: outbox.filter { $0.account == acct },
-                                               complete: MailboxKind.allCases.filter { isComplete(acct, $0) })
+                                               complete: boxes.filter { isComplete(acct, $0) }, folders: folders[acct])
         }
         return MailCache(accounts: out)
     }
@@ -386,6 +442,7 @@ public final class MailStore {
             for (box, token) in state.syncTokens { syncTokens[key(acct, box)] = token }
             outbox += state.outbox
             for box in state.complete ?? [] { complete.insert(key(acct, box)) }
+            if let f = state.folders, folders[acct] == nil { folders[acct] = f }
             serverAccounts.insert(acct)
         }
         scheduleFlush()
@@ -477,7 +534,7 @@ public final class MailStore {
         case let .setFlagged(ids, v): try await b.setFlagged(ids, v)
         case let .move(ids, box):
             guard let folder = remoteFolders[p.account]?.first(where: { $0.role == box }) else {
-                throw MailError("There is no \(box.title) folder on the server")
+                throw MailError("There is no \(name(of: box, in: p.account)) folder on the server")
             }
             renameRemote(try await b.move(ids, to: folder), account: p.account)
         case let .delete(ids): try await b.delete(ids)
@@ -592,7 +649,7 @@ public final class MailStore {
         await flushTask?.value
         for (acct, backend) in backends where !paused.contains(acct) {
             do {
-                if remoteFolders[acct] == nil { remoteFolders[acct] = try await backend.folders() }
+                if remoteFolders[acct] == nil { setRemoteFolders(try await backend.folders(), account: acct) }
                 for role in quickCheckRoles(acct) {
                     guard let folder = remoteFolders[acct]?.first(where: { $0.role == role }) else { continue }
                     if isComplete(acct, role) {
@@ -621,12 +678,16 @@ public final class MailStore {
         return [.inbox]
     }
 
-    /// History order: small, often-read folders first; Sent (often the largest) last.
+    /// History order: small, often-read folders first, the user's own folders after them; Sent (often the largest) last.
     static let historyPriority: [MailboxKind] = [.inbox, .drafts, .archive, .junk, .trash, .sent]
+
+    static func prioritized(_ roles: [MailboxKind]) -> [MailboxKind] {
+        historyPriority.dropLast().filter(roles.contains) + roles.filter { !$0.isStandard } + (roles.contains(.sent) ? [.sent] : [])
+    }
 
     /// The mailbox on screen jumps the queue.
     func historyOrder(_ acct: UUID, _ roles: [MailboxKind]) -> [MailboxKind] {
-        var order = Self.historyPriority.filter(roles.contains)
+        var order = Self.prioritized(roles)
         if case let .account(a, box) = selectedMailbox, a == acct, let i = order.firstIndex(of: box) {
             order.insert(order.remove(at: i), at: 0)
         }
@@ -651,35 +712,55 @@ public final class MailStore {
         }
     }
 
+    /// How long history pages are collected before they are shown. Applied together in one go, they cost the
+    /// window one update instead of one per page, which kept a big mailbox's window from responding.
+    static let historyBatch: Duration = .milliseconds(1500)
+
     /// Fetches every folder's full contents in the background: first the newest messages of each folder,
-    /// then one page at a time. The next folder is picked after every page, so switching mailboxes takes
-    /// effect at once. A failing folder doesn't stop the others; offline, the history waits for the next check.
+    /// then one page at a time, shown in batches (`historyBatch`). The next folder is picked after every batch,
+    /// so switching mailboxes takes effect within moments. A failing folder doesn't stop the others; offline,
+    /// the history waits for the next check.
     public func syncHistory() async {
         defer { progress = nil }
         for (acct, backend) in backends where !paused.contains(acct) {
+            var fetched: [(MailboxKind, [Message])] = [], since = ContinuousClock.now
+            func show() {
+                for (role, ms) in fetched { merge(ms, account: acct, mailbox: role); newestLoaded.insert(key(acct, role)) }
+                fetched = []; since = .now
+            }
             for role in historyOrder(acct, (remoteFolders[acct] ?? []).map(\.role))
             where !isComplete(acct, role) && !historyFailed.contains(key(acct, role)) && !newestLoaded.contains(key(acct, role)) {
                 guard let folder = remoteFolders[acct]?.first(where: { $0.role == role }) else { continue }
                 showHistoryProgress(acct)
                 do {
-                    merge(try await backend.newest(in: folder, limit: 200), account: acct, mailbox: role)
-                    newestLoaded.insert(key(acct, role))
+                    fetched.append((role, try await backend.newest(in: folder, limit: 200)))
                 } catch {
                     _ = pauseIfSignInFailed(error, account: acct)
                     break
                 }
+                if since.duration(to: .now) > Self.historyBatch { show() }
             }
+            show()
         }
         while let (acct, backend, folder) = nextHistoryFolder() {
             showHistoryProgress(acct)
+            var pages: [SyncResult] = []
+            // Whatever arrived is shown, also when a page fails; in one merge.
+            defer { apply(pages, account: acct, mailbox: folder.role) }
             do {
-                apply(try await backend.sync(folder, token: syncToken(acct, folder.role)), account: acct, mailbox: folder.role)
+                var token = syncToken(acct, folder.role)
+                let start = ContinuousClock.now
+                repeat {
+                    let r = try await backend.sync(folder, token: token)
+                    pages.append(r)
+                    token = r.token
+                } while pages.last?.more == true && start.duration(to: .now) < Self.historyBatch
             } catch where pauseIfSignInFailed(error, account: acct) {
             } catch is URLError {
                 return
             } catch {
                 historyFailed.insert(key(acct, folder.role))
-                historyError = "\(folder.role.title): \(error.localizedDescription)"
+                historyError = "\(name(of: folder.role, in: acct)): \(error.localizedDescription)"
                 status = historyError
             }
         }
@@ -705,7 +786,7 @@ public final class MailStore {
     /// Complete folders the quick check doesn't cover.
     func backgroundDeltaRoles(_ acct: UUID, _ roles: [MailboxKind]) -> [MailboxKind] {
         let quick = quickCheckRoles(acct)
-        return Self.historyPriority.filter { roles.contains($0) && isComplete(acct, $0) && !quick.contains($0) }
+        return Self.prioritized(roles).filter { isComplete(acct, $0) && !quick.contains($0) }
     }
 
     private func nextHistoryFolder() -> (UUID, any MailBackend, RemoteFolder)? {

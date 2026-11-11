@@ -9,31 +9,47 @@ public struct Account: Identifiable, Hashable, Sendable {
     }
 }
 
-/// Standard per-account mailboxes, in Mail's sidebar order.
-public enum MailboxKind: String, CaseIterable, Hashable, Codable, Sendable {
-    case inbox, drafts, sent, junk, trash, archive
+/// A mailbox of an account: one of the standard ones, in Mail's sidebar order, or a folder of the user's own.
+/// A string, so caches written when only the standard ones existed still load.
+public struct MailboxKind: RawRepresentable, Hashable, Codable, Sendable {
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
 
+    public static let inbox = Self(rawValue: "inbox")
+    public static let drafts = Self(rawValue: "drafts")
+    public static let sent = Self(rawValue: "sent")
+    public static let junk = Self(rawValue: "junk")
+    public static let trash = Self(rawValue: "trash")
+    public static let archive = Self(rawValue: "archive")
+
+    /// The standard mailboxes every account has.
+    public static let allCases: [MailboxKind] = [.inbox, .drafts, .sent, .junk, .trash, .archive]
+
+    /// A folder of the user's own; `id` is unique within its account (the server's folder ID).
+    public static func folder(_ id: String) -> Self { Self(rawValue: "folder:" + id) }
+
+    public var isStandard: Bool { Self.allCases.contains(self) }
+
+    /// The standard mailbox's name. A folder's name is in `MailStore.name(of:in:)`.
     public var title: String {
-        switch self {
-        case .inbox: "Inbox"
-        case .drafts: "Drafts"
-        case .sent: "Sent"
-        case .junk: "Junk"
-        case .trash: "Trash"
-        case .archive: "Archive"
-        }
+        [.inbox: "Inbox", .drafts: "Drafts", .sent: "Sent", .junk: "Junk", .trash: "Trash", .archive: "Archive"][self] ?? ""
     }
 
-    /// SF Symbols Mail uses for these mailboxes.
+    /// SF Symbols Mail uses for these mailboxes; a plain folder for the user's own.
     public var symbol: String {
-        switch self {
-        case .inbox: "tray"
-        case .drafts: "doc"
-        case .sent: "paperplane"
-        case .junk: "xmark.bin"
-        case .trash: "trash"
-        case .archive: "archivebox"
-        }
+        [.inbox: "tray", .drafts: "doc", .sent: "paperplane", .junk: "xmark.bin", .trash: "trash",
+         .archive: "archivebox"][self] ?? "folder"
+    }
+}
+
+/// A folder of the user's own, in the account's tree.
+public struct Folder: Hashable, Codable, Sendable {
+    public var box: MailboxKind
+    public var name: String
+    /// The mailbox it sits in, standard or not; nil at the top of the account.
+    public var parent: MailboxKind?
+    public init(box: MailboxKind, name: String, parent: MailboxKind? = nil) {
+        self.box = box; self.name = name; self.parent = parent
     }
 }
 

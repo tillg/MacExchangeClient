@@ -5,7 +5,7 @@ import Foundation
 ///
 /// Messages returned here carry `remoteID`; the store assigns account, mailbox and its own local IDs.
 public protocol MailBackend: Sendable {
-    /// The account's standard folders, mapped to Mail's mailbox roles.
+    /// The account's standard folders, mapped to Mail's mailbox roles, and the user's own mail folders.
     func folders() async throws -> [RemoteFolder]
     /// The newest messages of a folder, for a fast first screen before the full sync finishes.
     func newest(in folder: RemoteFolder, limit: Int) async throws -> [Message]
@@ -75,12 +75,16 @@ public struct PendingChange: Hashable, Codable, Sendable {
 }
 
 public struct RemoteFolder: Hashable, Sendable {
+    /// A standard mailbox, or `.folder(id)` for a folder of the user's own.
     public var role: MailboxKind
     public var id: String
     /// Messages in the folder on the server, for the history progress bar.
     public var totalCount: Int
-    public init(role: MailboxKind, id: String, totalCount: Int = 0) {
-        self.role = role; self.id = id; self.totalCount = totalCount
+    /// The user's own folders only: the name, and the mailbox it sits in (nil at the top).
+    public var name: String
+    public var parent: MailboxKind?
+    public init(role: MailboxKind, id: String, totalCount: Int = 0, name: String = "", parent: MailboxKind? = nil) {
+        self.role = role; self.id = id; self.totalCount = totalCount; self.name = name; self.parent = parent
     }
 }
 
@@ -119,8 +123,9 @@ public struct MessageBody: Sendable {
 /// Progress of a check for mail.
 public struct SyncProgress: Equatable, Sendable {
     public var text: String
-    public var fraction: Double
-    public init(text: String, fraction: Double) { self.text = text; self.fraction = fraction }
+    /// nil while the amount of work is unknown: the bar then runs without a value.
+    public var fraction: Double?
+    public init(text: String, fraction: Double?) { self.text = text; self.fraction = fraction }
 }
 
 /// The server rejected the credentials. Backends throw this so the store stops retrying: repeated

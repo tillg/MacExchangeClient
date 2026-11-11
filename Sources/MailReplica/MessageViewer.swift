@@ -147,8 +147,12 @@ struct MoveMenu: View {
         Menu {
             ForEach(store.accounts) { acct in
                 Section(acct.name) {
-                    ForEach(MailboxKind.allCases, id: \.self) { kind in
-                        Button { move(acct.id, kind) } label: { Label(kind.title, systemImage: kind.symbol) }
+                    // Subfolders follow their parent, indented, as in Mail's Move To menu.
+                    ForEach(boxes(acct.id), id: \.box) { item in
+                        Button { move(acct.id, item.box) } label: {
+                            Label(String(repeating: "    ", count: item.depth) + store.name(of: item.box, in: acct.id),
+                                  systemImage: item.box.symbol)
+                        }
                     }
                 }
             }
@@ -158,11 +162,19 @@ struct MoveMenu: View {
         .help("Move selected messages")
     }
 
-    private func move(_ acct: UUID, _ kind: MailboxKind) {
-        store.actOnSelection { ids in
-            store.move(ids, to: kind)
+    /// The account's mailboxes in sidebar order, each followed by its subfolders.
+    private func boxes(_ acct: UUID) -> [(box: MailboxKind, depth: Int)] {
+        func below(_ box: MailboxKind, _ depth: Int) -> [(box: MailboxKind, depth: Int)] {
+            [(box, depth)] + store.children(of: box, account: acct).flatMap { below($0.box, depth + 1) }
         }
+        return (MailboxKind.allCases + store.children(of: nil, account: acct).map(\.box)).flatMap { below($0, 0) }
     }
+
+    /// Into that account's mailbox; `drop` refuses to move server mail to another account.
+    private func move(_ acct: UUID, _ kind: MailboxKind) {
+        store.drop(store.selection, on: .account(acct, kind))
+    }
+
 }
 
 struct FlagMenu: View {

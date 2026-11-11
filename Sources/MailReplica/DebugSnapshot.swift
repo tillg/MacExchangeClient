@@ -23,8 +23,10 @@ struct DebugSnapshot: ViewModifier {
                     store.setBody(MessageBody(text: m.body, attachments: m.attachments, html: html), for: m.id)
                 }
             }
-            if let f = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_PROGRESS"].flatMap(Double.init) {
-                store.progress = SyncProgress(text: "Checking for Mail…", fraction: f)
+            // MAIL_SNAPSHOT_PROGRESS=0.4 shows the activity bar at 40%; "loading" shows the bar of the startup cache load.
+            if let p = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_PROGRESS"] {
+                store.progress = p == "loading" ? SyncProgress(text: "Loading Mail…", fraction: nil)
+                    : Double(p).map { SyncProgress(text: "Checking for Mail…", fraction: $0) }
             }
             // MAIL_SNAPSHOT_ANSWER=accept|tentative|decline|propose opens the answer window for the selected
             // invite and captures that window instead.

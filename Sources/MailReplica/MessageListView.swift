@@ -7,13 +7,19 @@ struct MessageListView: View {
 
     var body: some View {
         let msgs = store.visibleMessages
+        // SwiftUI compares a view's data and the values its closures capture on every change, field by field.
+        // For tens of thousands of messages that blocked the window, so the list gets IDs and the rows look
+        // their message up in a class, which is compared by reference.
+        let lookup = Lookup(msgs)
+        let isEmpty = msgs.isEmpty
         VStack(spacing: 0) {
             if store.showCategories && store.selectedMailbox.isInbox && store.searchText.isEmpty {
                 CategoryBar()
                 Divider()
             }
             List(selection: Bindable(store).selection) {
-                ForEach(msgs) { m in
+                ForEach(msgs.map(\.id), id: \.self) { id in
+                    let m = lookup.byID[id]!
                     MessageRow(message: m)
                         .tag(m.id)
                         // Dragging a selected row drags the whole selection, as in Mail.
@@ -43,7 +49,7 @@ struct MessageListView: View {
             }
             .listStyle(.inset)
             .overlay {
-                if msgs.isEmpty {
+                if isEmpty {
                     if store.searchText.isEmpty {
                         ContentUnavailableView(store.filterUnread ? "No Unread Messages" : "No Messages",
                                                systemImage: "tray")
@@ -67,6 +73,12 @@ struct MessageListView: View {
             }
         }
     }
+}
+
+/// The visible messages by ID, for the rows. A class, so SwiftUI compares it by reference.
+private final class Lookup {
+    let byID: [Message.ID: Message]
+    init(_ msgs: [Message]) { byID = Dictionary(uniqueKeysWithValues: msgs.map { ($0.id, $0) }) }
 }
 
 struct MessageRow: View {

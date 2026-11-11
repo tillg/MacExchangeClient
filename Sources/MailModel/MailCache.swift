@@ -9,6 +9,8 @@ public struct MailCache: Codable, Sendable {
         public var outbox: [PendingChange]
         /// Folders whose full sync has finished. Optional, so caches from before it existed still load.
         public var complete: [MailboxKind]?
+        /// The account's folders of its own, so their mail has a place in the sidebar before the server answers.
+        public var folders: [Folder]?
     }
 
     public var accounts: [UUID: AccountState]

@@ -13,7 +13,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 
 ## Features
 
-- **Exchange accounts over EWS:** sign in under Settings ▸ Accounts with email, `DOMAIN\user`, password and server, as in iOS Mail. Inbox, Drafts, Sent, Junk, Deleted Items and Archive are synced. What you look at drives the order, as described under [How mail is fetched](#how-mail-is-fetched). The password is kept in the Keychain
+- **Exchange accounts over EWS:** sign in under Settings ▸ Accounts with email, `DOMAIN\user`, password and server, as in iOS Mail. Inbox, Drafts, Sent, Junk, Deleted Items and Archive are synced, and so are your own mail folders and subfolders. What you look at drives the order, as described under [How mail is fetched](#how-mail-is-fetched). The password is kept in the Keychain
 
 - **Meeting invites, as in Outlook:** for each invite you see:
   - when and where, with the required and optional attendees;
@@ -26,6 +26,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 - **HTML mail:** shown as the sender laid it out, on a white page also in dark mode. Mail without its own fonts uses Mail's default, Helvetica 14, with Mail's margins. Images, styles and fonts from the web follow Outlook's "Download external images" (Settings ▸ Privacy): by default they load for senders in your organisation (your account's mail domain and its subdomains). Other mail shows Load Remote Content first, so opening it doesn't tell the sender. Images load straight from the sender's server, with no privacy relay like Mail's. The app runs no JavaScript in mail, and links open in your browser. Images attached to the message and shown in its text (`cid:`, such as signature logos) load from Exchange when you open the message; they are kept in memory only, not in the cache. The list, search and replies use the plain-text version, which Exchange sends along
 - **Three-column window** with a mailboxes sidebar, a message list and a message view, using Mail's toolbar layout and SF Symbols
 - **Favorites and smart mailboxes:** All Inboxes, VIPs, Flagged, Unread, then each account's Inbox, Drafts, Sent, Junk, Trash and Archive, with unread badges
+- **Folder trees, as in Mail:** each account's own folders follow its standard mailboxes, sorted by name. Subfolders sit under their parent (for example Inbox ▸ Projects ▸ Launch), behind a disclosure triangle. With more than one account, Favorites ▸ All Inboxes opens into each account's Inbox. Folders are move and drop targets, and the Move menu lists them indented under their parent. From Exchange you get every mail folder below the mailbox root, without calendar, contacts, tasks, Outbox and hidden folders. The folder list is read once per launch, so a folder created elsewhere shows up after a relaunch. Mail in a subfolder of Inbox doesn't count towards All Inboxes, as in Mail
 - **Categories:** Primary, Transactions, Updates and Promotions in the Inbox (⌥⌘1–4)
 - **Message actions:** reply, reply all, forward, archive, delete, junk, flag in seven colours, mark read or unread. After an action the next message is selected, as in Mail
 - **Drag & drop:** drag messages onto a mailbox to move them, also to another account. Drop them on Flagged to flag them, or on All Inboxes to put each back in its own Inbox
@@ -34,7 +35,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 - **Swipe actions:** swipe right for Unread, left for Trash or Flag
 - **Menu bar and shortcuts** taken from Mail's own `MainMenu.nib`
 - **Light and dark mode**
-- **Own app icon:** a white envelope on pink, drawn in code (`AppIcon.swift`). `MAIL_ICON_EXPORT=icon.png` writes it as a PNG
+- **Own app icon:** a white envelope on pink, drawn in code (`AppIcon.swift`). `MAIL_ICON_EXPORT=icon.png` writes it as a PNG. `run.sh` wraps the build in `MailReplica.app` with that icon, so Activity Monitor and system dialogs show it too
 
 ## Getting started
 
@@ -43,8 +44,8 @@ You need macOS 14 or later and Swift 6. Command Line Tools are enough; Xcode is 
 ```sh
 git clone https://github.com/tillg/MacExchangeClient.git
 cd MacExchangeClient
-./run.sh          # build and launch
-./run.sh build    # build only
+./run.sh          # build and launch .build/MailReplica.app
+./run.sh build    # build only (the bare binary and the .app)
 ./run.sh test     # run the model tests
 ```
 
@@ -64,11 +65,11 @@ Changes to Exchange mail show at once and are then written to the server in orde
 - Offline, changes wait until the next refresh. A message that fails to send is never resent automatically. It is kept in Drafts on this Mac instead.
 - Exchange messages can't be dragged to another account yet.
 
-Exchange mail, sync positions and unsent changes are cached in `~/Library/Application Support/MailReplica/Cache.json`, readable only by you. It is loaded in the background at launch, about 0.6s for 70,000 messages, before the first check, so only changes are fetched. It is saved at most once a minute after changes, off the main thread, and on quit. Sample data is never cached. Delete the file to start fresh.
+Exchange mail, sync positions and unsent changes are cached in `~/Library/Application Support/MailReplica/Cache.json`, readable only by you. It is loaded in the background at launch, before the first check, so only changes are fetched. Meanwhile the sidebar shows “Loading Mail…”. A test cache of 70,000 messages without bodies (26.7 MB) loads in about 0.6s. A real one with 180,000 messages (183 MB) took 11s on a busy machine, nearly all of it JSON decoding. It is saved at most once a minute after changes, off the main thread, and on quit. Sample data is never cached. Delete the file to start fresh.
 
 `MAIL_SAMPLE_DATA=1 ./run.sh` shows the sample data even when an account is set up.
 
-**Keychain prompt after every build:** run `./make-signing-identity.sh` once. It creates a self-signed code-signing certificate "MailReplica Dev" in your login keychain, and `run.sh` then signs each build with it. The Keychain asks once more, so answer "Always Allow". After that it recognises rebuilt apps as the same app. Without the certificate, every build is signed ad hoc, looks like a new app, and the Keychain asks again. Remove the certificate with `security delete-identity -c "MailReplica Dev"`.
+**Keychain prompt after every build:** each new build asks for the login password once before it can read the Exchange password. `./make-signing-identity.sh` creates a self-signed certificate "MailReplica Dev", and `run.sh` signs each build with it, but that does not stop the prompt. A certificate without an Apple Team ID gives the Keychain nothing stable to recognise, so it ties access to the exact binary. Checked on 2026-11-11: a rebuilt binary with the same certificate was refused the item the previous build had stored. Signing with an Apple Development certificate (with a Team ID) should end the prompts, but this hasn't been tried yet. Remove the self-signed certificate with `security delete-identity -c "MailReplica Dev"`.
 
 ### How mail is fetched
 
@@ -76,7 +77,7 @@ What's on screen comes first:
 
 1. **Quick check:** every 15 seconds, and at once when you select a mailbox. It covers only the Inbox and the selected mailbox. A fully synced folder is asked only for changes, one small request of about 0.05s. A folder still syncing gets its newest 50 messages, about 0.1s.
 2. **Bodies:** loaded when you open a message.
-3. **History, in the background:** first the newest 200 messages of every folder. Then each folder's full contents, one page of 512 at a time. The selected mailbox goes first and Sent comes last. While it runs, the sidebar shows "Synchronizing “Exchange”" with a progress bar based on the server's message counts. It never holds up the quick check.
+3. **History, in the background:** first the newest 200 messages of every folder. Then each folder's full contents, one page of 512 at a time. The selected mailbox goes first, your own folders come after the standard ones, and Sent comes last. While it runs, the sidebar shows "Synchronizing “Exchange”" with a progress bar based on the server's message counts. It never holds up the quick check.
 
 4. **Folders not on screen:** once history is done, fully synced folders are also asked for changes, one small request each.
 
@@ -113,7 +114,7 @@ Views stay thin. Every action is a method on `MailStore`, and each one has a tes
 
 `MailStore` talks to servers only through the `MailBackend` protocol: folders, newest messages, sync with an opaque token, and message bodies. EWS is one implementation; Microsoft Graph will be another, with the token holding a Graph delta link. The data store doesn't change.
 
-The live EWS tests run only with `EWS_USER` (`DOMAIN\user`) and `EWS_SERVER` set and the password in the Keychain (service `MailReplica-EWS`, account = username). Otherwise they are skipped. The read test only reads. The write test also needs `EWS_WRITE_TEST=1`. It works only inside the folder `MailReplica-Test` (created if missing), on a message it creates there itself, and never sends mail. `EWS_DEBUG=1` logs which sign-in method was used. `EWS_PROBE=1` lists which fields a real invite carries, never values. `EWS_TIMING=1` prints read-only timings and folder sizes, never mail content. Run the live tests on their own (`--filter EWSLive`): the performance tests hold the main thread and would skew their timings.
+The live EWS tests run only with `EWS_USER` (`DOMAIN\user`) and `EWS_SERVER` set and the password in the Keychain (service `MailReplica-EWS`, account = username). Otherwise they are skipped. The read test only reads. The write test also needs `EWS_WRITE_TEST=1`. It works only inside the folder `MailReplica-Test` (created if missing), on a message it creates there itself, and never sends mail. `EWS_DEBUG=1` logs which sign-in method was used. `EWS_PROBE=1` lists which fields a real invite carries, never values. `EWS_TIMING=1` prints read-only timings and folder sizes, never mail content. `MAIL_CACHE_PROBE=1` times loading your real cache and prints only sizes and counts. Run the live tests on their own (`--filter EWSLive`): the performance tests hold the main thread and would skew their timings.
 
 ### Screenshots without screen recording
 
@@ -137,6 +138,7 @@ The details come from Mail.app's own resources in `/System/Applications/Mail.app
 | Window | Sidebar, message list, message view | ✅ nibs `MailboxesViewController`, `MessageListListLayoutViewController`, `MessageViewController` |
 | Toolbar | toggle sidebar · back/forward · filter · view options · compose ‖ reply/reply all/forward · archive/delete/junk · move · flag ‖ search | ✅ `MainWindow.toolbar` default set and SF Symbol names |
 | Sidebar | Favorites, Smart Mailboxes, per-account mailboxes, badges | ✅ `Sidebar*.icns` names · ⚠️ badge rules |
+| Folder tree | Own folders after the standard ones, by name; subfolders behind disclosure triangles, closed at launch; a closed folder shows only its own count; All Inboxes opens into one Inbox per account | ⚠️ from memory of Mail, not read from the bundle |
 | Categories | Primary, Transactions, Updates, Promotions | ✅ `MainMenu.nib` · ⚠️ colours |
 | Flags | Red, Orange, Yellow, Green, Blue, Purple, Gray | ✅ `MainMenu.nib` |
 | Shortcuts | See table above | ✅ `MainMenu.nib` key equivalents |
@@ -155,7 +157,7 @@ The details come from Mail.app's own resources in `/System/Applications/Mail.app
 - [x] HTML message view
 - [x] Inline images in HTML mail
 - [ ] Opening attachments
-- [ ] Custom folders (only the standard folders are shown now)
+- [x] Custom folders and subfolders, as a tree
 - [ ] Microsoft Graph backend, once the mailbox is reachable there
 
 **Not planned for now:** rules, conversation threading, rich-text compose, Remind Me, Follow Up, Mute, and the separate message window on double-click.

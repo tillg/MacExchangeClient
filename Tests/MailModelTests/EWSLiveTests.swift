@@ -52,4 +52,21 @@ struct EWSLiveTests {
         #expect(store.progress == nil)
         #expect(took < 5)
     }
+
+    /// The folder tree leaves out the standard folders by ID, so the IDs FindFolder returns must match
+    /// GetFolder's. Otherwise the Inbox would show up again as a folder of its own. Prints counts only.
+    @Test(.enabled(if: EWSLiveTests.backend != nil)) func folderTreeMatchesTheStandardFolders() async throws {
+        let b = try #require(Self.backend)
+        let folders = try await b.folders()
+        let standard = folders.filter { $0.role.isStandard }, own = folders.filter { !$0.role.isStandard }
+        let deep = try await b.client.call("""
+            <m:FindFolder Traversal="Deep"><m:FolderShape><t:BaseShape>IdOnly</t:BaseShape></m:FolderShape>\
+            <m:ParentFolderIds><t:DistinguishedFolderId Id="msgfolderroot"/></m:ParentFolderIds></m:FindFolder>
+            """)
+        let ids = Set(deep.all("FolderId").compactMap { $0.attr("Id") })
+        print("FOLDERS standard \(standard.count), own \(own.count), nested \(own.filter { $0.parent != nil }.count), deep \(ids.count)")
+        #expect(standard.allSatisfy { ids.contains($0.id) })
+        #expect(Set(own.map(\.id)).isDisjoint(with: standard.map(\.id)))
+        #expect(own.allSatisfy { !$0.name.isEmpty })
+    }
 }

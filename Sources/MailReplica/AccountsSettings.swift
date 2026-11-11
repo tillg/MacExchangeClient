@@ -15,7 +15,11 @@ enum AppSetup {
     /// Reads the cache off the main thread (tens of MB for a big mailbox), so the window shows at once.
     static func loadCache(into store: MailStore) async {
         defer { cacheReady = true }
-        guard usesServer, let cache = await Task.detached(priority: .userInitiated, operation: { MailCache.load() }).value
+        guard usesServer else { return }
+        // A big cache takes seconds to read; say so instead of showing empty mailboxes.
+        store.progress = SyncProgress(text: "Loading Mail…", fraction: nil)
+        defer { if store.progress?.fraction == nil { store.progress = nil } }
+        guard let cache = await Task.detached(priority: .userInitiated, operation: { MailCache.load() }).value
         else { return }
         store.restore(cache)
     }
