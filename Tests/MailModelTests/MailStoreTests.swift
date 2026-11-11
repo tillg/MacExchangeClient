@@ -525,6 +525,27 @@ struct MailStoreTests {
         #expect(s.isComplete(work.id, .sent))
     }
 
+    /// The quick check mostly gets nothing new: that mustn't touch the messages, which redraws every view.
+    @Test func anEmptySyncLeavesTheMessagesAlone() {
+        let s = synced(["A"])
+        let before = s.changeCount
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], token: "t2", more: false), account: work.id, mailbox: .inbox)
+        s.apply([SyncResult(upserts: [], deletedRemoteIDs: [], token: "t3", more: false)], account: work.id, mailbox: .inbox)
+        s.merge([], account: work.id, mailbox: .sent)
+        #expect(s.changeCount == before)
+        #expect(s.syncToken(work.id, .inbox) == "t3")
+    }
+
+    /// The newest messages of several folders go in with one pass over all messages.
+    @Test func newestOfSeveralFoldersMergeAtOnce() {
+        let s = synced([])
+        let before = s.changeCount
+        s.merge([(.sent, [remote("S")]), (.drafts, [remote("D")]), (.archive, [])], account: work.id)
+        #expect(s.changeCount == before + 1)
+        #expect(s.messages.first { $0.remoteID == "S" }?.mailbox == .sent)
+        #expect(s.messages.first { $0.remoteID == "D" }?.mailbox == .drafts)
+    }
+
     @Test func folderIsCompleteOnceTheLastPageArrived() {
         let s = synced([])
         s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "p1", more: true), account: work.id, mailbox: .sent)

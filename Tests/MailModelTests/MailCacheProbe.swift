@@ -6,9 +6,15 @@ import Testing
 /// Loads the real cache and prints timings and sizes only, never mail content. Runs only with `MAIL_CACHE_PROBE=1`.
 @MainActor
 struct MailCacheProbe {
+    /// The cache, or what's left of it after the move to SQLite.
+    static var cacheURL: URL {
+        FileManager.default.fileExists(atPath: MailCache.defaultURL.path) ? MailCache.defaultURL
+            : MailCache.defaultURL.appendingPathExtension("imported")
+    }
+
     @Test(.enabled(if: ProcessInfo.processInfo.environment["MAIL_CACHE_PROBE"] == "1")) func realCacheLoad() throws {
         var t = Date()
-        let data = try Data(contentsOf: MailCache.defaultURL)
+        let data = try Data(contentsOf: Self.cacheURL)
         let read = Date().timeIntervalSince(t); t = Date()
         let cache = try JSONDecoder().decode(MailCache.self, from: data)
         let decode = Date().timeIntervalSince(t)
@@ -93,7 +99,7 @@ extension MailCacheProbe {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
-        try FileManager.default.copyItem(at: MailCache.defaultURL, to: cacheURL)
+        try FileManager.default.copyItem(at: Self.cacheURL, to: cacheURL)
         let accounts = try #require(MailCache.load(from: cacheURL)).accounts.keys.map { Account(id: $0, name: "A", address: "") }
 
         var t = Date()

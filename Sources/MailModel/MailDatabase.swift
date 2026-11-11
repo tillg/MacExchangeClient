@@ -109,6 +109,16 @@ public final class MailDatabase: @unchecked Sendable {
 
     deinit { sqlite3_close(db) }
 
+    /// Where an import builds the database; it gets its real name only once complete.
+    public static func importingURL(for url: URL) -> URL {
+        url.deletingLastPathComponent().appendingPathComponent(url.lastPathComponent + ".importing")
+    }
+
+    /// The database file and SQLite's journal files next to it.
+    static func removeFiles(_ url: URL) {
+        for suffix in ["", "-wal", "-shm"] { try? FileManager.default.removeItem(atPath: url.path + suffix) }
+    }
+
     // MARK: Reading
 
     public func meta() throws -> StoredMeta {
@@ -235,8 +245,9 @@ public final class MailDatabase: @unchecked Sendable {
     // MARK: Moving from Cache.json
 
     /// Moves the old JSON cache into a new database, once: loads it into `store` (decoding off the main
-    /// thread), writes everything, checks the count and renames the file to `Cache.json.imported`, so nothing
-    /// is lost if the database turns out wrong. Returns nil when there is no cache to import.
+    /// thread), writes everything under a temporary name, checks the count, and only then gives the database
+    /// its name and renames the cache to `Cache.json.imported`. Interrupted at any point, the next launch
+    /// imports again. Returns nil when there is no cache to import.
     @MainActor
     public static func importCache(from cacheURL: URL = MailCache.defaultURL, into url: URL = defaultURL,
                                    store: MailStore) async throws -> MailDatabase? {
@@ -249,16 +260,26 @@ public final class MailDatabase: @unchecked Sendable {
         let db: MailDatabase
         do {
             db = try await Task.detached(priority: .userInitiated) { () throws -> MailDatabase in
-                try? FileManager.default.removeItem(at: url)  // a half-written one from an earlier attempt
-                let db = try MailDatabase(url: url)
-                try db.write(everything)
-                guard try db.count() == everything.upserts.count else {
-                    throw DatabaseError(errorDescription: "The new mail database is incomplete")
+                let temp = importingURL(for: url)
+                removeFiles(temp)  // a half-written one from an interrupted import
+                do {
+                    let building = try MailDatabase(url: temp)
+                    try building.write(everything)
+                    guard try building.count() == everything.upserts.count else {
+                        throw DatabaseError(errorDescription: "The new mail database is incomplete")
+                    }
+                }  // closed here: SQLite folds its journal into the file
+                // Never over an existing database: that one may hold newer mail than the cache.
+                guard !FileManager.default.fileExists(atPath: url.path) else {
+                    throw DatabaseError(errorDescription: "A mail database already exists")
                 }
-                return db
+                for suffix in ["-wal", "-shm"] { try? FileManager.default.removeItem(atPath: url.path + suffix) }
+                try FileManager.default.moveItem(at: temp, to: url)
+                removeFiles(temp)
+                return try MailDatabase(url: url)
             }.value
         } catch {
-            try? FileManager.default.removeItem(at: url)
+            removeFiles(importingURL(for: url))
             throw error
         }
         try FileManager.default.moveItem(at: cacheURL, to: cacheURL.appendingPathExtension("imported"))

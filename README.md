@@ -69,7 +69,7 @@ Exchange mail, sync positions, the folder tree and unsent changes are kept in a 
 
 - **Launch:** the Inboxes load first and show at once, about 0.1s for 2,870 messages. The other mailboxes follow in the background, about 4s for 180,000 messages on a busy machine, while “Loading Mail…” shows in the sidebar. The Inbox is checked with the server meanwhile. Other mailboxes are synced only once their mail is in memory, and changes waiting for Exchange go out after that.
 - **Saving:** changes are written every 15 seconds and on quit, off the main thread, only what changed: one flag change is one row, a few milliseconds.
-- **Upgrading:** the first launch with the database moves the old `Cache.json` into it, which takes a while for a big cache (31s for 180,000 messages on a busy machine). The sidebar shows “Updating Mail Storage…” meanwhile. Afterwards the old file is renamed to `Cache.json.imported`; delete it once you're happy.
+- **Upgrading:** the first launch with the database moves the old `Cache.json` into it, which takes a while for a big cache (31s for 180,000 messages on a busy machine). The sidebar shows “Updating Mail Storage…” meanwhile. The database is built under a temporary name and gets its real name only once the count matches. Quit midway, and the next launch imports again. Afterwards the old file is renamed to `Cache.json.imported`; delete it once you're happy. To go back, delete `Mail.sqlite*` and rename `Cache.json.imported` to `Cache.json`.
 
 Messages are still all held in memory, and the list, counts and search work on that, as before. Sample data is never stored. Delete `Mail.sqlite` (and its `-wal` and `-shm` files) to start fresh.
 
@@ -111,7 +111,7 @@ Sources/
   EWS/              MailBackend over Exchange Web Services, Keychain and account settings
   MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suites for MailStore, the database, the drag payload and EWS requests and parsing (136 tests, plus live tests against a real server)
+  MailModelTests/   Swift Testing suites for MailStore, the database, the drag payload and EWS requests and parsing (139 tests, plus live tests against a real server)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```

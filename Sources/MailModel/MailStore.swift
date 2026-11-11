@@ -385,7 +385,15 @@ public final class MailStore {
     /// waiting for the server keep their local read state, flag and mailbox.
     public func merge(_ upserts: [Message], deleted: [String] = [], reads: [String: Bool] = [:],
                       account: UUID, mailbox: MailboxKind) {
+        merge([(mailbox, upserts)], deleted: deleted, reads: reads, account: account)
+    }
+
+    /// The same for several mailboxes in one pass over all messages, e.g. the newest messages of each folder.
+    /// When nothing changes, `messages` isn't touched: assigning it redraws every view.
+    public func merge(_ groups: [(MailboxKind, [Message])], deleted: [String] = [], reads: [String: Bool] = [:],
+                      account: UUID) {
         serverAccounts.insert(account)
+        guard groups.contains(where: { !$0.1.isEmpty }) || !deleted.isEmpty || !reads.isEmpty else { return }
         let mine = outbox.lazy.filter { $0.account == account }
         let pending = Set(mine.flatMap(\.change.remoteIDs))
         // A pending move makes the source folder report the message as deleted; that one stays.
@@ -395,38 +403,50 @@ public final class MailStore {
             return []
         })
         var ms = messages  // one write to the observed array, not one per message
+        var changed = false
+        // By index, reading only what's needed: copying each of 180,000 messages is slow.
         let gone = Set(deleted).subtracting(moving)
         if !gone.isEmpty {
-            let ids = Set(ms.filter { $0.accountID == account && $0.remoteID.map(gone.contains) == true }.map(\.id))
-            ms.removeAll { ids.contains($0.id) }
-            selection.subtract(ids)
-            forget(ids)
+            var ids = Set<Message.ID>()
+            for i in ms.indices where ms[i].accountID == account {
+                if let r = ms[i].remoteID, gone.contains(r) { ids.insert(ms[i].id) }
+            }
+            if !ids.isEmpty {
+                ms.removeAll { ids.contains($0.id) }
+                selection.subtract(ids)
+                forget(ids)
+                changed = true
+            }
         }
         var index = [String: Int]()
-        for (i, m) in ms.enumerated() where m.accountID == account { if let r = m.remoteID { index[r] = i } }
-        for var m in upserts {
-            m.accountID = account
-            m.mailbox = mailbox
-            if let rid = m.remoteID, let i = index[rid] {
-                let old = ms[i]
-                m.id = old.id
-                if old.flag != nil && m.flag != nil { m.flag = old.flag }  // the server has no colours
-                if old.bodyLoaded && !m.bodyLoaded {
-                    m.body = old.body; m.attachments = old.attachments; m.invite = old.invite; m.bodyLoaded = true
-                    m.html = old.html; m.htmlChecked = old.htmlChecked
+        for i in ms.indices where ms[i].accountID == account { if let r = ms[i].remoteID { index[r] = i } }
+        for (mailbox, upserts) in groups {
+            for var m in upserts {
+                m.accountID = account
+                m.mailbox = mailbox
+                if let rid = m.remoteID, let i = index[rid] {
+                    let old = ms[i]
+                    m.id = old.id
+                    if old.flag != nil && m.flag != nil { m.flag = old.flag }  // the server has no colours
+                    if old.bodyLoaded && !m.bodyLoaded {
+                        m.body = old.body; m.attachments = old.attachments; m.invite = old.invite; m.bodyLoaded = true
+                        m.html = old.html; m.htmlChecked = old.htmlChecked
+                    }
+                    if pending.contains(rid) { m.isRead = old.isRead; m.flag = old.flag; m.mailbox = old.mailbox }
+                    guard m != old else { continue }
+                    ms[i] = m
+                } else {
+                    ms.append(m)
+                    if let rid = m.remoteID { index[rid] = ms.count - 1 }
                 }
-                if pending.contains(rid) { m.isRead = old.isRead; m.flag = old.flag; m.mailbox = old.mailbox }
-                ms[i] = m
-            } else {
-                ms.append(m)
-                if let rid = m.remoteID { index[rid] = ms.count - 1 }
+                changedIDs.insert(m.id)
+                changed = true
             }
-            changedIDs.insert(m.id)
         }
         for (rid, read) in reads where !pending.contains(rid) {
-            if let i = index[rid] { ms[i].isRead = read; changedIDs.insert(ms[i].id) }
+            if let i = index[rid], ms[i].isRead != read { ms[i].isRead = read; changedIDs.insert(ms[i].id); changed = true }
         }
-        messages = ms
+        if changed { messages = ms }
     }
 
     // MARK: Database
@@ -843,7 +863,8 @@ public final class MailStore {
         for (acct, backend) in backends where !paused.contains(acct) {
             var fetched: [(MailboxKind, [Message])] = [], since = ContinuousClock.now
             func show() {
-                for (role, ms) in fetched { merge(ms, account: acct, mailbox: role); newestLoaded.insert(key(acct, role)) }
+                merge(fetched, account: acct)
+                for (role, _) in fetched { newestLoaded.insert(key(acct, role)) }
                 fetched = []; since = .now
             }
             for role in historyOrder(acct, (remoteFolders[acct] ?? []).map(\.role))

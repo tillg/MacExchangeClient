@@ -196,6 +196,25 @@ struct MailDatabaseTests {
 
     // MARK: Moving from the JSON cache
 
+    /// An import stopped halfway (quit, crash) leaves only a temporary file; the next launch imports again.
+    @Test func anInterruptedImportIsRedone() async throws {
+        let dir = tempURL().deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
+        let old = MailStore(accounts: [work], messages: [])
+        old.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "t", more: false), account: work.id, mailbox: .inbox)
+        try old.cache().save(to: cacheURL)
+        // What the interrupted import left: a database with its tables but no mail, under the temporary name.
+        _ = try MailDatabase(url: MailDatabase.importingURL(for: dbURL))
+        #expect(!FileManager.default.fileExists(atPath: dbURL.path))
+
+        let s = MailStore(accounts: [work], messages: [])
+        let db = try #require(try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s))
+        #expect(try db.messages().map(\.remoteID) == ["A"])
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.contains("importing") }
+        #expect(leftovers.isEmpty)
+    }
+
     @Test func theJSONCacheIsImportedOnce() async throws {
         let dir = tempURL().deletingLastPathComponent()
         defer { try? FileManager.default.removeItem(at: dir) }
