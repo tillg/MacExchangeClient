@@ -12,39 +12,68 @@ enum AppSetup {
         return store
     }
 
-    /// Reads the cache off the main thread (tens of MB for a big mailbox), so the window shows at once.
-    static func loadCache(into store: MailStore) async {
-        defer { cacheReady = true }
+    /// The mail database; nil with sample data, or when it couldn't be opened (nothing is saved then).
+    private static var database: MailDatabase?
+
+    /// Loads stored mail in stages: the Inboxes first (shown at once), the rest in the background. The first
+    /// launch after the update moves `Cache.json` into the database.
+    static func loadMail(into store: MailStore) async {
         guard usesServer else { return }
-        // A big cache takes seconds to read; say so instead of showing empty mailboxes.
         store.progress = SyncProgress(text: "Loading Mail…", fraction: nil)
-        defer { if store.progress?.fraction == nil { store.progress = nil } }
-        guard let cache = await Task.detached(priority: .userInitiated, operation: { MailCache.load() }).value
-        else { return }
-        store.restore(cache)
+        do {
+            if !FileManager.default.fileExists(atPath: MailDatabase.defaultURL.path) {
+                store.progress = SyncProgress(text: "Updating Mail Storage…", fraction: nil)
+                if let db = try await MailDatabase.importCache(store: store) {
+                    database = db
+                    store.progress = nil
+                    return
+                }
+            }
+            let first = store.accounts.map { MailboxKey(account: $0.id, mailbox: .inbox) }
+            let (db, meta, inboxes) = try await Task.detached(priority: .userInitiated) {
+                let db = try MailDatabase(url: MailDatabase.defaultURL)
+                return (db, try db.meta(), try db.messages(in: first))
+            }.value
+            database = db
+            store.restore(meta)
+            store.restore(inboxes, boxes: first)
+            // The rest arrives while the Inbox is already usable and checked with the server.
+            Task {
+                do {
+                    let rest = try await Task.detached(priority: .userInitiated) { try db.messages(notIn: first) }.value
+                    store.finishLoading(rest)
+                } catch {
+                    failedToLoad(store, error)
+                }
+                if store.progress?.fraction == nil { store.progress = nil }
+            }
+        } catch {
+            failedToLoad(store, error)
+            if store.progress?.fraction == nil { store.progress = nil }
+        }
     }
 
-    /// Saving before the load finished would overwrite the cache with an almost empty one.
-    private static var cacheReady = false
+    /// Mail can't be loaded: work on without saving, so mail missing in memory isn't written twice to disk.
+    private static func failedToLoad(_ store: MailStore, _ error: Error) {
+        database = nil
+        store.status = "Couldn't load mail from disk: \(error.localizedDescription). Changes aren't saved until relaunch."
+        if store.isLoading { store.finishLoading([]) }
+    }
 
-    /// False while showing sample data; the disk cache is then neither read nor written.
+    /// False while showing sample data; nothing is then read from or written to disk.
     static var usesServer: Bool {
         !ExchangeAccount.saved().isEmpty && ProcessInfo.processInfo.environment["MAIL_SAMPLE_DATA"] == nil
     }
 
-    private static var lastSave = (change: -1, at: Date.distantPast)
-
-    /// Saves at most once a minute and only after a change. Encoding tens of thousands of messages takes
-    /// a moment, so it happens off the main thread, except on quit (`now`).
-    static func saveCache(_ store: MailStore, now: Bool = false) {
-        guard usesServer, cacheReady else { return }
-        guard now || (store.changeCount != lastSave.change && Date().timeIntervalSince(lastSave.at) > 60) else { return }
-        lastSave = (store.changeCount, .now)
-        let snapshot = store.cache()
-        if now { try? snapshot.save(); return }
-        Task.detached(priority: .utility) {
-            do { try snapshot.save() } catch {
-                await MainActor.run { store.status = "Couldn't save the mail cache: \(error.localizedDescription)" }
+    /// Writes what changed since the last call, in the background; on quit (`now`) before returning.
+    static func saveChanges(_ store: MailStore, now: Bool = false) {
+        guard let db = database else { return }
+        let changes = store.takeChanges()
+        if now { try? db.write(changes); return }
+        db.writeInBackground(changes) { error in
+            Task { @MainActor in
+                store.retry(changes)
+                store.status = "Couldn't save mail: \(error.localizedDescription)"
             }
         }
     }

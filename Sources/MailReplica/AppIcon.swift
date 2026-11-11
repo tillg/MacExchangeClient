@@ -1,22 +1,20 @@
 import AppKit
 import SwiftUI
 
-/// The app icon: a pink rounded square with a white envelope, in the spirit of Mail's icon (our own drawing).
+/// The app icon: Mail's icon geometry (measured from a 360 px copy of it) in pink.
 /// Drawn in code and set at launch; `MAIL_ICON_EXPORT=/path/icon.png` writes it as a 1024 px PNG and quits.
 struct AppIcon: View {
     var body: some View {
         GeometryReader { geo in
-            let s = geo.size.width
+            let s = geo.size.width, b = s * 0.805   // macOS icon grid: 824 pt body inside a 1024 pt canvas
             ZStack {
-                // macOS icon grid: 824 pt body inside a 1024 pt canvas, continuous corners.
-                RoundedRectangle(cornerRadius: s * 0.185, style: .continuous)
-                    .fill(LinearGradient(colors: [Color(red: 1.0, green: 0.55, blue: 0.78), Color(red: 0.89, green: 0.12, blue: 0.50)],
+                // Saturated at the top, lighter at the bottom, like Mail's blue (#1D6FF2 → #1AC8FB).
+                RoundedRectangle(cornerRadius: b * 0.225, style: .continuous)
+                    .fill(LinearGradient(colors: [Color(red: 0.93, green: 0.11, blue: 0.49), Color(red: 1.0, green: 0.42, blue: 0.71)],
                                          startPoint: .top, endPoint: .bottom))
-                    .frame(width: s * 0.805, height: s * 0.805)
-                    .shadow(color: .black.opacity(0.25), radius: s * 0.012, y: s * 0.01)
+                    .frame(width: b, height: b)
                 Envelope()
-                    .frame(width: s * 0.56, height: s * 0.39)
-                    .offset(y: s * 0.01)
+                    .frame(width: b * 0.71, height: b * 0.455)
             }
             .frame(width: s, height: s)
         }
@@ -41,23 +39,28 @@ struct AppIcon: View {
     }
 }
 
+/// White envelope whose lines are cut out, so the background shows through them.
 private struct Envelope: View {
     var body: some View {
         GeometryReader { g in
-            let w = g.size.width, h = g.size.height, r = w * 0.06
+            let w = g.size.width, h = g.size.height, e = w * 0.05
             ZStack {
-                RoundedRectangle(cornerRadius: r, style: .continuous)
-                    .fill(LinearGradient(colors: [.white, Color(white: 0.93)], startPoint: .top, endPoint: .bottom))
-                // The flap: a V from the top corners to just below the middle.
+                RoundedRectangle(cornerRadius: w * 0.06).fill(.white)
+                // Flap: 45° from the top corners, rounded where the two sides meet.
                 Path { p in
-                    p.move(to: CGPoint(x: r * 0.8, y: r * 0.8))
-                    p.addLine(to: CGPoint(x: w / 2, y: h * 0.58))
-                    p.addLine(to: CGPoint(x: w - r * 0.8, y: r * 0.8))
+                    p.move(to: CGPoint(x: -e, y: -e))
+                    p.addArc(tangent1End: CGPoint(x: w / 2, y: w / 2), tangent2End: CGPoint(x: w + e, y: -e), radius: w * 0.147)
+                    p.addLine(to: CGPoint(x: w + e, y: -e))
+                    // Bottom folds: 45° from the bottom corners up to the flap.
+                    p.move(to: CGPoint(x: -e, y: h + e))
+                    p.addLine(to: CGPoint(x: h / 2, y: h / 2))
+                    p.move(to: CGPoint(x: w + e, y: h + e))
+                    p.addLine(to: CGPoint(x: w - h / 2, y: h / 2))
                 }
-                .stroke(Color(red: 0.93, green: 0.45, blue: 0.68).opacity(0.55),
-                        style: StrokeStyle(lineWidth: w * 0.022, lineCap: .round, lineJoin: .round))
+                .stroke(style: StrokeStyle(lineWidth: w * 0.033))
+                .blendMode(.destinationOut)
             }
-            .shadow(color: .black.opacity(0.18), radius: w * 0.02, y: w * 0.015)
+            .compositingGroup()
         }
     }
 }

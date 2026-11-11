@@ -24,7 +24,7 @@ struct MailReplicaApp: App {
                 .frame(minWidth: 900, minHeight: 500)
                 .task { await pollForMail() }
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-                    AppSetup.saveCache(store, now: true)
+                    AppSetup.saveChanges(store, now: true)
                 }
         }
         .defaultSize(width: 1280, height: 800)
@@ -50,10 +50,10 @@ struct MailReplicaApp: App {
     /// sync runs on its own in the background. Off while taking a snapshot.
     private func pollForMail() async {
         guard ProcessInfo.processInfo.environment["MAIL_SNAPSHOT"] == nil else { return }
-        await AppSetup.loadCache(into: store)  // before the first check, so it only fetches what changed
+        await AppSetup.loadMail(into: store)  // before the first check, so it only fetches what changed
         while !Task.isCancelled {
             await store.refresh()
-            AppSetup.saveCache(store)
+            AppSetup.saveChanges(store)
             try? await Task.sleep(for: .seconds(15))
         }
     }

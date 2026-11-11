@@ -85,3 +85,45 @@ struct MailCacheProbe {
                      write, inbox.0, inbox.1, all.0, all.1, one))
     }
 }
+
+extension MailCacheProbe {
+    /// The real move to SQLite, on a copy of the cache in a temporary folder: import, then a launch in stages.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["MAIL_CACHE_PROBE"] == "1")) func realImportAndStagedLaunch() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("probe-\(UUID())")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
+        try FileManager.default.copyItem(at: MailCache.defaultURL, to: cacheURL)
+        let accounts = try #require(MailCache.load(from: cacheURL)).accounts.keys.map { Account(id: $0, name: "A", address: "") }
+
+        var t = Date()
+        let old = MailStore(accounts: accounts, messages: [])
+        _ = try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: old)
+        let imported = Date().timeIntervalSince(t)
+        let size = (try? FileManager.default.attributesOfItem(atPath: dbURL.path)[.size] as? Int) ?? 0
+
+        // A launch: what the app does, timed until the Inbox is in memory and until everything is.
+        t = Date()
+        let s = MailStore(accounts: accounts, messages: [])
+        let first = accounts.map { MailboxKey(account: $0.id, mailbox: .inbox) }
+        let db = try MailDatabase(url: dbURL)
+        s.restore(try db.meta())
+        s.restore(try db.messages(in: first), boxes: first)
+        let inbox = Date().timeIntervalSince(t)
+        s.finishLoading(try db.messages(notIn: first))
+        let all = Date().timeIntervalSince(t)
+        #expect(Set(s.messages) == Set(old.messages))
+
+        s.setFlag(.red, for: [s.messages[0].id])
+        t = Date()
+        let changes = s.takeChanges()
+        let take = Date().timeIntervalSince(t)
+        t = Date()
+        try db.write(changes)
+        let flag = Date().timeIntervalSince(t)
+        print(String(format: "CACHEPROBE flag change: collect %.4fs (main thread), write %.4fs; %d rows, outbox %d",
+                     take, flag, changes.upsertIDs.count, changes.outbox?.count ?? -1))
+        print(String(format: "CACHEPROBE import %.1fs into %.1f MB; launch: inbox %.2fs, all %.2fs (%d messages); one flag change written %.4fs",
+                     imported, Double(size) / 1e6, inbox, all, s.messages.count, flag))
+    }
+}

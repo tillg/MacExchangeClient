@@ -35,7 +35,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 - **Swipe actions:** swipe right for Unread, left for Trash or Flag
 - **Menu bar and shortcuts** taken from Mail's own `MainMenu.nib`
 - **Light and dark mode**
-- **Own app icon:** a white envelope on pink, drawn in code (`AppIcon.swift`). `MAIL_ICON_EXPORT=icon.png` writes it as a PNG. `run.sh` wraps the build in `MailReplica.app` with that icon, so Activity Monitor and system dialogs show it too
+- **Own app icon:** Mail's envelope icon in pink, drawn in code (`AppIcon.swift`). `MAIL_ICON_EXPORT=icon.png` writes it as a PNG. `run.sh` wraps the build in `MailReplica.app` with that icon, so Activity Monitor and system dialogs show it too
 
 ## Getting started
 
@@ -65,7 +65,13 @@ Changes to Exchange mail show at once and are then written to the server in orde
 - Offline, changes wait until the next refresh. A message that fails to send is never resent automatically. It is kept in Drafts on this Mac instead.
 - Exchange messages can't be dragged to another account yet.
 
-Exchange mail, sync positions and unsent changes are cached in `~/Library/Application Support/MailReplica/Cache.json`, readable only by you. It is loaded in the background at launch, before the first check, so only changes are fetched. Meanwhile the sidebar shows “Loading Mail…”. A test cache of 70,000 messages without bodies (26.7 MB) loads in about 0.6s. A real one with 180,000 messages (183 MB) took 11s on a busy machine, nearly all of it JSON decoding. It is saved at most once a minute after changes, off the main thread, and on quit. Sample data is never cached. Delete the file to start fresh.
+Exchange mail, sync positions, the folder tree and unsent changes are kept in a SQLite database, `~/Library/Application Support/MailReplica/Mail.sqlite`, readable only by you. There is one row per message, like Mail's Envelope Index, so:
+
+- **Launch:** the Inboxes load first and show at once, about 0.1s for 2,870 messages. The other mailboxes follow in the background, about 4s for 180,000 messages on a busy machine, while “Loading Mail…” shows in the sidebar. The Inbox is checked with the server meanwhile. Other mailboxes are synced only once their mail is in memory, and changes waiting for Exchange go out after that.
+- **Saving:** changes are written every 15 seconds and on quit, off the main thread, only what changed: one flag change is one row, a few milliseconds.
+- **Upgrading:** the first launch with the database moves the old `Cache.json` into it, which takes a while for a big cache (31s for 180,000 messages on a busy machine). The sidebar shows “Updating Mail Storage…” meanwhile. Afterwards the old file is renamed to `Cache.json.imported`; delete it once you're happy.
+
+Messages are still all held in memory, and the list, counts and search work on that, as before. Sample data is never stored. Delete `Mail.sqlite` (and its `-wal` and `-shm` files) to start fresh.
 
 `MAIL_SAMPLE_DATA=1 ./run.sh` shows the sample data even when an account is set up.
 
@@ -101,11 +107,11 @@ A change you made that hasn't reached the server yet is kept when a sync reports
 
 ```
 Sources/
-  MailModel/        MailStore (@MainActor @Observable), the models, the drag payload and the MailBackend protocol
+  MailModel/        MailStore (@MainActor @Observable), the models, MailDatabase (SQLite), the drag payload and the MailBackend protocol
   EWS/              MailBackend over Exchange Web Services, Keychain and account settings
   MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (113 tests, plus live tests against a real server)
+  MailModelTests/   Swift Testing suites for MailStore, the database, the drag payload and EWS requests and parsing (136 tests, plus live tests against a real server)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```
@@ -114,7 +120,7 @@ Views stay thin. Every action is a method on `MailStore`, and each one has a tes
 
 `MailStore` talks to servers only through the `MailBackend` protocol: folders, newest messages, sync with an opaque token, and message bodies. EWS is one implementation; Microsoft Graph will be another, with the token holding a Graph delta link. The data store doesn't change.
 
-The live EWS tests run only with `EWS_USER` (`DOMAIN\user`) and `EWS_SERVER` set and the password in the Keychain (service `MailReplica-EWS`, account = username). Otherwise they are skipped. The read test only reads. The write test also needs `EWS_WRITE_TEST=1`. It works only inside the folder `MailReplica-Test` (created if missing), on a message it creates there itself, and never sends mail. `EWS_DEBUG=1` logs which sign-in method was used. `EWS_PROBE=1` lists which fields a real invite carries, never values. `EWS_TIMING=1` prints read-only timings and folder sizes, never mail content. `MAIL_CACHE_PROBE=1` times loading your real cache and prints only sizes and counts. Run the live tests on their own (`--filter EWSLive`): the performance tests hold the main thread and would skew their timings.
+The live EWS tests run only with `EWS_USER` (`DOMAIN\user`) and `EWS_SERVER` set and the password in the Keychain (service `MailReplica-EWS`, account = username). Otherwise they are skipped. The read test only reads. The write test also needs `EWS_WRITE_TEST=1`. It works only inside the folder `MailReplica-Test` (created if missing), on a message it creates there itself, and never sends mail. `EWS_DEBUG=1` logs which sign-in method was used. `EWS_PROBE=1` lists which fields a real invite carries, never values. `EWS_TIMING=1` prints read-only timings and folder sizes, never mail content. `MAIL_CACHE_PROBE=1` times loading your real `Cache.json` and moving a copy of it into SQLite, and prints only sizes and counts. Run the live tests on their own (`--filter EWSLive`): the performance tests hold the main thread and would skew their timings.
 
 ### Screenshots without screen recording
 

@@ -26,13 +26,13 @@ public final class MailStore {
     public var progress: SyncProgress?
 
     /// Each account's folders of its own, as a tree (see `children(of:account:)`).
-    public private(set) var folders: [UUID: [Folder]] = [:]
+    public private(set) var folders: [UUID: [Folder]] = [:] { didSet { foldersChanged = true } }
 
     private var backends: [UUID: any MailBackend] = [:]
     private var remoteFolders: [UUID: [RemoteFolder]] = [:]
-    private var syncTokens: [String: String] = [:]
+    private var syncTokens: [String: String] = [:] { didSet { syncChanged = true } }
     /// Folders ("account/mailbox") whose full sync has finished; checks then only fetch changes.
-    private var complete: Set<String> = []
+    private var complete: Set<String> = [] { didSet { syncChanged = true } }
     private var historyTask: Task<Void, Never>?
     /// Folders whose history sync failed this session; retried after a relaunch.
     private var historyFailed: Set<String> = []
@@ -44,7 +44,16 @@ public final class MailStore {
     /// Accounts whose messages live on a server (they have a backend or received a sync).
     private var serverAccounts: Set<UUID> = []
     /// Local changes not yet written to the server, oldest first.
-    public private(set) var outbox: [PendingChange] = []
+    public private(set) var outbox: [PendingChange] = [] { didSet { outboxChanged = true } }
+
+    // What changed since the last `takeChanges()`, for writing to disk.
+    @ObservationIgnored private var changedIDs = Set<Message.ID>()
+    @ObservationIgnored private var removedIDs = Set<Message.ID>()
+    @ObservationIgnored private var syncChanged = false
+    @ObservationIgnored private var foldersChanged = false
+    @ObservationIgnored private var outboxChanged = false
+    /// Mailboxes whose stored mail is in memory while launch is still loading; nil once everything is.
+    @ObservationIgnored private var loadedBoxes: Set<String>?
     private var flushTask: Task<Void, Never>?
     /// IDs per server request, so "Mark All as Read" on a big inbox doesn't send one huge request.
     public static let batchSize = 100
@@ -175,6 +184,7 @@ public final class MailStore {
     /// Every local action goes through here or `delete`. Server messages change locally at once and
     /// the change is queued for the server.
     private func update(_ ids: Set<Message.ID>, _ f: (inout Message) -> Void) {
+        changedIDs.formUnion(ids)
         var changed: [(old: Message, new: Message)] = []
         for i in messages.indices where ids.contains(messages[i].id) {
             let old = messages[i]
@@ -231,6 +241,7 @@ public final class MailStore {
         let erase = messages.filter { ids.contains($0.id) && $0.mailbox == .trash }
         let eraseIDs = Set(erase.map(\.id))
         messages.removeAll { eraseIDs.contains($0.id) }
+        forget(eraseIDs)
         for (acct, group) in Dictionary(grouping: erase.filter { $0.remoteID != nil }, by: \.accountID) {
             enqueue(group, account: acct) { .delete($0) }
         }
@@ -389,6 +400,7 @@ public final class MailStore {
             let ids = Set(ms.filter { $0.accountID == account && $0.remoteID.map(gone.contains) == true }.map(\.id))
             ms.removeAll { ids.contains($0.id) }
             selection.subtract(ids)
+            forget(ids)
         }
         var index = [String: Int]()
         for (i, m) in ms.enumerated() where m.accountID == account { if let r = m.remoteID { index[r] = i } }
@@ -409,12 +421,111 @@ public final class MailStore {
                 ms.append(m)
                 if let rid = m.remoteID { index[rid] = ms.count - 1 }
             }
+            changedIDs.insert(m.id)
         }
         for (rid, read) in reads where !pending.contains(rid) {
-            if let i = index[rid] { ms[i].isRead = read }
+            if let i = index[rid] { ms[i].isRead = read; changedIDs.insert(ms[i].id) }
         }
         messages = ms
     }
+
+    // MARK: Database
+
+    /// A new message: shown at once and written to disk with the next changes.
+    private func add(_ m: Message) {
+        messages.append(m)
+        changedIDs.insert(m.id); removedIDs.remove(m.id)
+    }
+
+    private func forget(_ ids: Set<Message.ID>) {
+        changedIDs.subtract(ids)
+        removedIDs.formUnion(ids)
+    }
+
+    /// Accounts whose mail is written to disk: server accounts, not the sample data.
+    private func isStored(_ account: UUID) -> Bool { serverAccounts.contains(account) }
+
+    /// What changed since the last call, for `MailDatabase.write`. Messages are taken as they are now.
+    /// Cheap on the main thread: see `StoreChanges.resolved()`.
+    public func takeChanges() -> StoreChanges {
+        var c = StoreChanges()
+        if !changedIDs.isEmpty && !serverAccounts.isEmpty {
+            // The array is shared, not copied; the write picks the changed messages from it, off the main thread.
+            c.snapshot = messages
+            c.snapshotIDs = changedIDs
+            c.storedAccounts = serverAccounts
+        }
+        c.removed = Array(removedIDs)
+        if syncChanged { c.sync = syncStates() }
+        if foldersChanged { c.folders = folders.filter { isStored($0.key) } }
+        if outboxChanged { c.outbox = outbox }
+        changedIDs = []; removedIDs = []
+        syncChanged = false; foldersChanged = false; outboxChanged = false
+        return c
+    }
+
+    /// A write failed: these changes go out again with the next ones.
+    public func retry(_ c: StoreChanges) {
+        changedIDs.formUnion(c.upsertIDs.filter { !removedIDs.contains($0) })
+        removedIDs.formUnion(c.removed.filter { !changedIDs.contains($0) })
+        if c.sync != nil { syncChanged = true }
+        if c.folders != nil { foldersChanged = true }
+        if c.outbox != nil { outboxChanged = true }
+    }
+
+    /// Everything that is stored, to fill a new database.
+    public func storedState() -> StoreChanges {
+        StoreChanges(upserts: messages.filter { isStored($0.accountID) }, sync: syncStates(),
+                     folders: folders.filter { isStored($0.key) }, outbox: outbox)
+    }
+
+    private func syncStates() -> [SyncState] {
+        Set(syncTokens.keys).union(complete).compactMap { k in
+            guard let account = UUID(uuidString: String(k.prefix(36))), isStored(account) else { return nil }
+            return SyncState(account: account, mailbox: MailboxKind(rawValue: String(k.dropFirst(37))),
+                             token: syncTokens[k], complete: complete.contains(k))
+        }
+    }
+
+    /// Launch, step 1: sync positions, folders and waiting changes. Messages follow with the next calls.
+    public func restore(_ meta: StoredMeta) {
+        let mine = Set(accounts.map(\.id))
+        for s in meta.sync where mine.contains(s.account) {
+            if let t = s.token { syncTokens[key(s.account, s.mailbox)] = t }
+            if s.complete { complete.insert(key(s.account, s.mailbox)) }
+            serverAccounts.insert(s.account)
+        }
+        for (a, f) in meta.folders where mine.contains(a) && folders[a] == nil {
+            folders[a] = f
+            serverAccounts.insert(a)
+        }
+        outbox += meta.outbox.filter { mine.contains($0.account) }
+        loadedBoxes = []
+        // What was just read from disk doesn't need writing back.
+        syncChanged = false; foldersChanged = false; outboxChanged = false
+    }
+
+    /// Launch, step 2: the mail of some mailboxes (the Inbox first), shown while the rest loads.
+    public func restore(_ msgs: [Message], boxes: [MailboxKey]) {
+        let known = Set(messages.map(\.id))
+        messages += msgs.filter { !known.contains($0.id) }
+        for b in boxes { loadedBoxes?.insert(key(b.account, b.mailbox)) }
+    }
+
+    /// Launch, step 3: everything else. A message changed meanwhile keeps its version in memory.
+    /// Then waiting changes go to the server and the history sync may start.
+    public func finishLoading(_ rest: [Message]) {
+        let known = Set(messages.map(\.id))
+        messages += rest.filter { !known.contains($0.id) }
+        loadedBoxes = nil
+        scheduleFlush()
+        if !backends.isEmpty { startHistory() }
+    }
+
+    /// True while launch is still loading stored mail.
+    public var isLoading: Bool { loadedBoxes != nil }
+
+    func isLoaded(_ account: UUID, _ box: MailboxKind) -> Bool { loadedBoxes?.contains(key(account, box)) ?? true }
 
     // MARK: Disk cache
 
@@ -453,7 +564,7 @@ public final class MailStore {
     /// Exchange gives moved items new IDs. Updates the messages and the changes still queued.
     public func renameRemote(_ map: [String: String], account: UUID) {
         for i in messages.indices where messages[i].accountID == account {
-            if let rid = messages[i].remoteID, let new = map[rid] { messages[i].remoteID = new }
+            if let rid = messages[i].remoteID, let new = map[rid] { messages[i].remoteID = new; changedIDs.insert(messages[i].id) }
         }
         for i in outbox.indices where outbox[i].account == account { outbox[i].change = outbox[i].change.renamed(map) }
     }
@@ -464,14 +575,15 @@ public final class MailStore {
         switch p.change {
         case let .send(d), let .saveDraft(d):
             let acct = account(d.accountID)
-            messages.append(Message(accountID: d.accountID, mailbox: .drafts,
-                                    from: Contact(name: acct?.name ?? "", email: acct?.address ?? ""),
-                                    to: Contact.parseList(d.to), cc: Contact.parseList(d.cc),
-                                    subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
-                                    body: d.body, date: .now, isRead: true))
+            add(Message(accountID: d.accountID, mailbox: .drafts,
+                        from: Contact(name: acct?.name ?? "", email: acct?.address ?? ""),
+                        to: Contact.parseList(d.to), cc: Contact.parseList(d.cc),
+                        subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
+                        body: d.body, date: .now, isRead: true))
             status = "Couldn't send “\(d.subject)”: \(error). It's in Drafts on this Mac."
         default:
             for old in p.previous {
+                changedIDs.insert(old.id); removedIDs.remove(old.id)
                 if let i = messages.firstIndex(where: { $0.id == old.id }) {
                     messages[i].mailbox = old.mailbox
                     messages[i].isRead = old.isRead
@@ -486,7 +598,8 @@ public final class MailStore {
     }
 
     private func scheduleFlush() {
-        guard flushTask == nil, outbox.contains(where: canSend) else { return }
+        // Not while loading: the server renames moved messages, and those not in memory yet would keep old IDs.
+        guard flushTask == nil, loadedBoxes == nil, outbox.contains(where: canSend) else { return }
         flushTask = Task {
             await drain()
             flushTask = nil
@@ -547,6 +660,7 @@ public final class MailStore {
 
     public func setBody(_ b: MessageBody, for id: Message.ID) {
         guard let i = messages.firstIndex(where: { $0.id == id }) else { return }
+        changedIDs.insert(id)
         messages[i].body = b.text
         messages[i].attachments = b.attachments
         messages[i].hasAttachments = !b.attachments.isEmpty
@@ -579,6 +693,7 @@ public final class MailStore {
     public func respond(_ r: InviteResponse, to id: Message.ID) {
         guard let i = messages.firstIndex(where: { $0.id == id }), messages[i].invite != nil else { return }
         let old = messages[i]
+        changedIDs.insert(id)
         messages[i].invite?.response = r
         messages[i].invite?.reply = nil
         guard let rid = old.remoteID else { return }
@@ -594,6 +709,7 @@ public final class MailStore {
         }
         guard let i = messages.firstIndex(where: { $0.id == id }), messages[i].invite != nil else { return }
         let old = messages[i]
+        changedIDs.insert(id)
         messages[i].invite?.response = reply.response
         messages[i].invite?.reply = reply
         guard let rid = old.remoteID else { return }
@@ -674,8 +790,10 @@ public final class MailStore {
 
     /// Roles the quick check covers: the Inbox, plus the mailbox on screen if it belongs to this account.
     func quickCheckRoles(_ acct: UUID) -> [MailboxKind] {
-        if case let .account(a, box) = selectedMailbox, a == acct, box != .inbox { return [.inbox, box] }
-        return [.inbox]
+        var roles: [MailboxKind] = [.inbox]
+        if case let .account(a, box) = selectedMailbox, a == acct, box != .inbox { roles.append(box) }
+        // While launch is loading, a mailbox not yet in memory isn't checked: merging would duplicate its mail.
+        return roles.filter { isLoaded(acct, $0) }
     }
 
     /// History order: small, often-read folders first, the user's own folders after them; Sent (often the largest) last.
@@ -705,7 +823,7 @@ public final class MailStore {
     }
 
     public func startHistory() {
-        guard historyTask == nil else { return }
+        guard historyTask == nil, loadedBoxes == nil else { return }
         historyTask = Task {
             await syncHistory()
             historyTask = nil
@@ -855,7 +973,7 @@ public final class MailStore {
             outbox.append(PendingChange(account: acct.id, change: .send(d), previous: []))
             return scheduleFlush()
         }
-        messages.append(Message(accountID: acct.id, mailbox: .sent, from: Contact(name: acct.name, email: acct.address),
+        add(Message(accountID: acct.id, mailbox: .sent, from: Contact(name: acct.name, email: acct.address),
                                 to: Contact.parseList(d.to), cc: Contact.parseList(d.cc), subject: d.subject,
                                 body: d.body, date: .now, isRead: true))
     }
@@ -866,7 +984,7 @@ public final class MailStore {
             outbox.append(PendingChange(account: acct.id, change: .saveDraft(d), previous: []))
             return scheduleFlush()
         }
-        messages.append(Message(accountID: acct.id, mailbox: .drafts, from: Contact(name: acct.name, email: acct.address),
+        add(Message(accountID: acct.id, mailbox: .drafts, from: Contact(name: acct.name, email: acct.address),
                                 to: Contact.parseList(d.to), subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
                                 body: d.body, date: .now, isRead: true))
     }
