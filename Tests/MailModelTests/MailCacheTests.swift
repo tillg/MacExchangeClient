@@ -67,4 +67,14 @@ struct MailCacheTests {
         #expect(perms == 0o600)
         #expect(MailCache.load(from: url.deletingLastPathComponent().appendingPathComponent("missing.json")) == nil)
     }
+
+    @Test func cacheWithoutHTMLFieldsStillLoads() throws {
+        let m = Message(accountID: work.id, from: Contact(name: "Ann", email: "ann@x.com"), to: [], subject: "S",
+                        body: "Old", date: Date(timeIntervalSince1970: 1_000), remoteID: "A")
+        var json = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(m)) as? [String: Any])
+        json["html"] = nil; json["htmlChecked"] = nil
+        let old = try JSONDecoder().decode(Message.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(old.body == "Old" && old.html == nil)
+        #expect(old.needsBody)
+    }
 }

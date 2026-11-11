@@ -8,10 +8,14 @@ struct ComposeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            field("To:") { TextField("", text: $draft.to) }
-            field("Cc:") { TextField("", text: $draft.cc) }
-            field("Subject:") { TextField("", text: $draft.subject) }
-            if store.accounts.count > 1 {
+            if draft.inviteAnswer != nil {
+                answerFields
+            } else {
+                field("To:") { TextField("", text: $draft.to) }
+                field("Cc:") { TextField("", text: $draft.cc) }
+                field("Subject:") { TextField("", text: $draft.subject) }
+            }
+            if store.accounts.count > 1 && draft.inviteAnswer == nil {
                 field("From:") {
                     Picker("", selection: $draft.accountID) {
                         ForEach(store.accounts) { a in Text("\(a.name) – \(a.address)").tag(a.id) }
@@ -31,15 +35,40 @@ struct ComposeView: View {
             ToolbarItem(placement: .navigation) {
                 Button { send() } label: { Label("Send", systemImage: "paperplane") }
                     .keyboardShortcut("d", modifiers: [.command, .shift])
-                    .disabled(draft.to.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(!canSend)
                     .help("Send message")
             }
-            ToolbarItem {
-                Button { store.saveDraft(draft); dismiss() } label: { Label("Save Draft", systemImage: "doc") }
-                    .keyboardShortcut("s", modifiers: .command)
+            if draft.inviteAnswer == nil {
+                ToolbarItem {
+                    Button { store.saveDraft(draft); dismiss() } label: { Label("Save Draft", systemImage: "doc") }
+                        .keyboardShortcut("s", modifiers: .command)
+                }
             }
         }
         .frame(minWidth: 480, minHeight: 360)
+    }
+
+    private var canSend: Bool {
+        guard let a = draft.inviteAnswer else { return !draft.to.trimmingCharacters(in: .whitespaces).isEmpty }
+        guard let s = a.proposedStart, let e = a.proposedEnd else { return true }
+        return e > s
+    }
+
+    /// An invite answer: Exchange sends it to the organizer with its own subject, so both are shown, not edited.
+    @ViewBuilder private var answerFields: some View {
+        field("To:") { Text(draft.to.isEmpty ? "Organizer" : draft.to).frame(maxWidth: .infinity, alignment: .leading) }
+        field("Subject:") { Text(draft.subject).frame(maxWidth: .infinity, alignment: .leading) }
+        if let a = draft.inviteAnswer, let start = a.proposedStart, let end = a.proposedEnd {
+            field("Start:") {
+                DatePicker("", selection: Binding { start } set: { draft.inviteAnswer?.proposedStart = $0 }).labelsHidden().fixedSize()
+                Spacer()
+            }
+            field("End:") {
+                DatePicker("", selection: Binding { end } set: { draft.inviteAnswer?.proposedEnd = $0 }).labelsHidden().fixedSize()
+                if end <= start { Text("The meeting must end after it starts.").foregroundStyle(.red) }
+                Spacer()
+            }
+        }
     }
 
     private func send() {

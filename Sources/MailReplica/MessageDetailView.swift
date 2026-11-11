@@ -22,6 +22,9 @@ struct MessageDetailView: View {
 struct MessageContent: View {
     @Environment(MailStore.self) private var store
     let message: Message
+    /// Messages whose remote content the user loaded, until the window closes (Mail asks again later too).
+    @State private var remoteAllowed: Set<Message.ID> = []
+    @AppStorage("remoteImages") private var remoteImages = RemoteImages.defaultValue
 
     var body: some View {
         ScrollView {
@@ -48,18 +51,48 @@ struct MessageContent: View {
 }
 
 extension MessageContent {
+    private var loadsRemoteContent: Bool {
+        guard let account = store.accounts.first(where: { $0.id == message.accountID }) else { return false }
+        return remoteImages.loadsAutomatically(from: message.from, account: account)
+    }
+
     private var text: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(message.bodyLoaded ? message.body : message.preview)
-                .font(.system(size: 13))
-                .lineSpacing(3)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(20)
+            if message.bodyLoaded, let html = message.html {
+                let allowed = remoteAllowed.contains(message.id) || loadsRemoteContent
+                if message.hasRemoteContent && !allowed {
+                    RemoteContentBanner { remoteAllowed.insert(message.id) }
+                }
+                HTMLBodyView(html: html, allowRemote: allowed)
+            } else {
+                Text(message.bodyLoaded ? message.body : message.preview)
+                    .font(.system(size: 13))
+                    .lineSpacing(3)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+            }
             if !message.attachments.isEmpty {
                 AttachmentStrip(names: message.attachments).padding(.horizontal, 20).padding(.bottom, 20)
             }
         }
+    }
+}
+
+/// Mail's bar above a message whose images and styles from the web were blocked.
+struct RemoteContentBanner: View {
+    let load: () -> Void
+
+    var body: some View {
+        HStack {
+            Text("This message contains remote content.").font(.system(size: 12)).foregroundStyle(.secondary)
+            Spacer()
+            Button("Load Remote Content", action: load).controlSize(.small)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.08))
+        .overlay(alignment: .bottom) { Divider() }
     }
 }
 

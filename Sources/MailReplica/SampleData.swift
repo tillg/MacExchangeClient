@@ -30,7 +30,7 @@ enum SampleData {
             Message(accountID: icloud.id, from: c("Tidewater Outfitters", "news@tidewater.example"), to: me,
                     subject: "30% off everything this weekend 🌊",
                     body: "Our biggest sale of the season starts now. Jackets, packs and boots – all 30% off until Sunday.",
-                    date: ago(9), category: .promotions),
+                    date: ago(9), category: .promotions).withHTML(tidewaterHTML),
             Message(accountID: work.id, from: c("Jonas Weber", "jonas@northwind.example"), to: meWork,
                     subject: "Re: Staging outage postmortem",
                     body: "Root cause was the expired TLS cert on the internal load balancer. I've added an alert 14 days before expiry.\n\n> Can we get a short write-up by Friday?",
@@ -91,4 +91,25 @@ enum SampleData {
 
 extension Message {
     func with(_ box: MailboxKind) -> Message { var m = self; m.mailbox = box; return m }
+    func withHTML(_ html: String) -> Message { var m = self; m.html = html; return m }
 }
+
+/// A made-up newsletter in the usual table layout, with a hero image from the web (blocked until loaded).
+private let tidewaterHTML = """
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#eef3f6"><tr><td align="center" style="padding:24px 0">
+    <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;font-family:Georgia,serif">
+    <tr><td style="background:#0b4f6c;color:#ffffff;padding:20px 28px;font-size:22px;letter-spacing:2px">TIDEWATER OUTFITTERS</td></tr>
+    <tr><td><img src="https://images.tidewater.example/hero-fall.jpg" width="560" height="180" alt="Fall sale"></td></tr>
+    <tr><td style="padding:24px 28px;color:#1d2b33">
+    <h1 style="margin:0 0 12px;font-size:28px;color:#0b4f6c">30% off everything 🌊</h1>
+    <p style="font-size:15px;line-height:1.5">Our biggest sale of the season starts now. Jackets, packs and boots –
+    <b>all 30% off</b> until Sunday.</p>
+    <table cellpadding="0" cellspacing="0"><tr>
+    <td style="background:#f26b3a;border-radius:4px;padding:12px 22px">
+    <a href="https://tidewater.example/sale" style="color:#ffffff;text-decoration:none;font-weight:bold">Shop the sale</a></td>
+    </tr></table>
+    </td></tr>
+    <tr><td style="padding:16px 28px;color:#7a8a93;font-size:11px;border-top:1px solid #e3e9ec">
+    You get this because you signed up at tidewater.example. <a href="https://tidewater.example/unsubscribe" style="color:#7a8a93">Unsubscribe</a>
+    </td></tr></table></td></tr></table>
+    """

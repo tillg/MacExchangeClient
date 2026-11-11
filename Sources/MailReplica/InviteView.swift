@@ -5,9 +5,9 @@ import SwiftUI
 /// and notes about missing answers and conflicts.
 struct InviteCard: View {
     @Environment(MailStore.self) private var store
+    @Environment(\.openWindow) private var openWindow
     let message: Message
     let invite: Invite
-    @State private var sheet: ReplySheet.Mode?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -27,8 +27,8 @@ struct InviteCard: View {
                     answer(.tentative, "Tentative", "questionmark")
                     answer(.decline, "Decline", "xmark")
                     Menu {
-                        Button("Tentative and Propose New Time…") { sheet = .propose(.tentative) }
-                        Button("Decline and Propose New Time…") { sheet = .propose(.decline) }
+                        Button("Tentative and Propose New Time…") { write(.tentative, proposing: true) }
+                        Button("Decline and Propose New Time…") { write(.decline, proposing: true) }
                     } label: {
                         Label("Propose New Time", systemImage: "clock").font(.system(size: 12))
                     }
@@ -38,9 +38,6 @@ struct InviteCard: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .padding(.top, 4)
-                .sheet(item: $sheet) { mode in
-                    ReplySheet(mode: mode, invite: invite) { store.respond($0, to: message.id) }
-                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
@@ -78,7 +75,7 @@ struct InviteCard: View {
     /// Outlook's answer button: a menu with the three ways to answer.
     private func answer(_ r: InviteResponse, _ title: String, _ symbol: String) -> some View {
         Menu {
-            Button("Respond with Comments…") { sheet = .comment(r) }
+            Button("Respond with Comments…") { write(r) }
             Button("Respond without Comments") { store.respond(r, to: message.id) }
             Button("Do Not Send a Response") { store.respond(InviteReply(response: r, send: false), to: message.id) }
         } label: {
@@ -86,6 +83,11 @@ struct InviteCard: View {
         }
         .fixedSize()
         .tint(invite.response == r ? .accentColor : nil)
+    }
+
+    /// Like Outlook: the answer opens as a message to the organizer, sent when you press Send.
+    private func write(_ r: InviteResponse, proposing: Bool = false) {
+        openWindow(id: "compose", value: store.answerDraft(r, to: message.id, proposing: proposing))
     }
 
     private func answered(_ r: InviteResponse) -> String {
@@ -242,59 +244,5 @@ private struct Hatch: Shape {
             x += 8
         }
         return p
-    }
-}
-
-/// Asks for a comment, and for "Propose New Time" also the new start and end, then sends the answer.
-struct ReplySheet: View {
-    enum Mode: Identifiable, Hashable {
-        case comment(InviteResponse)
-        case propose(InviteResponse)
-        var id: Self { self }
-        var response: InviteResponse {
-            switch self { case let .comment(r), let .propose(r): r }
-        }
-    }
-
-    let mode: Mode
-    let invite: Invite
-    let send: (InviteReply) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var comment = ""
-    @State private var start = Date()
-    @State private var end = Date()
-
-    private var proposing: Bool { if case .propose = mode { true } else { false } }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(proposing ? "\(mode.response.title) and Propose New Time" : "\(mode.response.title) with Comments")
-                .font(.headline)
-            if proposing {
-                DatePicker("Start", selection: $start)
-                DatePicker("End", selection: $end)
-                if end <= start { Text("The meeting must end after it starts.").font(.caption).foregroundStyle(.red) }
-            }
-            Text("Comment").font(.subheadline).foregroundStyle(.secondary)
-            TextEditor(text: $comment)
-                .font(.system(size: 13))
-                .frame(minHeight: 100)
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
-            HStack {
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Send") {
-                    let text = comment.trimmingCharacters(in: .whitespacesAndNewlines)
-                    send(InviteReply(response: mode.response, comment: text.isEmpty ? nil : text,
-                                     proposedStart: proposing ? start : nil, proposedEnd: proposing ? end : nil))
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(proposing && end <= start)
-            }
-        }
-        .padding(20)
-        .frame(width: 420)
-        .onAppear { start = invite.start; end = invite.end }
     }
 }

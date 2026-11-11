@@ -346,6 +346,7 @@ public final class MailStore {
                 if old.flag != nil && m.flag != nil { m.flag = old.flag }  // the server has no colours
                 if old.bodyLoaded && !m.bodyLoaded {
                     m.body = old.body; m.attachments = old.attachments; m.invite = old.invite; m.bodyLoaded = true
+                    m.html = old.html; m.htmlChecked = old.htmlChecked
                 }
                 if pending.contains(rid) { m.isRead = old.isRead; m.flag = old.flag; m.mailbox = old.mailbox }
                 ms[i] = m
@@ -493,6 +494,8 @@ public final class MailStore {
         messages[i].attachments = b.attachments
         messages[i].hasAttachments = !b.attachments.isEmpty
         messages[i].bodyLoaded = true
+        messages[i].html = b.html
+        messages[i].htmlChecked = true
         if let f = b.from { messages[i].from = f }
         if let to = b.to { messages[i].to = to }
         if let cc = b.cc { messages[i].cc = cc }
@@ -546,7 +549,7 @@ public final class MailStore {
 
     /// Fetches the body of a server message the first time it is shown.
     public func loadBody(_ id: Message.ID) async {
-        guard let m = message(id), !m.bodyLoaded, let rid = m.remoteID, let backend = backends[m.accountID],
+        guard let m = message(id), m.needsBody, let rid = m.remoteID, let backend = backends[m.accountID],
               !paused.contains(m.accountID) else { return }
         do { setBody(try await backend.body(remoteID: rid), for: id) } catch {
             if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load message: \(error.localizedDescription)" }
@@ -723,7 +726,28 @@ public final class MailStore {
         return Draft(accountID: m.accountID, to: to, subject: subject, body: header + quoted)
     }
 
+    /// An invite answer "with comments" as a message, like Outlook's: to the organizer, with the subject
+    /// Exchange gives it. Proposing starts from the meeting's own time.
+    public func answerDraft(_ r: InviteResponse, to id: Message.ID, proposing: Bool = false) -> Draft {
+        guard let m = message(id), let invite = m.invite else { return Draft(accountID: accounts[0].id) }
+        let answered = switch r {
+        case .accept: "Accepted"
+        case .tentative: "Tentative"
+        case .decline: "Declined"
+        }
+        let prefix = proposing ? "New Time Proposed" : answered
+        let to = invite.organizer.map { $0.email.isEmpty ? $0.name : "\($0.name) <\($0.email)>" } ?? ""
+        return Draft(accountID: m.accountID, to: to, subject: "\(prefix): \(m.subject)",
+                     inviteAnswer: InviteAnswer(messageID: id, response: r, proposedStart: proposing ? invite.start : nil,
+                                                proposedEnd: proposing ? invite.end : nil))
+    }
+
     public func send(_ d: Draft) {
+        if let a = d.inviteAnswer {
+            let text = d.body.trimmingCharacters(in: .whitespacesAndNewlines)
+            return respond(InviteReply(response: a.response, comment: text.isEmpty ? nil : text,
+                                       proposedStart: a.proposedStart, proposedEnd: a.proposedEnd), to: a.messageID)
+        }
         let acct = account(d.accountID) ?? accounts[0]
         if serverAccounts.contains(acct.id) {
             outbox.append(PendingChange(account: acct.id, change: .send(d), previous: []))

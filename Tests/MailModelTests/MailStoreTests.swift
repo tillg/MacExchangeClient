@@ -257,6 +257,42 @@ struct MailStoreTests {
         #expect(s.selection == [id])
     }
 
+    @Test func htmlBodyIsStoredAndSurvivesASync() {
+        let s = store([])
+        s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "t1", more: false),
+                account: work.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        s.setBody(MessageBody(text: "Hi", attachments: [], html: "<p>Hi</p>"), for: id)
+        #expect(s.messages[0].html == "<p>Hi</p>")
+        #expect(s.messages[0].body == "Hi")
+        #expect(!s.messages[0].needsBody)
+        s.apply(SyncResult(upserts: [remote("A", read: true)], deletedRemoteIDs: [], token: "t2", more: false),
+                account: work.id, mailbox: .inbox)
+        #expect(s.messages[0].html == "<p>Hi</p>")
+        #expect(!s.messages[0].needsBody)
+    }
+
+    @Test func bodyLoadedBeforeHTMLSupportIsFetchedOnceMore() {
+        var m = remote("A")
+        #expect(m.needsBody)
+        m.body = "Plain"; m.bodyLoaded = true  // as cached by an older version: no HTML check yet
+        #expect(m.needsBody)
+        let s = store([])
+        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "t", more: false), account: work.id, mailbox: .inbox)
+        s.setBody(MessageBody(text: "Plain", attachments: []), for: s.messages[0].id)
+        #expect(!s.messages[0].needsBody)  // a plain-text message is not fetched again
+        #expect(!msg(work).needsBody)      // sample data has no server
+    }
+
+    @Test func remoteContentIsDetected() {
+        func html(_ h: String) -> Message { var m = msg(work); m.html = h; return m }
+        #expect(html(#"<img src="https://t.example/p.gif">"#).hasRemoteContent)
+        #expect(html("<td style=\"background:url( 'http://x.example/bg.png')\">").hasRemoteContent)
+        #expect(html("<td background=http://x.example/bg.png>").hasRemoteContent)
+        #expect(!html(#"<a href="https://x.example">link</a><img src="cid:image001.png">"#).hasRemoteContent)
+        #expect(!msg(work).hasRemoteContent)
+    }
+
     @Test func applyDeletesByRemoteIDAndDropsFromSelection() {
         let s = store([])
         s.apply(SyncResult(upserts: [remote("A"), remote("B")], deletedRemoteIDs: [], token: "t1", more: false),
@@ -597,6 +633,42 @@ struct MailStoreTests {
         let ok = InviteReply(response: .decline, proposedStart: start, proposedEnd: start.addingTimeInterval(1800))
         s.respond(ok, to: id)
         #expect(s.outbox.map(\.change) == [.reply("M", ok)])
+    }
+
+    @Test func answerWithCommentsIsWrittenAsAMessageToTheOrganizer() {
+        var m = remote("M", subject: "Q4 review")
+        m.invite = Invite(start: .now, end: .now.addingTimeInterval(1800), organizer: Contact(name: "Priya Raman", email: "priya@x.com"))
+        let s = store([])
+        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "t", more: false), account: work.id, mailbox: .inbox)
+        let id = id(s, "M")
+        let d = s.answerDraft(.decline, to: id)
+        #expect(d.to == "Priya Raman <priya@x.com>")
+        #expect(d.subject == "Declined: Q4 review")
+        #expect(d.body.isEmpty && d.accountID == work.id)
+        #expect(d.inviteAnswer == InviteAnswer(messageID: id, response: .decline))
+        #expect(s.answerDraft(.accept, to: id).subject == "Accepted: Q4 review")
+        #expect(s.answerDraft(.tentative, to: id).subject == "Tentative: Q4 review")
+
+        var written = d
+        written.body = "  Da bin ich im Zug…\n"
+        s.send(written)
+        #expect(s.outbox.map(\.change) == [.reply("M", InviteReply(response: .decline, comment: "Da bin ich im Zug…"))])
+        #expect(s.message(id)?.invite?.response == .decline)
+    }
+
+    @Test func proposingANewTimeIsWrittenAsAMessageToo() {
+        let (s, id) = inviteStore()
+        let d = s.answerDraft(.tentative, to: id, proposing: true)
+        #expect(d.subject.hasPrefix("New Time Proposed: "))
+        #expect(d.inviteAnswer?.proposedStart == Date(timeIntervalSince1970: 3600))  // starts at the meeting's time
+        #expect(d.inviteAnswer?.proposedEnd == Date(timeIntervalSince1970: 5400))
+        #expect(d.to == "")  // no organizer known: Exchange still sends it to the organizer
+        var written = d
+        written.inviteAnswer?.proposedStart = Date(timeIntervalSince1970: 7200)
+        written.inviteAnswer?.proposedEnd = Date(timeIntervalSince1970: 9000)
+        s.send(written)
+        #expect(s.outbox.map(\.change) == [.reply("M", InviteReply(response: .tentative, proposedStart: Date(timeIntervalSince1970: 7200),
+                                                                     proposedEnd: Date(timeIntervalSince1970: 9000)))])
     }
 
     @Test func markAllRead() {

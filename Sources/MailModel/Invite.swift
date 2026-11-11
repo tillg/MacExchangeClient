@@ -101,3 +101,15 @@ public enum DayLayout {
         return result
     }
 }
+
+/// The invite a compose window answers, and the new time when proposing one.
+public struct InviteAnswer: Hashable, Codable, Sendable {
+    public var messageID: UUID
+    public var response: InviteResponse
+    public var proposedStart: Date?
+    public var proposedEnd: Date?
+    public init(messageID: UUID, response: InviteResponse, proposedStart: Date? = nil, proposedEnd: Date? = nil) {
+        self.messageID = messageID; self.response = response
+        self.proposedStart = proposedStart; self.proposedEnd = proposedEnd
+    }
+}

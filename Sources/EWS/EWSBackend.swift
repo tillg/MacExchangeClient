@@ -59,17 +59,23 @@ public struct EWSBackend: MailBackend {
     }
 
     public func body(remoteID: String) async throws -> MessageBody {
-        let doc = try await client.call("""
-            <m:GetItem><m:ItemShape><t:BaseShape>IdOnly</t:BaseShape><t:BodyType>Text</t:BodyType>\
-            <t:AdditionalProperties><t:FieldURI FieldURI="item:Body"/><t:FieldURI FieldURI="item:Attachments"/>\
-            <t:FieldURI FieldURI="message:From"/><t:FieldURI FieldURI="message:ToRecipients"/>\
-            <t:FieldURI FieldURI="message:CcRecipients"/>\(Self.inviteProps)</t:AdditionalProperties></m:ItemShape>\
-            <m:ItemIds><t:ItemId Id="\(xmlEscape(remoteID))"/></m:ItemIds></m:GetItem>
-            """)
+        let doc = try await client.call(Self.bodyRequest(remoteID))
         guard let item = doc.first("Items")?.elementChildren.first else {
             throw EWSError(code: "ErrorItemNotFound", message: "Message not found")
         }
         return Self.parseBody(item)
+    }
+
+    /// `Best` returns HTML when the message has it. `TextBody` (Exchange 2013) adds the plain text for the list and replies.
+    static func bodyRequest(_ remoteID: String) -> String {
+        """
+        <m:GetItem><m:ItemShape><t:BaseShape>IdOnly</t:BaseShape><t:BodyType>Best</t:BodyType>\
+        <t:AdditionalProperties><t:FieldURI FieldURI="item:Body"/><t:FieldURI FieldURI="item:TextBody"/>\
+        <t:FieldURI FieldURI="item:Attachments"/>\
+        <t:FieldURI FieldURI="message:From"/><t:FieldURI FieldURI="message:ToRecipients"/>\
+        <t:FieldURI FieldURI="message:CcRecipients"/>\(inviteProps)</t:AdditionalProperties></m:ItemShape>\
+        <m:ItemIds><t:ItemId Id="\(xmlEscape(remoteID))"/></m:ItemIds></m:GetItem>
+        """
     }
 
     /// Asked of every item when its body loads; only meeting requests return them (checked on the real server).
@@ -267,10 +273,25 @@ public struct EWSBackend: MailBackend {
         let attachments = (item.child("Attachments")?.elementChildren ?? [])
             .filter { $0.text("IsInline") != "true" }
             .compactMap { $0.child("Name")?.stringValue }
-        return MessageBody(text: item.child("Body")?.stringValue ?? "", attachments: attachments,
+        let body = item.child("Body")
+        let html = body?.attr("BodyType") == "HTML" ? body?.stringValue : nil
+        let text = item.child("TextBody")?.stringValue ?? html.map(plainText) ?? body?.stringValue ?? ""
+        return MessageBody(text: text, attachments: attachments,
                            from: item.child("From").map(contact),
                            to: item.child("ToRecipients").map(mailboxes) ?? [],
-                           cc: item.child("CcRecipients").map(mailboxes) ?? [], invite: parseInvite(item))
+                           cc: item.child("CcRecipients").map(mailboxes) ?? [], invite: parseInvite(item), html: html)
+    }
+
+    /// Rough text of an HTML body, used only if the server sends no `TextBody`.
+    static func plainText(_ html: String) -> String {
+        var s = html.replacingOccurrences(of: #"(?is)<(head|style|script)\b.*?</\1>"#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"(?i)<br\s*/?>|</(p|div|tr|li|h\d)>"#, with: "\n", options: .regularExpression)
+        s = s.replacingOccurrences(of: "<[^>]*>", with: "", options: .regularExpression)
+        for (e, c) in [("&nbsp;", " "), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&#39;", "'"), ("&amp;", "&")] {
+            s = s.replacingOccurrences(of: e, with: c)
+        }
+        return s.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            .joined(separator: "\n")
     }
 
     static func contact(_ n: XMLNode) -> Contact {

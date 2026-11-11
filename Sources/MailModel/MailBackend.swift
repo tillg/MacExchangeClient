@@ -105,9 +105,12 @@ public struct MessageBody: Sendable {
     public var to: [Contact]?
     public var cc: [Contact]?
     public var invite: Invite?
+    /// The HTML body, if the message has one; `text` is then its plain-text version.
+    public var html: String?
     public init(text: String, attachments: [String], from: Contact? = nil, to: [Contact]? = nil, cc: [Contact]? = nil,
-                invite: Invite? = nil) {
+                invite: Invite? = nil, html: String? = nil) {
         self.text = text; self.attachments = attachments; self.from = from; self.to = to; self.cc = cc; self.invite = invite
+        self.html = html
     }
 }
 

@@ -17,12 +17,13 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 
 - **Meeting invites, as in Outlook:** for each invite you see:
   - when and where, with the required and optional attendees;
-  - Accept, Tentative and Decline menus, as in Outlook: Respond with Comments, Respond without Comments, or Do Not Send a Response (only the calendar changes);
-  - Propose New Time, together with Tentative or Decline, with a new start and end and an optional comment;
+  - Accept, Tentative and Decline menus, as in Outlook: Respond with Comments, Respond without Comments, or Do Not Send a Response (only the calendar changes). With Comments opens a message window to the organizer, with the subject Exchange will use ("Declined: …"); its text becomes the comment;
+  - Propose New Time, together with Tentative or Decline, in the same message window with a new start and end;
   - "Please respond" until you have answered, and a yellow note when the meeting overlaps other events;
   - the invite's day from your Exchange calendar next to the text, with overlapping events side by side and the invite's slot hatched.
 
   Attendee answer icons are missing: your copy of an invite reports every attendee's answer as unknown.
+- **HTML mail:** shown as the sender laid it out, on a white page also in dark mode. Mail without its own fonts uses Mail's default, Helvetica 14, with Mail's margins. Images, styles and fonts from the web follow Outlook's "Download external images" (Settings ▸ Privacy): by default they load for senders in your organisation (your account's mail domain and its subdomains). Other mail shows Load Remote Content first, so opening it doesn't tell the sender. Images load straight from the sender's server, with no privacy relay like Mail's. The app runs no JavaScript in mail, and links open in your browser. Inline images (`cid:`) are hidden for now. The list, search and replies use the plain-text version, which Exchange sends along
 - **Three-column window** with a mailboxes sidebar, a message list and a message view, using Mail's toolbar layout and SF Symbols
 - **Favorites and smart mailboxes:** All Inboxes, VIPs, Flagged, Unread, then each account's Inbox, Drafts, Sent, Junk, Trash and Archive, with unread badges
 - **Categories:** Primary, Transactions, Updates and Promotions in the Inbox (⌥⌘1–4)
@@ -67,6 +68,8 @@ Exchange mail, sync positions and unsent changes are cached in `~/Library/Applic
 
 `MAIL_SAMPLE_DATA=1 ./run.sh` shows the sample data even when an account is set up.
 
+**Keychain prompt after every build:** run `./make-signing-identity.sh` once. It creates a self-signed code-signing certificate "MailReplica Dev" in your login keychain, and `run.sh` then signs each build with it. The Keychain asks once more, so answer "Always Allow". After that it recognises rebuilt apps as the same app. Without the certificate, every build is signed ad hoc, looks like a new app, and the Keychain asks again. Remove the certificate with `security delete-identity -c "MailReplica Dev"`.
+
 ### How mail is fetched
 
 What's on screen comes first:
@@ -101,7 +104,7 @@ Sources/
   EWS/              MailBackend over Exchange Web Services, Keychain and account settings
   MailReplica/      SwiftUI views, MailCommands (menu bar), DebugSnapshot
 Tests/
-  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (89 tests, plus live tests against a real server)
+  MailModelTests/   Swift Testing suites for MailStore, the disk cache, the drag payload and EWS requests and parsing (108 tests, plus live tests against a real server)
 docs/screenshots/   README images
 run.sh              build / launch / test
 ```
@@ -121,7 +124,7 @@ MAIL_SNAPSHOT=$PWD/tmp/snap.png .build/debug/MailReplica
 MAIL_SNAPSHOT=$PWD/tmp/snap-dark.png MAIL_SNAPSHOT_DARK=1 .build/debug/MailReplica
 ```
 
-`MAIL_SNAPSHOT_SUBJECT="Q4 numbers review"` selects a message by subject (here the sample invite). `MAIL_SNAPSHOT_PROGRESS=0.3` shows the progress bar. Use `MAIL_SAMPLE_DATA=1` so no real mail ends up in a screenshot.
+`MAIL_SNAPSHOT_SUBJECT="Q4 numbers review"` selects a message by subject (here the sample invite), switching to its category; `"30% off everything this weekend 🌊"` is the sample HTML newsletter. HTML bodies are drawn into the PNG once they have loaded. `MAIL_SNAPSHOT_HTML=mail.html` shows that file as the selected message's HTML body, to check how a particular mail renders. `MAIL_SNAPSHOT_ANSWER=decline` (or `accept`, `tentative`, `propose`) opens the answer window for the selected invite and captures that window. `MAIL_SNAPSHOT_PROGRESS=0.3` shows the progress bar. Use `MAIL_SAMPLE_DATA=1` so no real mail ends up in a screenshot.
 
 ## How faithful is it?
 
@@ -149,7 +152,8 @@ The details come from Mail.app's own resources in `/System/Applications/Mail.app
 - [x] Flags, read state, moves, deletes and sending written back to Exchange
 - [ ] Push for new mail (EWS notifications) instead of the 15-second quick check
 - [x] Local cache on disk, so a launch doesn't sync everything again
-- [ ] HTML message view and opening attachments
+- [x] HTML message view
+- [ ] Inline images in HTML mail, opening attachments
 - [ ] Custom folders (only the standard folders are shown now)
 - [ ] Microsoft Graph backend, once the mailbox is reachable there
 

@@ -72,6 +72,40 @@ struct EWSParsingTests {
         #expect(b.cc == [])
     }
 
+    @Test func htmlBodyKeepsTheHTMLAndTakesTextFromTextBody() throws {
+        let d = try doc("""
+            <t:Message><t:ItemId Id="ID1"/><t:Body BodyType="HTML">&lt;p&gt;Hi &lt;b&gt;there&lt;/b&gt;&lt;/p&gt;</t:Body>
+            <t:TextBody BodyType="Text">Hi there</t:TextBody></t:Message>
+            """)
+        let b = EWSBackend.parseBody(try #require(d.first("Message")))
+        #expect(b.html == "<p>Hi <b>there</b></p>")
+        #expect(b.text == "Hi there")
+    }
+
+    @Test func htmlBodyWithoutTextBodyFallsBackToStrippedHTML() throws {
+        let d = try doc("""
+            <t:Message><t:ItemId Id="ID1"/><t:Body BodyType="HTML">&lt;html&gt;&lt;head&gt;&lt;style&gt;p{color:red}&lt;/style&gt;&lt;/head&gt;            &lt;body&gt;&lt;p&gt;Fish &amp;amp; chips&lt;/p&gt;&lt;p&gt;Bye&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</t:Body></t:Message>
+            """)
+        let b = EWSBackend.parseBody(try #require(d.first("Message")))
+        #expect(b.html != nil)
+        #expect(b.text == "Fish & chips\nBye")
+    }
+
+    @Test func plainTextBodyHasNoHTML() throws {
+        let d = try doc(#"<t:Message><t:ItemId Id="ID1"/><t:Body BodyType="Text">Hi there</t:Body></t:Message>"#)
+        let b = EWSBackend.parseBody(try #require(d.first("Message")))
+        #expect(b.html == nil)
+        #expect(b.text == "Hi there")
+    }
+
+    @Test func bodyRequestAsksForBestBodyAndTextBody() throws {
+        let d = try request(EWSBackend.bodyRequest("ID&1"))
+        #expect(d.text("BodyType") == "Best")
+        let fields = (d.first("AdditionalProperties")?.children("FieldURI") ?? []).compactMap { $0.attr("FieldURI") }
+        #expect(fields.contains("item:Body") && fields.contains("item:TextBody"))
+        #expect(d.first("ItemId")?.attr("Id") == "ID&1")
+    }
+
     @Test func archiveFolderFoundByLocalizedName() throws {
         let d = try doc("""
             <m:Folders><t:Folder><t:FolderId Id="F1"/><t:DisplayName>Posteingang</t:DisplayName></t:Folder>

@@ -37,7 +37,12 @@ struct MailReplicaApp: App {
         .defaultSize(width: 640, height: 520)
 
         Settings {
-            AccountsSettings().environment(store)
+            TabView {
+                AccountsSettings().environment(store)
+                    .tabItem { Label("Accounts", systemImage: "at") }
+                PrivacySettings()
+                    .tabItem { Label("Privacy", systemImage: "hand.raised") }
+            }
         }
     }
 

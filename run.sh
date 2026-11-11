@@ -12,7 +12,14 @@ if [ "$1" = test ]; then
   exec swift test --scratch-path .build/tests --skip-build
 fi
 export SDKROOT="${SDKROOT:-$(xcrun --show-sdk-path --sdk macosx26.5 2>/dev/null || echo /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk)}"
+# Sign with the stable identity from make-signing-identity.sh, if there is one. Ad-hoc signatures change with
+# every build, and the Keychain then asks again for the password item.
+sign() {
+  if security find-certificate -c "MailReplica Dev" >/dev/null 2>&1; then
+    codesign -f -s "MailReplica Dev" -i MailReplica .build/debug/MailReplica 2>/dev/null
+  fi
+}
 case "$1" in
-  build) swift build ;;
-  *) swift build && exec .build/debug/MailReplica ;;
+  build) swift build && sign ;;
+  *) swift build && sign && exec .build/debug/MailReplica ;;
 esac

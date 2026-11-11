@@ -146,6 +146,10 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
     public var isInvite: Bool?
     /// Time, place and attendees, loaded with the body.
     public var invite: Invite?
+    /// The HTML version of the body, when the sender sent one. `body` stays plain text for the list, search and replies.
+    public var html: String?
+    /// The body was fetched by a version that asks for HTML. Optional, so older caches load; those bodies are fetched once more.
+    public var htmlChecked: Bool?
 
     public init(id: UUID = UUID(), accountID: UUID, mailbox: MailboxKind = .inbox, from: Contact, to: [Contact],
                 cc: [Contact] = [], subject: String, body: String, date: Date, isRead: Bool = false,
@@ -158,6 +162,17 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
         self.remoteID = remoteID; self.hasAttachments = hasAttachments ?? !attachments.isEmpty
         self.serverPreview = serverPreview; self.bodyLoaded = bodyLoaded
         self.isInvite = isInvite ?? (invite != nil ? true : nil); self.invite = invite
+    }
+
+    /// The body must be fetched: never loaded, or loaded from a server before HTML was asked for.
+    public var needsBody: Bool { !bodyLoaded || (remoteID != nil && htmlChecked != true) }
+
+    /// The HTML loads images, styles or fonts from the web. They are blocked until the user allows them, so
+    /// opening a message doesn't tell the sender it was read.
+    public var hasRemoteContent: Bool {
+        guard let html else { return false }
+        return html.range(of: #"(src|background)\s*=\s*["']?\s*https?:|url\(\s*["']?\s*https?:|@import"#,
+                          options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     /// First lines of the body, as shown under the subject in the list.
@@ -174,8 +189,13 @@ public struct Draft: Hashable, Codable, Sendable {
     public var cc: String
     public var subject: String
     public var body: String
-    public init(accountID: UUID, to: String = "", cc: String = "", subject: String = "", body: String = "") {
+    /// Set when this is an answer to an invite: Send answers it, with the body as the comment.
+    /// Optional, so drafts cached before it existed still load.
+    public var inviteAnswer: InviteAnswer?
+    public init(accountID: UUID, to: String = "", cc: String = "", subject: String = "", body: String = "",
+                inviteAnswer: InviteAnswer? = nil) {
         self.accountID = accountID; self.to = to; self.cc = cc; self.subject = subject; self.body = body
+        self.inviteAnswer = inviteAnswer
     }
 }
 
