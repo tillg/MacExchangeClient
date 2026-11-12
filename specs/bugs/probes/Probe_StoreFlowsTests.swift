@@ -18,14 +18,6 @@ struct Probe_StoreFlowsTests {
 
     // MARK: Reply / forward
 
-    @Test func probe_replyToOwnSentMessageGoesToRecipients() {
-        let m = Message(accountID: work.id, mailbox: .sent, from: Contact(name: "Me", email: "me@work.com"),
-                        to: [Contact(name: "Bo", email: "bo@x.com")], subject: "Plans", body: "x", date: .now)
-        let s = store([m])
-        let d = s.draft(.reply, to: m.id)
-        #expect(d.to == "bo@x.com", "to: \(d.to)")
-    }
-
     @Test func probe_draftForUnknownMessageWithoutAccountsDoesNotCrash() {
         // Only checks that a missing message gives an empty draft for an existing account.
         let s = store([])

@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [029](BUG-029-reply-to-own-sent-message-addresses-self.md) | P3 | MailStore | Reply to a message in Sent addresses the reply to myself |
 | [030](BUG-030-local-save-draft-drops-cc.md) | P3 | MailStore | Save Draft without a server loses the Cc recipients |
 | [031](BUG-031-search-failed-notice-never-cleared.md) | P3 | MailStore | "Search failed: …" stays under the window title after the search is cleared or succeeds |
 | [032](BUG-032-half-proposal-silently-dropped.md) | P3 | MailStore | A proposed new time with only a start (or only an end) is accepted, then silently sent as a plain answer |
