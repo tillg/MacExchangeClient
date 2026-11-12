@@ -6,32 +6,6 @@ import Testing
 struct Probe_ModelTests {
     // MARK: Contact.parseList
 
-    @Test func parseListQuotedNameWithComma() {
-        let c = Contact.parseList(#""Doe, John" <john.doe@x.com>, ann@y.com"#)
-        #expect(c.map(\.email) == ["john.doe@x.com", "ann@y.com"])
-        #expect(c.first?.name == "Doe, John")
-    }
-
-    @Test func parseListStripsQuotesAroundName() {
-        let c = Contact.parseList(#""John Doe" <john@x.com>"#)
-        #expect(c.first?.name == "John Doe")
-    }
-
-    @Test func parseListSemicolonSeparated() {
-        let c = Contact.parseList("a@x.com; b@y.com")
-        #expect(c.map(\.email) == ["a@x.com", "b@y.com"])
-    }
-
-    @Test func parseListTrailingNewline() {
-        let c = Contact.parseList("a@x.com, b@y.com\n")
-        #expect(c.map(\.email) == ["a@x.com", "b@y.com"])
-    }
-
-    @Test func parseListSpacesInsideAngleBrackets() {
-        let c = Contact.parseList("Jane < jane@x.com >")
-        #expect(c.first?.email == "jane@x.com")
-    }
-
     @Test func parseListPlusAndIDN() {
         let c = Contact.parseList("Tom <tom+tag@bücher.de>, ünï@xn--bcher-kva.de")
         #expect(c.map(\.email) == ["tom+tag@bücher.de", "ünï@xn--bcher-kva.de"])

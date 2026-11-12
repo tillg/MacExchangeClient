@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [005](BUG-005-parselist-quoted-display-names.md) | P2 | Models | Contact.parseList breaks quoted display names (comma inside quotes splits the contact; quotes kept in name) |
 | [006](BUG-006-opened-message-vanishes-from-unread-filter.md) | P2 | MailStore | Opening a message with the unread filter on (or in the Unread mailbox) removes it from the list at once |
 | [007](BUG-007-reply-all-includes-own-address-when-case-differs.md) | P2 | MailStore | Reply All keeps my own address when the original lists it in different case |
 | [008](BUG-008-reply-quote-ignores-crlf-lines.md) | P2 | MailStore | Reply/forward quoting marks only the first line of a CRLF body |
@@ -16,8 +15,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [012](BUG-012-server-field-not-normalised.md) | P3 | EWS | Server field: `http://…`, `host/EWS/Exchange.asmx`, `host/`, trailing newline or blanks give a wrong EWS URL |
 | [013](BUG-013-attached-message-opens-nested-file-content.md) | P3 | EWS | Opening an attached message (.eml) can return the content of a file inside it instead of its MIME source |
 | [014](BUG-014-inline-image-with-generic-content-type-not-loaded.md) | P3 | EWS | Inline pictures sent as `application/octet-stream` are never fetched, so the HTML shows a broken image |
-| [015](BUG-015-parselist-semicolon-separator.md) | P3 | Models | Contact.parseList treats "a@x.com; b@y.com" as one recipient |
-| [016](BUG-016-parselist-does-not-trim-newlines-or-bracket-spaces.md) | P3 | Models | Contact.parseList leaves newlines and spaces inside <> in the address |
 | [017](BUG-017-preview-recomputed-over-whole-body.md) | P3 | Models | Message.preview processes the entire body on every access (80-300 ms for a 1 MB body) |
 | [018](BUG-018-hasremotecontent-misses-remote-references.md) | P3 | HTMLPage | hasRemoteContent misses srcset, <link href>, poster and &quot;-quoted url(), so no Load Remote Content banner |
 | [019](BUG-019-inline-image-content-type-injected-into-page.md) | P3 | HTMLPage | Inline image content type is inserted unescaped into the page, breaking out of the src attribute |

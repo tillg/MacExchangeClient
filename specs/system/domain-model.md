@@ -31,11 +31,14 @@ stored: [storage.md](storage.md). How EWS fills them: [ews.md](ews.md).
 
 - `initials`: the first letters of the first two parts of `name` split on ASCII space, uppercased.
 - `parseList(_:)` parses what the user types in To/Cc:
-  1. Split on `,` (only; `;` is not a separator, quotes are not respected).
-  2. Trim spaces and tabs (not newlines) from each part; skip empty parts.
-  3. If the part has `<` before its last `>`: the name is the text before `<` (trimmed; if empty, the address), the
-     address is everything between `<` and the last `>`, untrimmed.
-  4. Otherwise name and address are both the whole part.
+  1. Split on `,` and `;`, except inside double quotes (where `\"` and `\\` are escapes) or inside `<>`.
+  2. Trim blanks and line breaks from each part; skip empty parts.
+  3. A part with no `@`, `<` or `"`, followed by a part with `<`, is joined to it with ", ": Outlook's unquoted
+     `Doe, John <john@x.com>` is one recipient named "Doe, John".
+  4. If the part has `<` before `>` (the last of each): the name is the text before `<`, trimmed, with surrounding
+     double quotes removed and escapes resolved (if empty, the address); the address is the text between them,
+     trimmed of blanks and line breaks.
+  5. Otherwise name and address are both the whole part.
 
 ## Message
 

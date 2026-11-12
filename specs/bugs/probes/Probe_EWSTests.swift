@@ -77,13 +77,6 @@ struct Probe_EWSTests {
         #expect(msg.text("Subject") == subject)
     }
 
-    /// RFC 5322 display names may contain commas when quoted ("Gartner, Till" is the usual Exchange GAL format).
-    @Test func probeQuotedDisplayNameWithComma() throws {
-        let draft = Draft(accountID: UUID(), to: "\"Gartner, Till\" <till@x.com>", subject: "s", body: "b")
-        let msg = try #require(try request(EWSBackend.createRequest(draft, send: true)).first("Message"))
-        #expect(msg.child("ToRecipients")?.all("EmailAddress").map(\.stringValue) == ["till@x.com"])
-    }
-
     @Test func probeIDsWithSpecialChars() throws {
         let id = "AAMk+/=&<>\"'x"
         let d = try request(EWSBackend.moveRequest([id], to: id))
@@ -243,13 +236,6 @@ struct Probe_EWSTests {
         #expect(EWSBackend.folderTree(d.all("Folder"), known: [], skip: []).count == 1)
     }
 
-    /// Outlook copies recipients as `Last, First <addr>`; pasted into To that must stay one recipient.
-    @Test func probeUnquotedLastFirstName() throws {
-        let draft = Draft(accountID: UUID(), to: "Gartner, Till <till@x.com>", subject: "s", body: "b")
-        let msg = try #require(try request(EWSBackend.createRequest(draft, send: true)).first("Message"))
-        #expect(msg.child("ToRecipients")?.all("EmailAddress").map(\.stringValue) == ["till@x.com"])
-    }
-
     // MARK: Round 2
 
     @Test func probeEmptyTextBodyFallsBackToHTML() throws {
@@ -296,11 +282,5 @@ struct Probe_EWSTests {
 
     @Test func probeServerInnerSpace() {
         #expect(ExchangeAccount(email: "", username: "", server: "mail example.com").ewsURL == nil)
-    }
-
-    @Test func probeSemicolonSeparatedRecipients() throws {
-        let draft = Draft(accountID: UUID(), to: "a@x.com; b@x.com", subject: "s", body: "b")
-        let msg = try #require(try request(EWSBackend.createRequest(draft, send: true)).first("Message"))
-        #expect(msg.child("ToRecipients")?.all("EmailAddress").map(\.stringValue) == ["a@x.com", "b@x.com"])
     }
 }
