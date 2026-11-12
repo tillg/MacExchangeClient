@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [013](BUG-013-attached-message-opens-nested-file-content.md) | P3 | EWS | Opening an attached message (.eml) can return the content of a file inside it instead of its MIME source |
 | [014](BUG-014-inline-image-with-generic-content-type-not-loaded.md) | P3 | EWS | Inline pictures sent as `application/octet-stream` are never fetched, so the HTML shows a broken image |
 | [017](BUG-017-preview-recomputed-over-whole-body.md) | P3 | Models | Message.preview processes the entire body on every access (80-300 ms for a 1 MB body) |
 | [018](BUG-018-hasremotecontent-misses-remote-references.md) | P3 | HTMLPage | hasRemoteContent misses srcset, <link href>, poster and &quot;-quoted url(), so no Load Remote Content banner |

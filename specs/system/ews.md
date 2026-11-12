@@ -88,7 +88,8 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
   strip tags, decode six entities, trim lines, drop empty ones), else the body. From/To/Cc from the full `Mailbox`es.
 - **Attachments** (`listedAttachments`): every child of `Attachments` with a `Name` and `IsInline` not "true";
   `ItemAttachment` gets `.eml` appended and type `message/rfc822`; size from `Size`. Content: the first
-  `FileAttachment/Content` anywhere in the response, else `ItemAttachment/MimeContent`, base64-decoded.
+  element under `m:Attachments` only: a `FileAttachment`'s own `Content`, or the `MimeContent` directly under an
+  `ItemAttachment`'s item (never a nested attachment's), base64-decoded.
 - **Inline images** (`inlineAttachmentIDs`): `FileAttachment`s with `ContentType` starting `image/` and a
   `ContentId` (trimmed of `<`, `>`, space) in the wanted set, inline or not; keyed by that ID.
 - **Invite** (`parseInvite`): built for any item with `Start` and `End` (not only meeting requests): location, all-day,

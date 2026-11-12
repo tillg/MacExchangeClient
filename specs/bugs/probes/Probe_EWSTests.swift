@@ -110,18 +110,6 @@ struct Probe_EWSTests {
         #expect(b.from == nil)
     }
 
-    /// GetAttachment for an attached message returns the message with its own file attachments; the .eml is the MIME.
-    @Test func probeItemAttachmentContentPrefersMimeOverNestedFile() throws {
-        let d = try doc("""
-            <m:GetAttachmentResponse><m:ResponseMessages><m:GetAttachmentResponseMessage ResponseClass="Success">
-            <m:ResponseCode>NoError</m:ResponseCode><m:Attachments><t:ItemAttachment><t:AttachmentId Id="A"/><t:Name>Mail</t:Name>
-            <t:Message><t:MimeContent CharacterSet="UTF-8">TUlNRQ==</t:MimeContent><t:ItemId Id="X"/>
-            <t:Attachments><t:FileAttachment><t:AttachmentId Id="N"/><t:Name>n.txt</t:Name><t:Content>TkVTVEVE</t:Content></t:FileAttachment></t:Attachments>
-            </t:Message></t:ItemAttachment></m:Attachments></m:GetAttachmentResponseMessage></m:ResponseMessages></m:GetAttachmentResponse>
-            """)
-        #expect(EWSBackend.parseAttachmentContent(d) == Data("MIME".utf8))
-    }
-
     @Test func probeInlineImageCaseInsensitiveContentID() throws {
         let d = try doc("""
             <t:Message><t:Attachments><t:FileAttachment><t:AttachmentId Id="A1"/><t:Name>i.png</t:Name>
