@@ -1,0 +1,129 @@
+---
+title: "Functional"
+created: 2026-11-12
+edited: 2026-11-12
+---
+
+# Functional
+
+What a user can do today. Behaviour lives in `Sources/MailModel/MailStore.swift`; views are in
+`Sources/MailReplica/`. Search: [search.md](search.md). Message rendering: [rendering.md](rendering.md). Known bugs
+that change these rules: [../bugs/README.md](../bugs/README.md).
+
+## Window and mailboxes
+
+- One three-column window (`MessageViewer.swift`): sidebar, message list, message view. Title is the mailbox
+  ("All Inboxes", "Inbox – Exchange", a folder name); subtitle is `status` if set, else "N messages, U unread".
+- Toolbar: back/forward through visited mailboxes, unread filter, View Options (Show Contact Photo), New Message;
+  Reply / Reply All / Forward; Archive / Delete / Junk; Move menu (every account's mailboxes, subfolders indented);
+  Flag menu (click toggles red); search field.
+- Sidebar (`SidebarView.swift`): **Favorites** (All Inboxes — with more than one account a disclosure group with
+  each account's Inbox —, VIPs, Flagged), **Smart Mailboxes** (Unread), then per account the standard mailboxes
+  Inbox, Drafts, Sent, Junk, Trash, Archive, followed by the account's own top-level folders sorted by name
+  (`localizedStandardCompare`). Folders with subfolders have a disclosure triangle, closed at launch.
+- Badges: Drafts shows its total; Sent, Trash and Archive show none; everything else shows unread.
+- Smart mailbox rules (`contains`): All Inboxes = mailbox is `.inbox` (subfolders of Inbox don't count); VIPs = VIP
+  and in Inbox; Flagged = any flag and not in `.trash`; Unread = unread and in Inbox.
+- Selecting a mailbox clears the selection and runs a quick check. ⌘1–⌘9 go to All Inboxes, VIPs, Flagged, then each
+  account's Inbox. Right-click a mailbox: Mark All Messages as Read.
+- While syncing, the sidebar bottom shows a progress bar with "Loading Mail…", "Updating Mail Storage…" or
+  "Synchronizing “Exchange”".
+
+## Message list
+
+- `visibleMessages`: the selected mailbox's messages, newest first. With the unread filter (⌘L) only unread ones.
+  While searching, the list shows search results instead and ignores the unread filter ([search.md](search.md)).
+- Row: unread dot, optional avatar, VIP star, sender (for Sent and Drafts "To: " + first recipient), date (time today,
+  "Yesterday", weekday within 7 days, else short date), subject, paperclip, flag, two-line preview.
+- Selecting exactly one message marks it read (one main-loop turn later), and the message view loads it.
+- Swipe right: Read/Unread. Swipe left: Trash, Flag (toggles orange). Right-click: Reply, Reply All, Forward (single
+  message), Mark as Read/Unread, Flag colours, Archive, Move to Junk, Delete.
+- Pull down past the top: quick check, with a spinner shown at least 0.8 s (`PullToRefresh.swift`).
+
+## Actions and selection
+
+| Action | Effect |
+|---|---|
+| Delete (⌘⌫) | Messages in Trash are erased (removed; server: `DeleteItem` SoftDelete); others move to the account's Trash |
+| Archive (⌃⌘A) | Move to `.archive`, also when already there |
+| Junk (⇧⌘J) | Per message: Junk → Inbox, anything else → Junk |
+| Mark as Read/Unread (⇧⌘U) | All become read if any is unread, else all unread |
+| Toggle Flag (⇧⌘L) | Clears the flag if any selected message is flagged, else flags red |
+| Flag ▸ colour / Clear Flag | Sets that colour on all; seven colours, red to gray |
+| Mark All Messages as Read | Every message the mailbox contains |
+
+- **Next message:** Delete (toolbar, menu bar, Delete key), Archive and Junk from the toolbar or menu bar, the Move
+  menu, a drag of exactly the selection, and an invite answer on the selected invite go through `actOnSelection`: afterwards the first still-visible message after
+  the last selected one is selected, else the nearest one before it, else nothing. If no selected message was in
+  the list, the selection is left as it was. Context-menu and swipe actions don't move the selection.
+- An action on Exchange mail that would move it to another account is reverted with the status "Exchange messages
+  can't be moved to another account yet".
+
+## Drag and drop
+
+Rows drag as `MessageDrag` (the whole selection if the row is selected). Drop targets are sidebar rows
+(`drop(_:on:)`): an account mailbox moves there (local messages also across accounts; Exchange mail is refused for
+another account); Flagged flags unflagged ones red; All Inboxes moves each message to its own account's Inbox; VIPs
+and Unread refuse drops. Messages already in the target are left out. Resting on a closed folder for 0.7 s opens it.
+
+## Message view and conversations
+
+- `MessageDetailView.swift`: header (initials avatar, sender name, paperclip menu, flag, date, subject, To and Cc
+  names), invite card, body, attachments. Several selected: "N messages selected".
+- **Conversations** (Settings ▸ Viewing ▸ "Show messages as conversations", on by default): the selected message and
+  every message of the same account with the same `conversationID`, except those in Trash, Junk or Drafts, newest
+  first, each on its own card. A message from another mailbox than the selected one is labelled "Found in Sent –
+  Exchange Mailbox". The view scrolls to the selected card, again after 0.6 s. The list itself is not grouped.
+- **Attachments** (`AttachmentsView.swift`): pictures in place, other files as Finder icon with "name (size)".
+  Double-click opens, Space opens Quick Look, drag to Finder copies, Control-click: Open Attachment, Open With, Quick
+  Look, Save Attachment…, Save to Downloads Folder, View as Icon / View in Place. File ▸ Save Attachments… and Quick
+  Look Attachments… (⌘Y). Files are fetched on first open into a temporary "Mail Downloads/<message>/<index>/" folder
+  with the quarantine flag; saving never overwrites ("name 2.pdf").
+
+## Compose
+
+- New Message (⌘N) opens a compose window for the first account (the toolbar button: the selected mailbox's or message's account). Fields To, Cc,
+  Subject, From picker with more than one account, Message Size when files are attached. Send (⇧⌘D) needs a
+  non-empty To; Save Draft (⌘S).
+- Reply rules (`draft(_:to:)`):
+  - Subject gets "Re: " or "Fwd: " unless it already starts with exactly that prefix (case-sensitive).
+  - Body: an attribution line ("On <date>, Name <addr> wrote:") or a "Begin forwarded message:" block, then every
+    line of the plain-text body (split on `\n`) prefixed with "> ".
+  - Reply: To = the sender's address. Reply All: To = sender, To and Cc addresses minus the account address (exact
+    match), in that order, with duplicates; Cc stays empty. Forward: To empty.
+- Original attachments: Forward always loads them. Replies follow Edit ▸ Include Attachments With Replies (Never,
+  default; Ask: an alert when the window opens; When Adding Recipients: on leaving To/Cc or Return, if an address with
+  "@" wasn't on the original; Always). Ask and When Adding Recipients work for every reply; Always only for replies
+  from the menu bar, since toolbar and context-menu replies don't pass the setting to `draft()`. The Include/Exclude Attachments button adds or removes them by hand. Send and Save are blocked
+  while they load.
+- Attaching: Attach button, File ▸ Attach Files… (⇧⌘A), dropping or pasting files. A folder is sent as "Name.zip".
+  Files sit in the text at a U+FFFC mark ([domain-model.md](domain-model.md#draft)); JPEG, PNG and GIF placed in the
+  text are sent inline in an HTML body ([rendering.md](rendering.md#html-of-sent-mail)).
+- Size: estimated size above the account's MailTips limit shows red "(maximum …)"; Send then asks first (Try
+  Sending in Email / Cancel).
+- Closing a window with user changes (not the original's files) asks "Save this message as a draft?" (Save / Cancel
+  / Don't Save). Invite answers close without asking.
+- Send on an Exchange account queues `send`; without a server the message is added to Sent. Save Draft likewise
+  queues `saveDraft` or adds a local Drafts message.
+
+## Meeting invites
+
+- `InviteView.swift`: required and optional attendees (first 8 + "N more"), date/time and location, then Accept,
+  Tentative and Decline menus (Respond with Comments…, Respond without Comments, Do Not Send a Response) and Propose
+  New Time (with Tentative or Decline). A cancellation shows only Remove from Calendar.
+- Banners: "Please respond." or "You answered: …" (with the proposed time and "the organizer wasn't told"), and a
+  yellow conflict note when timed, non-free calendar events overlap (the invite's own entry excluded).
+- Next to the text, a day column from the Exchange calendar with overlapping events side by side.
+- With Comments / Propose open a compose window to the organizer with subject "Accepted: …", "Tentative: …",
+  "Declined: …" or "New Time Proposed: …"; its text becomes the comment. A proposal must end after it starts.
+- Any answer or Remove from Calendar moves the message to Trash locally at once.
+
+## Settings, menus, help
+
+- Settings ▸ Accounts: list of accounts; Add Exchange Account (email, `DOMAIN\user`, password, server). Sign In
+  checks the credentials with a folder request before saving, stores the password in the Keychain, removes the
+  sample accounts and runs a quick check. Accounts can't be removed or edited in the app.
+- Settings ▸ Viewing: conversations on/off. Settings ▸ Privacy: Download external images — Always, My organisation
+  (default), Ask before downloading ([rendering.md](rendering.md)).
+- Mailbox ▸ Get New Mail (⇧⌘N). Message ▸ Send (⇧⌘D) in the menu bar is always disabled; the compose toolbar has it.
+- Help ▸ What's New opens a window listing `WhatsNew.days` (`Sources/MailModel/WhatsNew.swift`), newest day first.

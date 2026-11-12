@@ -1,8 +1,8 @@
 ---
 title: In-memory fallback search ignores the README's matching rules (To/Cc/preview, every word, accents)
-priority: P2
+priority: P3
 area: MailStore
-status: design-question (README documents the launch fallback as "as before"; not counted as a bug)
+status: open (decided in DECISIONS.md#d-memory-search: align with README)
 found: 2026-11-12
 ---
 ## Summary

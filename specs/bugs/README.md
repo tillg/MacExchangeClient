@@ -57,5 +57,4 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [049](BUG-049-local-send-empty-subject-inconsistent.md) | P4 | MailStore | Sending without a server stores an empty subject; Drafts and failed sends use "(No Subject)" |
 | [050](BUG-050-reply-all-trailing-comma-for-addressless-recipient.md) | P4 | MailStore | Reply All leaves a trailing ", " (empty recipient) when the original lists a recipient without address |
 | [051](BUG-051-symlink-to-folder-cannot-be-attached.md) | P4 | MailStore | Attaching a symbolic link to a folder fails with "Couldn't attach" instead of zipping the folder |
-
-Not counted: [design question: memory-search fallback](design-question-memory-search-fallback.md). The README documents the launch fallback as "as before", which conflicts with its own matching rules.
+| [052](BUG-052-memory-search-fallback-ignores-readme-rules.md) | P3 | MailStore | In-memory fallback search ignores the README matching rules (To/Cc/preview, every word, accents) |
