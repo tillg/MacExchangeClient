@@ -203,3 +203,18 @@ edited: 2026-11-13
 - **Decision:** Within each piece of text, a space that follows a space, or starts a line, becomes `&nbsp;`, so plain spaces and `&nbsp;` alternate (`a␣␣␣b` → `a &nbsp; b`); single spaces between words stay plain. A tab becomes `<span class="Apple-tab-span" style="white-space:pre">⇥</span>`, as Mail writes it. The alternation restarts after a picture mark (the existing test `picturesInTheTextGoOutInline` pins `and  bye` where a file mark was left out).
 - **Why:** `&nbsp;` alternation is what Mail (and most clients) send and every client renders, including Outlook's Word engine, which ignores some CSS; `white-space: pre-wrap` on the body would also be simpler but isn't reliably honoured there. Alternating instead of all-`&nbsp;` keeps long runs breakable at line ends.
 - **Alternatives:** `white-space: pre-wrap` on `<body>` (rejected: less compatible, as the lead noted); expand tabs to spaces (rejected: tab stops lose alignment in proportional fonts either way, and Mail keeps the tab).
+
+## 00:31 — Bug hunts 2 and 3: `file://` fixture responses and WebKit probes are allowed {#d-hunt-harness}
+
+- **Status:** decided (the user may veto)
+- **Context:** The CLAUDE.md rule is "never mock without permission". EWS flows (sync, send, errors) can't be tested without a server.
+- **Decision:** Probes and regression tests may point the real `EWSClient`/`EWSBackend` at a `file://` URL that holds a hand-written Exchange XML response. No class is replaced and there is no network. The tests are marked `// file:// fixture`, so they are easy to find and remove. Real `WKWebView` rendering probes are also allowed.
+- **Why:** It is a recorded response read through the real transport, not a test double. Without it, the error paths found in round 2 (for example `ErrorInvalidSyncStateData` never being reset) can't be proven.
+- **Alternatives:** Skip backend flows. Rejected, because that is where the data-loss bugs are.
+
+## 00:31 — Filing rules for bug hunts 2 and 3 {#d-hunt-filing}
+
+- **Decision:**
+  - Bugs found by two hunters are filed once, with "Also seen by" in the file.
+  - Findings that an existing test pins as intended behaviour are not filed. Example: Exchange Send and Save Draft show nothing locally until the next sync (`sendFromServerAccountQueuesAndAddsNothingLocally`), although the README says "show at once". This contradiction is left for the user to decide.
+  - Every filed bug was re-run against the current HEAD before filing.
