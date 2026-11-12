@@ -13,6 +13,7 @@ public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
             "If the mail kept by an older version can't be read, the app keeps a copy of it, starts fresh and saves your mail again.",
+            "Messages no longer show up dated in the year 1, and more meeting invitations show their details and answer buttons.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",

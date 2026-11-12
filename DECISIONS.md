@@ -118,3 +118,11 @@ edited: 2026-11-12
 - **Why:** Everything in the cache except local-only state (flag colours, unsent changes) is on the server; refusing to create the database protected nothing. The user's file is never deleted, so it can still be recovered by hand.
 - **Alternatives:** Delete the file (rejected: never delete user data); keep throwing and ask the user (rejected: no UI for it, and the app is unusable meanwhile).
 - **Note:** The clock passed midnight during this run, so What's New lines from here on go to a new day, 2026-11-13, as CLAUDE.md asks ("today's day").
+
+## 00:03 — EWS dates: any fraction, and no zone means UTC {#d-bug-010}
+
+- **Status:** decided (assumption: zone-less values are UTC ⚠️, not seen on the live server)
+- **Context:** BUG-010. One `ISO8601DateFormatter` read every EWS date and rejected valid `xs:dateTime` values with fractional seconds or without a zone: the message got year 1, invites and calendar events were dropped.
+- **Decision:** `EWSBackend.isoDate` trims blanks, reads a fraction of any length (added to the whole seconds), and reads a time without `Z` or `±hh:mm` as UTC.
+- **Why:** EWS sends UTC unless the request sets a `TimeZoneContext`, which this client never does; so a zone-less value is most likely UTC. A wrong zone would shift a time by hours; dropping the item or showing year 1 is worse.
+- **Alternatives:** Read zone-less times in the Mac's zone (rejected: the server, not the Mac, decides the zone, and it is UTC by default).

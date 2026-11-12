@@ -184,7 +184,7 @@ public struct EWSBackend: MailBackend {
 
     static func parseEvents(_ doc: XMLDocument) -> [CalendarEvent] {
         (doc.first("Items")?.elementChildren ?? []).compactMap { e in
-            guard let start = e.text("Start").flatMap(isoDate.date), let end = e.text("End").flatMap(isoDate.date) else { return nil }
+            guard let start = e.text("Start").flatMap(isoDate), let end = e.text("End").flatMap(isoDate) else { return nil }
             let busy: BusyStatus = switch e.text("LegacyFreeBusyStatus") {
             case "Free": .free
             case "Tentative": .tentative
@@ -198,8 +198,8 @@ public struct EWSBackend: MailBackend {
     }
 
     static func parseInvite(_ item: XMLNode) -> Invite? {
-        guard let start = item.child("Start")?.stringValue.flatMap(isoDate.date),
-              let end = item.child("End")?.stringValue.flatMap(isoDate.date) else { return nil }
+        guard let start = item.child("Start")?.stringValue.flatMap(isoDate),
+              let end = item.child("End")?.stringValue.flatMap(isoDate) else { return nil }
         let attendees = { (tag: String) in (item.child(tag)?.children("Attendee") ?? []).compactMap { $0.child("Mailbox").map(contact) } }
         return Invite(start: start, end: end, location: item.child("Location")?.stringValue ?? "",
                       isAllDay: item.child("IsAllDayEvent")?.stringValue == "true",
@@ -484,7 +484,20 @@ public struct EWSBackend: MailBackend {
                           token: doc.text("SyncState") ?? "", more: doc.text("IncludesLastItemInRange") == "false")
     }
 
-    nonisolated(unsafe) static let isoDate = ISO8601DateFormatter()
+    nonisolated(unsafe) private static let isoFormatter = ISO8601DateFormatter()
+
+    /// An `xs:dateTime`: fractional seconds of any length are allowed, and a time without a zone is read as UTC,
+    /// which EWS uses unless a request asks for another zone.
+    static func isoDate(_ text: String) -> Date? {
+        var s = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.range(of: #"(Z|[+-]\d\d:\d\d)$"#, options: .regularExpression) == nil { s += "Z" }
+        var fraction = 0.0
+        if let r = s.range(of: #"\.\d+"#, options: .regularExpression) {
+            fraction = Double("0" + s[r]) ?? 0
+            s.removeSubrange(r)
+        }
+        return isoFormatter.date(from: s)?.addingTimeInterval(fraction)
+    }
 
     /// A list summary: no body yet, recipients as display names only.
     static func message(_ item: XMLNode) -> Message? {
@@ -492,7 +505,7 @@ public struct EWSBackend: MailBackend {
         let from = item.child("From").map(contact) ?? Contact(name: "", email: "")
         var m = Message(accountID: UUID(), from: from, to: names(item.text("DisplayTo")), cc: names(item.text("DisplayCc")),
                        subject: item.child("Subject")?.stringValue ?? "",
-                       body: "", date: item.text("DateTimeReceived").flatMap(isoDate.date) ?? .distantPast,
+                       body: "", date: item.text("DateTimeReceived").flatMap(isoDate) ?? .distantPast,
                        isRead: item.text("IsRead") == "true",
                        flag: item.child("Flag")?.text("FlagStatus") == "Flagged" ? .red : nil,
                        remoteID: rid, hasAttachments: item.text("HasAttachments") == "true",

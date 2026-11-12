@@ -334,6 +334,32 @@ struct EWSParsingTests {
         #expect(e.map(\.isAllDay) == [false, true])
     }
 
+    /// xs:dateTime allows fractional seconds and no zone; without a zone the time is read as UTC (EWS's default).
+    @Test func datesWithFractionalSecondsOrWithoutZoneAreRead() throws {
+        let utc = { ISO8601DateFormatter().date(from: $0)! }
+        let received = try doc("""
+            <t:Message><t:ItemId Id="ID1"/><t:DateTimeReceived>2026-11-10T09:30:00.123Z</t:DateTimeReceived></t:Message>
+            """)
+        let m = try #require(EWSBackend.message(received.first("Message")!))
+        #expect(abs(m.date.timeIntervalSince(utc("2026-11-10T09:30:00Z")) - 0.123) < 0.001)
+
+        let invite = try doc("""
+            <t:MeetingRequest><t:ItemId Id="M1"/><t:Body BodyType="Text">x</t:Body>
+            <t:Start>2026-11-23T11:30:00</t:Start><t:End>2026-11-23T12:00:00.5</t:End></t:MeetingRequest>
+            """)
+        let i = try #require(EWSBackend.parseBody(invite.first("MeetingRequest")!).invite)
+        #expect(i.start == utc("2026-11-23T11:30:00Z"))
+        #expect(abs(i.end.timeIntervalSince(utc("2026-11-23T12:00:00Z")) - 0.5) < 0.001)
+
+        let events = try doc("""
+            <m:Items><t:CalendarItem><t:ItemId Id="C1"/><t:Subject>S</t:Subject><t:Start>2026-11-23T08:00:00.000Z</t:Start>
+            <t:End>2026-11-23T09:15:00.000+01:00</t:End></t:CalendarItem></m:Items>
+            """)
+        let e = EWSBackend.parseEvents(events)
+        #expect(e.count == 1)
+        #expect(e.first?.end == utc("2026-11-23T08:15:00Z"))
+    }
+
     @Test func calendarViewRequestAsksForOneDay() throws {
         let from = ISO8601DateFormatter().date(from: "2026-11-23T00:00:00Z")!
         let d = try request(EWSBackend.calendarViewRequest(from: from, to: from.addingTimeInterval(86400)))
