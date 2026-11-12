@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [002](BUG-002-hidden-selection-erased-by-second-delete.md) | P1 | MailStore | Delete keeps a selection that is no longer in the list; a second Delete erases the message from Trash unseen |
 | [003](BUG-003-trash-hits-crowd-out-search-results.md) | P2 | MailStore | Indexed search: Trash/Junk hits fill the 2,000-result cap, hiding real matches and showing 'Showing the newest 2,000 results' over an empty list |
 | [004](BUG-004-control-chars-break-ews-requests.md) | P2 | EWS | Control characters in subject/body/file name/invite comment make the EWS request malformed XML, so Send/Save/Answer fails |
 | [005](BUG-005-parselist-quoted-display-names.md) | P2 | Models | Contact.parseList breaks quoted display names (comma inside quotes splits the contact; quotes kept in name) |

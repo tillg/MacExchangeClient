@@ -55,7 +55,12 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 - **Next message:** Delete (toolbar, menu bar, Delete key), Archive and Junk from the toolbar or menu bar, the Move
   menu, a drag of exactly the selection, and an invite answer on the selected invite go through `actOnSelection`: afterwards the first still-visible message after
   the last selected one is selected, else the nearest one before it, else nothing. If no selected message was in
-  the list, the selection is left as it was. Context-menu and swipe actions don't move the selection.
+  the list (hidden by the unread filter or a search), nothing stays selected that the action took out of the list.
+- **No hidden selection:** every delete or move (also from the context menu, a swipe or a drop) takes the selected
+  messages it removes from the visible list (or erases) out of the selection. If that was the whole selection, the
+  next message is selected by the rule above; otherwise the rest stays selected. A selected message that stays in
+  the list stays selected. So a second Delete can never erase a message from Trash that the user didn't see there.
+  Read/unread and flag changes don't move the selection.
 - An action on Exchange mail that would move it to another account is reverted with the status "Exchange messages
   can't be moved to another account yet".
 

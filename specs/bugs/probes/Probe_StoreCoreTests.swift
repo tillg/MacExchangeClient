@@ -41,20 +41,6 @@ struct Probe_StoreCoreTests {
         #expect(s.visibleMessages.map(\.id).contains(a.id))
     }
 
-    // 2. Delete on a selection that isn't in the list leaves it selected; a second Delete erases it for good.
-    @Test func deletingTwiceAHiddenSelectionDoesNotEraseIt() {
-        let a = msg(work, subject: "a", read: true, minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
-        let s = store([a, b])
-        s.selectedMailbox = .account(work.id, .inbox)
-        s.selection = [a.id]
-        s.filterUnread = true  // a is read: hidden now, still selected
-        s.deleteSelection()
-        #expect(s.message(a.id)?.mailbox == .trash)
-        #expect(!s.selection.contains(a.id))
-        s.deleteSelection()
-        #expect(s.message(a.id) != nil, "second ⌘⌫ erased a message the user never saw in Trash")
-    }
-
     // 4. Move to Junk on a mixed selection: everything ends up in Junk (like Mark as Read for a mixed selection).
     @Test func junkOnMixedSelectionMovesAllToJunk() {
         let a = msg(work, .junk, subject: "a", flag: .red), b = msg(work, subject: "b", flag: .red)
@@ -104,29 +90,6 @@ struct Probe_StoreCoreTests {
         let s = store([a, b])
         s.setFolders([Folder(box: deleted, name: "Old", parent: .trash)], account: work.id)
         #expect(s.conversation(of: a.id).map(\.id) == [a.id])
-    }
-
-    // 2b. Swipe/context-menu Delete on the selected message (store.delete), then ⌘⌫: erased without being seen.
-    @Test func swipeDeleteThenDeleteKeyDoesNotEraseIt() {
-        let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
-        let s = store([a, b])
-        s.selectedMailbox = .account(work.id, .inbox)
-        s.selection = [a.id]
-        s.delete([a.id])          // swipe ▸ Trash on the selected row
-        s.deleteSelection()       // ⌘⌫
-        #expect(s.message(a.id) != nil, "erased from Trash without ever being shown there")
-    }
-
-    // 2c. Typing a search that hides the selected message, then ⌘⌫ twice.
-    @Test func searchHidingTheSelectionThenDeleteTwiceDoesNotEraseIt() {
-        let a = msg(work, subject: "alpha", minutesAgo: 1), b = msg(work, subject: "beta", minutesAgo: 2)
-        let s = store([a, b])
-        s.selectedMailbox = .account(work.id, .inbox)
-        s.selection = [a.id]
-        s.searchText = "beta"
-        s.deleteSelection()
-        s.deleteSelection()
-        #expect(s.message(a.id) != nil)
     }
 
     // 3'. An action that changes nothing (Archive while viewing Archive) must not move the selection.
