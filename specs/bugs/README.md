@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [025](BUG-025-trash-subfolders-not-treated-as-trash.md) | P3 | MailStore | Subfolders of Trash (deleted folders) are treated as live mail – shown in conversations and in Flagged |
 | [026](BUG-026-reply-all-duplicates-recipients.md) | P3 | MailStore | Reply All lists the same recipient several times |
 | [027](BUG-027-reply-all-moves-cc-into-to.md) | P3 | MailStore | Reply All puts the original Cc recipients into To; Cc stays empty |
 | [028](BUG-028-reply-forward-prefix-case-sensitive.md) | P3 | MailStore | Reply/Forward stack prefixes: "RE: x" becomes "Re: RE: x", "Re:x" becomes "Re: Re:x" |

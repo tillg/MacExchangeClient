@@ -23,7 +23,7 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
   (`localizedStandardCompare`). Folders with subfolders have a disclosure triangle, closed at launch.
 - Badges: Drafts shows its total; Sent, Trash and Archive show none; everything else shows unread.
 - Smart mailbox rules (`contains`): All Inboxes = mailbox is `.inbox` (subfolders of Inbox don't count); VIPs = VIP
-  and in Inbox; Flagged = any flag and not in `.trash`; Unread = unread and in Inbox.
+  and in Inbox; Flagged = any flag and not in `.trash` or a folder inside it (any depth: Exchange keeps deleted folders in Deleted Items); Unread = unread and in Inbox.
 - Selecting a mailbox clears the selection and runs a quick check. ⌘1–⌘9 go to All Inboxes, VIPs, Flagged, then each
   account's Inbox. Right-click a mailbox: Mark All Messages as Read.
 - While syncing, the sidebar bottom shows a progress bar with "Loading Mail…", "Updating Mail Storage…" or
@@ -80,7 +80,7 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
 - `MessageDetailView.swift`: header (initials avatar, sender name, paperclip menu, flag, date, subject, To and Cc
   names), invite card, body, attachments. Several selected: "N messages selected".
 - **Conversations** (Settings ▸ Viewing ▸ "Show messages as conversations", on by default): the selected message and
-  every message of the same account with the same `conversationID`, except those in Trash, Junk or Drafts, newest
+  every message of the same account with the same `conversationID`, except those in Trash (or a folder inside it), Junk or Drafts, newest
   first, each on its own card. A message from another mailbox than the selected one is labelled "Found in Sent –
   Exchange Mailbox". The view scrolls to the selected card, again after 0.6 s. The list itself is not grouped.
 - **Attachments** (`AttachmentsView.swift`): pictures in place, other files as Finder icon with "name (size)".

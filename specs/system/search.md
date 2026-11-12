@@ -1,7 +1,7 @@
 ---
 title: "Search"
 created: 2026-11-12
-edited: 2026-11-12
+edited: 2026-11-13
 ---
 
 # Search
@@ -74,8 +74,10 @@ Junk since the last save isn't found by the index until that save.
 
 - An account mailbox is selected: only that account. A smart mailbox: all accounts. The mailbox itself doesn't
   limit the search.
-- Messages whose `mailbox` is exactly `.trash` or `.junk` are left out (memory: in the filter; index: in SQL before the
-  limit, and again in `hitList` against memory). User folders below Trash or Junk are searched.
+- Messages in `.trash`, in a folder inside Trash (any depth, from the account's folder tree) or in `.junk` are left
+  out (memory: in the filter; index: `trash` and `junk` in SQL before the limit, then all three again in `hitList`
+  against memory). The SQL doesn't know the folder tree, so hits in folders inside Trash count toward the 2,000 limit
+  before `hitList` drops them. User folders below Junk are searched.
 - The unread filter is ignored while searching.
 - Results are sorted by date, newest first.
 

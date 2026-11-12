@@ -40,16 +40,6 @@ struct Probe_StoreCoreTests {
         #expect(s.selection == [ms[3].id])
     }
 
-    // 8. Trash subfolders (Exchange puts deleted folders there) are still Trash for conversations.
-    @Test func conversationLeavesOutTrashSubfolders() {
-        let deleted = MailboxKind.folder("D")
-        let a = msg(work, subject: "a", minutesAgo: 1, rid: "1", conv: "C"),
-            b = msg(work, deleted, subject: "b", minutesAgo: 2, rid: "2", conv: "C")
-        let s = store([a, b])
-        s.setFolders([Folder(box: deleted, name: "Old", parent: .trash)], account: work.id)
-        #expect(s.conversation(of: a.id).map(\.id) == [a.id])
-    }
-
     // 3'. An action that changes nothing (Archive while viewing Archive) must not move the selection.
     @Test func archivingInArchiveKeepsTheSelection() {
         let a = msg(work, .archive, subject: "a", minutesAgo: 1), b = msg(work, .archive, subject: "b", minutesAgo: 2)
@@ -168,14 +158,5 @@ struct Probe_StoreCoreTests {
         let t = time { s.toggleRead(ids) }
         print("PROBE toggleRead 54k:", t)
         #expect(t < 5.0)
-    }
-
-    // 5b. Same root cause as 8: a flagged message in a Trash subfolder shows in Flagged.
-    @Test func flaggedLeavesOutTrashSubfolders() {
-        let deleted = MailboxKind.folder("D")
-        let a = msg(work, deleted, flag: .red)
-        let s = store([a])
-        s.setFolders([Folder(box: deleted, name: "Old", parent: .trash)], account: work.id)
-        #expect(s.count(.smart(.flagged)) == 0)
     }
 }
