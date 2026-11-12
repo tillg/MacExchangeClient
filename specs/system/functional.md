@@ -128,7 +128,8 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
   yellow conflict note when timed, non-free calendar events overlap (the invite's own entry excluded).
 - Next to the text, a day column from the Exchange calendar with overlapping events side by side.
 - With Comments / Propose open a compose window to the organizer with subject "Accepted: …", "Tentative: …",
-  "Declined: …" or "New Time Proposed: …"; its text becomes the comment. A proposal must end after it starts.
+  "Declined: …" or "New Time Proposed: …"; its text becomes the comment. A proposal needs both a start and an end
+  ("The proposed meeting needs both a start and an end.") and must end after it starts; otherwise nothing is queued.
 - Any answer or Remove from Calendar moves the message to Trash locally at once.
 
 ## Settings, menus, help
