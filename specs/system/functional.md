@@ -97,7 +97,7 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
 - Reply rules (`draft(_:to:)`):
   - Subject gets "Re: " or "Fwd: " unless it already starts with exactly that prefix (case-sensitive).
   - Body: an attribution line ("On <date>, Name <addr> wrote:") or a "Begin forwarded message:" block, then every
-    line of the plain-text body (split on `\n`) prefixed with "> ".
+    line of the plain-text body (split on any line ending: `\r\n`, `\n`, `\r`) prefixed with "> ", joined with `\n`.
   - Reply: To = the sender's address. Reply All: To = sender, To and Cc addresses minus the account address
     (compared without case), in that order, with duplicates; Cc stays empty. Forward: To empty.
 - Original attachments: Forward always loads them. Replies follow Edit ▸ Include Attachments With Replies (Never,

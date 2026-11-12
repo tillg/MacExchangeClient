@@ -50,14 +50,6 @@ struct Probe_StoreFlowsTests {
         #expect(s.draft(.forward, to: b.id).subject == "fwd: Plans")
     }
 
-    @Test func probe_replyQuotesEveryLineOfCRLFBody() {
-        let m = msg(work, body: "first\r\nsecond\r\nthird")
-        let s = store([m])
-        let d = s.draft(.reply, to: m.id)
-        #expect(d.body.contains("> second"), "body: \(d.body.debugDescription)")
-        #expect(d.body.contains("> third"), "body: \(d.body.debugDescription)")
-    }
-
     @Test func probe_replyToOwnSentMessageGoesToRecipients() {
         let m = Message(accountID: work.id, mailbox: .sent, from: Contact(name: "Me", email: "me@work.com"),
                         to: [Contact(name: "Bo", email: "bo@x.com")], subject: "Plans", body: "x", date: .now)
