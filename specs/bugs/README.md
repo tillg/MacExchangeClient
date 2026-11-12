@@ -25,7 +25,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [049](BUG-049-local-send-empty-subject-inconsistent.md) | P4 | MailStore | Sending without a server stores an empty subject; Drafts and failed sends use "(No Subject)" |
 | [050](BUG-050-reply-all-trailing-comma-for-addressless-recipient.md) | P4 | MailStore | Reply All leaves a trailing ", " (empty recipient) when the original lists a recipient without address |
 | [051](BUG-051-symlink-to-folder-cannot-be-attached.md) | P4 | MailStore | Attaching a symbolic link to a folder fails with "Couldn't attach" instead of zipping the folder |
-| [052](BUG-052-memory-search-fallback-ignores-readme-rules.md) | P3 | MailStore | In-memory fallback search ignores the README matching rules (To/Cc/preview, every word, accents) |
 | [053](BUG-053-upgrade-resync-keeps-mail-deleted-on-server.md) | P2 | MailDatabase | The from-scratch re-sync after the conversation upgrade never removes mail deleted or moved on the server since the last session (ghost messages forever) |
 | [054](BUG-054-invalid-sync-state-never-reset.md) | P2 | EWS | A SyncState Exchange rejects (ErrorInvalidSyncStateData) is kept: every later check of that folder fails the same way |
 | [055](BUG-055-failed-send-draft-loses-attachment-content-after-relaunch.md) | P2 | MailStore | A message that failed to send is kept "in Drafts on this Mac", but after a relaunch its attached files can no longer be opened |

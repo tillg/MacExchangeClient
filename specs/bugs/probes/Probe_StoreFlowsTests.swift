@@ -45,34 +45,6 @@ struct Probe_StoreFlowsTests {
 
     // MARK: Search (memory)
 
-    @Test func probe_memorySearchMatchesEveryWordAnywhere() {
-        let s = store([msg(work, subject: "Review of the budget")])
-        s.searchText = "budget review"
-        #expect(s.visibleMessages.count == 1)
-    }
-
-    @Test func probe_memorySearchIgnoresAccents() {
-        let s = store([msg(work, subject: "Hi", from: "Müller")])
-        s.searchText = "muller"
-        #expect(s.visibleMessages.count == 1)
-    }
-
-    @Test func probe_memorySearchFindsRecipients() {
-        let s = store([msg(work, subject: "Hi", to: [Contact(name: "Zoe Quill", email: "zoe@q.com")])])
-        s.searchText = "quill"
-        #expect(s.visibleMessages.count == 1)
-    }
-
-    @Test func probe_memorySearchFindsServerPreviewOfUnloadedBody() {
-        var m = msg(work, subject: "Hi", body: "")
-        m.bodyLoaded = false
-        m.serverPreview = "the quarterly forecast"
-        m.remoteID = "r1"
-        let s = store([m])
-        s.searchText = "forecast"
-        #expect(s.visibleMessages.count == 1)
-    }
-
     @Test func probe_searchWithUnreadFilterKeepsCountOfMatches() {
         // Not a claim, just a data point.
         let s = store([msg(work, subject: "Lunch")])

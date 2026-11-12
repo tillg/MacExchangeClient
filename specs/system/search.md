@@ -25,9 +25,11 @@ query of the SQLite FTS5 index. Design history: [../change/fast-search.md](../ch
 
 ## Memory path
 
-- Fields: `subject`, `from.name`, `from.email`, `body` (each lowercased).
-- Match: the whole typed text, spaces included, as one substring (`contains`). Not To, Cc or the server preview; no
-  splitting into words, no accent folding. A message whose body isn't loaded is found only by header fields.
+- Fields: `subject`, `from.name`, `from.email`, every To and Cc name and address, `serverPreview`, `body`, joined
+  with line breaks and folded (case and diacritics) once per message.
+- Match: the typed text is split at whitespace; every word (folded the same way) must occur in that text, in any
+  order and any field. Unlike the index, a word also matches inside a word (`report` finds "Misreported"), see
+  DECISIONS.md#d-bug-052. A message whose body isn't loaded is found by its headers and server preview.
 - Scope: see below. Results newest first. Runs on the main actor on every recomputation of the list.
 
 ## Index path
