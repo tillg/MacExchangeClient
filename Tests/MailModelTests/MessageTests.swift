@@ -58,4 +58,13 @@ struct MessageTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         try Data([1]).write(to: dir.appendingPathComponent(file), options: .atomic)
     }
+
+    /// Draft HTML has a line per `<div>`, whatever the line ending (quoted Exchange text uses CRLF).
+    @Test func draftHTMLSplitsLinesOnEveryLineEnding() {
+        let h = Draft(accountID: UUID(), body: "one\r\ntwo\rthree\n\r\nfour\u{2028}five").html { _ in nil }
+        for line in ["one", "two", "three", "<br>", "four", "five"] {
+            #expect(h.contains("<div>\(line)</div>"), "\(line) in \(h)")
+        }
+        #expect(!h.contains("\r"))
+    }
 }

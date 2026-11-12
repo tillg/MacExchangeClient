@@ -322,7 +322,8 @@ extension Draft {
                 .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
         }
         var k = 0
-        let lines = body.split(separator: "\n", omittingEmptySubsequences: false).map { line -> String in
+        // Any line ending: "\r\n" (as in quoted Exchange text) is one Character, not "\n".
+        let lines = body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map { line -> String in
             var out = "", run = Substring()
             for c in line {
                 guard c == Self.fileMark else { run.append(c); continue }

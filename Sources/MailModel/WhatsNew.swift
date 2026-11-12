@@ -22,6 +22,7 @@ public enum WhatsNew {
             "Load Remote Content now also appears for emails whose pictures or styles from the internet were blocked without notice.",
             "A picture inside an email can no longer slip extra content into the message you read.",
             "Attachments with very long names open and save again; the name is shortened and keeps its ending, like .pdf.",
+            "Replies with a picture in the text keep the quoted email's line breaks instead of running it into one paragraph.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",

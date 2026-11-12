@@ -188,3 +188,10 @@ edited: 2026-11-12
 - **Decision:** `fileName` keeps the extension (if it is at most 32 bytes) and cuts the rest at a whole character so the whole name is at most 255 UTF-8 bytes. `MailStore.freeURL` shortens the same way when it adds " 2", " 3", … The name shown in the message is unchanged.
 - **Why:** 255 bytes is APFS's limit per name; checked here that the file system counts the name as given (composed): 127 × "ä" (254 bytes) writes, 128 fails. Cutting by `Character` keeps valid UTF-8 and never splits an accent from its letter. Keeping the extension keeps the file's type for Quick Look and the Finder.
 - **Alternatives:** A short hash-based name (rejected: users recognise the start of the name).
+
+## 00:24 — Draft HTML splits on every line ending {#d-bug-021}
+
+- **Status:** decided
+- **Context:** BUG-021. `Draft.html` split on `"\n"`; `"\r\n"` is one `Character` in Swift, so quoted Exchange text (CRLF) became one `<div>` when a picture was placed.
+- **Decision:** Split on every newline character (`isNewline`: `\r\n`, `\n`, `\r`, U+2028 and the others), one `<div>` per line, as BUG-008 did for quoting.
+- **Why:** Same root cause and rule as BUG-008; the plain-text path already kept these breaks.
