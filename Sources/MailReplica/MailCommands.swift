@@ -35,6 +35,10 @@ struct MailCommands: Commands {
                 ForEach(IncludeAttachments.allCases, id: \.self) { Text($0.title).tag($0) }
             }
         }
+        // There is no help book, so "MailReplica Help" goes; the change log takes its place.
+        CommandGroup(replacing: .help) {
+            Button("What's New") { openWindow(id: "whats-new") }
+        }
         SidebarCommands()
         CommandGroup(after: .sidebar) {
             Toggle("Enable Message Filter", isOn: Bindable(store).filterUnread)

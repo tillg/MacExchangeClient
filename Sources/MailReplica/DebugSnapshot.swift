@@ -35,6 +35,11 @@ struct DebugSnapshot: ViewModifier {
             // invite and captures that window instead.
             var windowTitle: String?
             var dragCheck: (DropTextView, Int, Int)?
+            // MAIL_SNAPSHOT_WHATSNEW=1 opens Help ▸ What's New and captures that window.
+            if ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_WHATSNEW"] != nil {
+                openWindow(id: "whats-new")
+                windowTitle = "What's New"
+            }
             if let answer = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_ANSWER"], let id = store.selection.first {
                 let draft = answer == "forward" ? store.draft(.forward, to: id)
                     : answer == "propose" ? store.answerDraft(.decline, to: id, proposing: true)

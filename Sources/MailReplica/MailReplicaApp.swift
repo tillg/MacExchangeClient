@@ -36,6 +36,11 @@ struct MailReplicaApp: App {
         }
         .defaultSize(width: 640, height: 520)
 
+        Window("What's New", id: "whats-new") {
+            WhatsNewView()
+        }
+        .defaultSize(width: 520, height: 600)
+
         Settings {
             TabView {
                 AccountsSettings().environment(store)

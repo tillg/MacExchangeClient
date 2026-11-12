@@ -31,3 +31,7 @@ Read the PNG before you say a visual change works. Artifacts go in `tmp/`, which
 - `Sources/MailModel`: `MailStore` (`@MainActor @Observable`) and the models. All behaviour lives here, and every change gets a test in `Tests/MailModelTests`.
 - `Sources/MailReplica`: the views, `MailCommands` (menu shortcuts read from `MainMenu.nib`) and `DebugSnapshot`.
 - Mail.app source files: `/System/Applications/Mail.app/Contents/Resources` (`MainWindow.toolbar`, `*.loctable`, `Base.lproj/*.nib`). Decode nibs with `~/git/bear_design/tools/nibdump.py`.
+
+## Change log (Help ▸ What's New)
+
+With every change a user would notice, update `WhatsNew.days` in `Sources/MailModel/WhatsNew.swift` in the same change: add a line to today's day (newest day first; start a new day if today has none). Write for people who don't program: what they can now do or see, in one short sentence, no technical terms (no EWS, SQLite, FTS, cid, cache…). Leave out purely internal changes.

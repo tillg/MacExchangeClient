@@ -38,6 +38,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 - **Pull to refresh:** pull the message list down past its top (the bounce) to check for new mail in the Inbox and the mailbox on screen, as Get New Mail (⇧⌘N) does. A spinner shows above the list until the check is done. Short lists bounce too, as in Mail
 - **Swipe actions:** swipe right for Unread, left for Trash or Flag
 - **Menu bar and shortcuts** taken from Mail's own `MainMenu.nib`
+- **Help ▸ What's New:** a window with the change log, a date and what was added that day, in plain words. There is no help book, so Help has no "MailReplica Help" item
 - **Light and dark mode**
 - **Own app icon:** Mail's envelope icon in pink, drawn in code (`AppIcon.swift`). `MAIL_ICON_EXPORT=icon.png` writes it as a PNG. `run.sh` wraps the build in `MailReplica.app` with that icon, so Activity Monitor and system dialogs show it too
 
