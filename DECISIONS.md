@@ -250,3 +250,10 @@ edited: 2026-11-13
 - **Context:** BUG-026. Reply All joined sender, To and Cc without removing repeats, so a sender also in Cc, or one address in two spellings of case, appeared twice.
 - **Decision:** Addresses are compared without case; the first occurrence is kept (sender before To before Cc), with its spelling.
 - **Why:** Exchange treats addresses case-insensitively; Mail lists each person once.
+
+## 00:43 — Reply All keeps the original Cc in Cc {#d-bug-027}
+
+- **Status:** decided
+- **Context:** BUG-027. Reply All put sender, To and Cc all into To and left Cc empty.
+- **Decision:** To = original sender + original To; Cc = original Cc. My own address is left out of both, and each address appears once across both fields (To wins, as it comes first; compared without case).
+- **Why:** That is what Mail and Outlook do; people who were only copied stay copied.

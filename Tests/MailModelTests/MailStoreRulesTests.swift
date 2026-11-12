@@ -131,4 +131,15 @@ struct MailStoreRulesTests {
         let emails = Contact.parseList(d.to + "," + d.cc).map(\.email)
         #expect(emails == ["ann@x.com", "bo@x.com"], "to: \(d.to) cc: \(d.cc)")
     }
+
+    /// Reply All: sender and To go to To, the original Cc stays in Cc; my own address is in neither.
+    @Test func replyAllKeepsOriginalCcInCc() {
+        let m = msg(work, from: "Ann", to: [Contact(name: "Me", email: "me@work.com"), Contact(name: "Bo", email: "bo@x.com")],
+                    cc: [Contact(name: "Carl", email: "carl@x.com"), Contact(name: "Me", email: "ME@work.com"),
+                         Contact(name: "Bo", email: "Bo@x.com")])
+        let s = store([m])
+        let d = s.draft(.replyAll, to: m.id)
+        #expect(d.to == "ann@x.com, bo@x.com", "to: \(d.to)")
+        #expect(d.cc == "carl@x.com", "cc: \(d.cc)")
+    }
 }

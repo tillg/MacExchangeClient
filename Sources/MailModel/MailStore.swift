@@ -1307,17 +1307,20 @@ public final class MailStore {
         let header = kind == .forward
             ? "\n\nBegin forwarded message:\n\nFrom: \(m.from.name) <\(m.from.email)>\nSubject: \(m.subject)\nDate: \(df.string(from: m.date))\n\n"
             : "\n\nOn \(df.string(from: m.date)), \(m.from.name) <\(m.from.email)> wrote:\n\n"
-        var to = ""
+        // Each address once, whatever its case, and never my own; the first occurrence is kept.
+        var seen: Set<String> = me.map { [$0.lowercased()] } ?? []
+        func addresses(_ cs: [Contact]) -> String {
+            cs.map(\.email).filter { seen.insert($0.lowercased()).inserted }.joined(separator: ", ")
+        }
+        var to = "", cc = ""
         switch kind {
         case .reply: to = m.from.email
         case .replyAll:
-            // Each address once, whatever its case; the first occurrence is kept.
-            var seen = Set<String>()
-            to = ([m.from] + m.to + m.cc).map(\.email)
-                .filter { $0.lowercased() != me?.lowercased() && seen.insert($0.lowercased()).inserted }.joined(separator: ", ")
+            to = addresses([m.from] + m.to)
+            cc = addresses(m.cc)
         case .forward: break
         }
-        var d = Draft(accountID: m.accountID, to: to, subject: subject, body: header + quoted)
+        var d = Draft(accountID: m.accountID, to: to, cc: cc, subject: subject, body: header + quoted)
         if m.hasAttachments || !m.attachments.isEmpty {
             d.original = id
             // Forward always takes them along; a reply only with Include Attachments With Replies ▸ Always.
