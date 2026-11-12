@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [010](BUG-010-iso-dates-without-z-or-with-fraction-dropped.md) | P3 | EWS | Dates with fractional seconds or without a zone suffix aren't parsed: message dated year 1, invite and calendar events dropped |
 | [011](BUG-011-sanitize-misses-noncharacter-references.md) | P3 | EWS | `&#xFFFE;`/`&#xFFFF;`/surrogate references in a response still make the whole page unreadable |
 | [012](BUG-012-server-field-not-normalised.md) | P3 | EWS | Server field: `http://…`, `host/EWS/Exchange.asmx`, `host/`, trailing newline or blanks give a wrong EWS URL |
 | [013](BUG-013-attached-message-opens-nested-file-content.md) | P3 | EWS | Opening an attached message (.eml) can return the content of a file inside it instead of its MIME source |

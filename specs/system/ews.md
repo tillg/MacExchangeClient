@@ -1,7 +1,7 @@
 ---
 title: "EWS backend"
 created: 2026-11-12
-edited: 2026-11-12
+edited: 2026-11-13
 ---
 
 # EWS backend
@@ -74,9 +74,9 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
 
 ## Parsing rules
 
-- **Dates:** one shared `ISO8601DateFormatter` with default options (needs a zone, no fractional seconds). A
-  message date that doesn't parse becomes `distantPast`; an invite without parsable Start/End is nil; such calendar
-  events are dropped. Requests format dates with a default `ISO8601DateFormatter` too (UTC, `Z`).
+- **Dates:** `EWSBackend.isoDate` reads `xs:dateTime`: blanks trimmed, fractional seconds of any length, and a
+  time without `Z` or `±hh:mm` read as UTC (EWS's default without a `TimeZoneContext`). A message date that still
+  doesn't parse becomes `distantPast`; an invite without parsable Start/End is nil; such calendar events are dropped. Requests format dates with a default `ISO8601DateFormatter` too (UTC, `Z`).
 - **Summary** (`message(_:)`): needs `ItemId`. Sender from `From` (`Name`, else the address). To/Cc from
   `DisplayTo`/`DisplayCc` split on `;`, as names with empty addresses. `FlagStatus Flagged` → red flag. `isInvite`
   when the element is `MeetingRequest` or `MeetingCancellation`. `bodyLoaded` false, `serverPreview` = `Preview`.

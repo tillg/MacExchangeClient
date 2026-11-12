@@ -44,22 +44,6 @@ struct Probe_EWSTests {
 
     // MARK: Dates
 
-    @Test func probeReceivedDateWithFractionalSeconds() throws {
-        let d = try doc("""
-            <t:Message><t:ItemId Id="ID1"/><t:DateTimeReceived>2026-11-10T09:30:00.123Z</t:DateTimeReceived></t:Message>
-            """)
-        let m = try #require(EWSBackend.message(d.first("Message")!))
-        #expect(m.date != .distantPast)
-    }
-
-    @Test func probeInviteStartWithoutTimeZone() throws {
-        let d = try doc("""
-            <t:MeetingRequest><t:ItemId Id="M1"/><t:Body BodyType="Text">x</t:Body>
-            <t:Start>2026-11-23T11:30:00</t:Start><t:End>2026-11-23T12:00:00</t:End></t:MeetingRequest>
-            """)
-        #expect(EWSBackend.parseBody(d.first("MeetingRequest")!).invite != nil)
-    }
-
     @Test func probeReceivedDateWithOffset() throws {
         let d = try doc("""
             <t:Message><t:ItemId Id="ID1"/><t:DateTimeReceived>2026-11-10T10:30:00+01:00</t:DateTimeReceived></t:Message>
@@ -208,14 +192,6 @@ struct Probe_EWSTests {
         let r = EWSBackend.parseSync(d)
         #expect(r.upserts.count == 512)
         #expect(Date().timeIntervalSince(t) < 2)
-    }
-
-    @Test func probeEventsWithFractionalSeconds() throws {
-        let d = try doc("""
-            <m:Items><t:CalendarItem><t:ItemId Id="C1"/><t:Subject>S</t:Subject><t:Start>2026-11-23T08:00:00.000Z</t:Start>
-            <t:End>2026-11-23T08:15:00.000Z</t:End></t:CalendarItem></m:Items>
-            """)
-        #expect(EWSBackend.parseEvents(d).count == 1)
     }
 
     /// "Accepted: …" answers carry the meeting's Start/End in Exchange 2013; they are not invites to answer.
