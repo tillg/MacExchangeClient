@@ -76,7 +76,9 @@ Sent mail is plain text (`Draft.text`) unless a JPEG, PNG or GIF is placed in th
 - `<html><head>` with a UTF-8 meta, `<body style="overflow-wrap: break-word; -webkit-nbsp-mode: space;
   line-break: after-white-space;">`.
 - `body` is split on every line ending (`isNewline`: `\r\n`, `\n`, `\r`, U+2028, …); each line becomes `<div>…</div>`, an empty line `<div><br></div>`, lines joined by
-  `\n`. Text is escaped (`&`, `<`, `>`, `"`); spaces and tabs are not preserved specially.
+  `\n`. Text is escaped (`&`, `<`, `>`, `"`). Between marks, a space that follows a space or starts the
+  line becomes `&nbsp;` (so runs alternate ` &nbsp;`), and a tab becomes
+  `<span class="Apple-tab-span" style="white-space:pre">⇥</span>`, as Mail writes them.
 - At a file mark with a content ID: `<img src="cid:<id>" alt="<escaped file name>">`; marks of other files are left
   out (those files go as ordinary attachments).
 

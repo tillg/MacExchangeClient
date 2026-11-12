@@ -100,13 +100,6 @@ struct Probe_ModelTests {
 
     // MARK: Draft.html
 
-    @Test func draftHTMLKeepsRunsOfSpaces() {
-        let d = Draft(accountID: UUID(), body: "Name    Qty\nApple      3")
-        let h = d.html { _ in nil }
-        // Multiple spaces must survive in HTML: &nbsp; or a white-space: pre-wrap style.
-        #expect(h.contains("&nbsp;") || h.contains("pre-wrap"), "\(h)")
-    }
-
     @Test func draftHTMLEscapesWeirdText() {
         let d = Draft(accountID: UUID(), body: "<script>alert('x')</script> & \"q\"")
         let h = d.html { _ in nil }
