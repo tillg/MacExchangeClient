@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-12", features: [
+            "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",
             "Search is now instant, even in mailboxes with many thousands of messages.",
             "Attachments: see what came with a message, preview it with Quick Look and save it.",
             "When writing, attach files and whole folders, or drop pictures right into the text where they belong.",

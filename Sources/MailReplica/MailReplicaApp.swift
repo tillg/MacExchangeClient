@@ -45,6 +45,8 @@ struct MailReplicaApp: App {
             TabView {
                 AccountsSettings().environment(store)
                     .tabItem { Label("Accounts", systemImage: "at") }
+                ViewingSettings()
+                    .tabItem { Label("Viewing", systemImage: "eyeglasses") }
                 PrivacySettings()
                     .tabItem { Label("Privacy", systemImage: "hand.raised") }
             }

@@ -4,18 +4,20 @@ import SwiftUI
 
 struct MessageDetailView: View {
     @Environment(MailStore.self) private var store
-    /// The message whose body and inline images have finished loading (or failed to).
-    @State private var loaded: Message.ID?
+    @AppStorage("showConversations") private var showConversations = true
 
     var body: some View {
         if let m = store.selectedMessage {
-            MessageContent(message: m, loading: loaded != m.id)
-                .task(id: m.id) {
-                    await store.loadBody(m.id)
-                    await store.loadInlineImages(for: m.id)
-                    loaded = m.id
-                    await store.loadDay(for: m.id)
+            let thread = showConversations ? store.conversation(of: m.id) : [m]
+            Group {
+                if thread.count > 1 {
+                    ConversationView(selected: m, messages: thread)
+                } else {
+                    ScrollView { MessageContent(message: m) }
                 }
+            }
+            .background(Color(nsColor: .textBackgroundColor))
+            .quickLookPreview(Bindable(store).previewItem, in: store.previewItems)
         } else if store.selection.count > 1 {
             ContentUnavailableView("\(store.selection.count) messages selected", systemImage: "envelope.stack")
         } else {
@@ -24,37 +26,86 @@ struct MessageDetailView: View {
     }
 }
 
+/// The message with the rest of its conversation, newest first, each on its own card as in Mail.
+private struct ConversationView: View {
+    @Environment(MailStore.self) private var store
+    let selected: Message
+    let messages: [Message]
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(messages) { m in
+                        MessageContent(message: m, foundIn: m.mailbox == selected.mailbox ? nil : foundIn(m))
+                            .background(Color(nsColor: .textBackgroundColor))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator))
+                            .id(m.id)
+                    }
+                }
+                .padding(10)
+            }
+            .background(Color(nsColor: .windowBackgroundColor))
+            .task(id: selected.id) {
+                // Again once the cards above have their height: HTML bodies measure themselves after loading.
+                proxy.scrollTo(selected.id, anchor: .top)
+                try? await Task.sleep(for: .milliseconds(600))
+                proxy.scrollTo(selected.id, anchor: .top)
+            }
+        }
+    }
+
+    /// Mail's "Found in Sent – Work Mailbox" above a message from another mailbox.
+    private func foundIn(_ m: Message) -> String {
+        let box = store.name(of: m.mailbox, in: m.accountID)
+        return "Found in \(box) – \(store.account(m.accountID)?.name ?? "") Mailbox"
+    }
+}
+
+/// One message: header, invite and body. Loads its body and inline images the first time it is shown.
 struct MessageContent: View {
     @Environment(MailStore.self) private var store
     let message: Message
-    var loading = false
+    var foundIn: String?
+    /// The message whose body and inline images have finished loading (or failed to).
+    @State private var loaded: Message.ID?
     /// Messages whose remote content the user loaded, until the window closes (Mail asks again later too).
     @State private var remoteAllowed: Set<Message.ID> = []
     @AppStorage("remoteImages") private var remoteImages = RemoteImages.defaultValue
     @Environment(\.colorScheme) private var colorScheme
 
+    private var loading: Bool { loaded != message.id }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                MessageHeader(message: message)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
-                if let invite = message.invite {
-                    InviteCard(message: message, invite: invite)
-                    HStack(alignment: .top, spacing: 0) {
-                        text
-                        Divider()
-                        DayColumn(invite: invite, subject: message.subject, events: store.dayEvents[message.id])
-                            .frame(width: 300)
-                    }
-                } else {
-                    Divider()
+        VStack(alignment: .leading, spacing: 0) {
+            if let foundIn {
+                Label(foundIn, systemImage: message.mailbox.symbol)
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .padding(.horizontal, 20).padding(.top, 10)
+            }
+            MessageHeader(message: message)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+            if let invite = message.invite {
+                InviteCard(message: message, invite: invite)
+                HStack(alignment: .top, spacing: 0) {
                     text
+                    Divider()
+                    DayColumn(invite: invite, subject: message.subject, events: store.dayEvents[message.id])
+                        .frame(width: 300)
                 }
+            } else {
+                Divider()
+                text
             }
         }
-        .background(Color(nsColor: .textBackgroundColor))
-        .quickLookPreview(Bindable(store).previewItem, in: store.previewItems)
+        .task(id: message.id) {
+            await store.loadBody(message.id)
+            await store.loadInlineImages(for: message.id)
+            loaded = message.id
+            await store.loadDay(for: message.id)
+        }
     }
 }
 

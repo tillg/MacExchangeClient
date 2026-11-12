@@ -18,7 +18,8 @@ struct EWSParsingTests {
         <t:DateTimeReceived>2026-11-10T09:30:00Z</t:DateTimeReceived><t:HasAttachments>true</t:HasAttachments>
         <t:DisplayCc></t:DisplayCc><t:DisplayTo>Ann Smith; Bob Jones</t:DisplayTo><t:Preview>First line</t:Preview>
         <t:Flag><t:FlagStatus>Flagged</t:FlagStatus></t:Flag><t:IsRead>false</t:IsRead>
-        <t:From><t:Mailbox><t:Name>Carol</t:Name></t:Mailbox></t:From></t:Message>
+        <t:From><t:Mailbox><t:Name>Carol</t:Name></t:Mailbox></t:From>
+        <t:ConversationId Id="CONV1" ChangeKey="CK"/></t:Message>
         """
 
     @Test func summaryMessage() throws {
@@ -35,6 +36,8 @@ struct EWSParsingTests {
         #expect(m.from.name == "Carol")
         #expect(!m.bodyLoaded)
         #expect(m.preview == "First line")
+        #expect(m.conversationID == "CONV1")
+        #expect(EWSBackend.summaryProps.contains("item:ConversationId"))
     }
 
     @Test func syncChanges() throws {

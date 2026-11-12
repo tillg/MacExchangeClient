@@ -3,3 +3,4 @@ tmp/
 .DS_Store
 .worktrees/
 .build-number
+.pilcrow

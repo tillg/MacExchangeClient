@@ -254,6 +254,25 @@ struct MailStoreTests {
         #expect(s.selection == [id])
     }
 
+    /// After the one-time sync from the start, mail already on the Mac learns its conversation and keeps the rest.
+    @Test func syncingAgainAddsTheConversationAndKeepsLocalState() {
+        let s = store([])
+        s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "t1", more: false),
+                account: work.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        s.selection = [id]
+        s.setBody(MessageBody(text: "Full text", attachments: ["a.pdf"]), for: id)
+        s.setFlag(.purple, for: [id])
+        _ = s.takeChanges()
+        var again = remote("A"); again.flag = .red; again.conversationID = "C"
+        s.apply(SyncResult(upserts: [again], deletedRemoteIDs: [], token: "t2", more: false), account: work.id, mailbox: .inbox)
+        let m = s.messages[0]
+        #expect(m.id == id && m.conversationID == "C")
+        #expect(m.body == "Full text" && m.flag == .purple)
+        #expect(s.selection == [id])
+        #expect(s.takeChanges().resolved().upserts.map(\.conversationID) == ["C"])
+    }
+
     @Test func htmlBodyIsStoredAndSurvivesASync() {
         let s = store([])
         s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "t1", more: false),
@@ -786,6 +805,54 @@ struct MailStoreTests {
         s.setInlineImages(["z@y": png], for: b)
         #expect(s.inlineImages(for: a).isEmpty)
         #expect(s.inlineImages(for: b) == ["z@y": png])
+    }
+
+    func thread(_ acct: Account, _ box: MailboxKind = .inbox, _ conversation: String?, minutesAgo: Double) -> Message {
+        var m = msg(acct, box, subject: "Re: Plan", minutesAgo: minutesAgo)
+        m.conversationID = conversation
+        return m
+    }
+
+    /// A message shows with the rest of its conversation: same account, any mailbox but Trash, Junk and Drafts,
+    /// newest first, as in Mail.
+    @Test func conversationCollectsTheThreadAcrossMailboxes() {
+        let received = thread(work, .inbox, "C", minutesAgo: 30), sent = thread(work, .sent, "C", minutesAgo: 10)
+        let filed = thread(work, .folder("P"), "C", minutesAgo: 60)
+        let others = [thread(work, .trash, "C", minutesAgo: 5), thread(work, .junk, "C", minutesAgo: 6),
+                      thread(work, .drafts, "C", minutesAgo: 7), thread(home, .inbox, "C", minutesAgo: 8),
+                      thread(work, .inbox, "D", minutesAgo: 9), thread(work, .inbox, nil, minutesAgo: 11)]
+        let s = store([received, sent, filed] + others)
+        #expect(s.conversation(of: received.id).map(\.id) == [sent.id, received.id, filed.id])
+        #expect(s.conversation(of: filed.id).map(\.id) == [sent.id, received.id, filed.id])
+    }
+
+    /// Without a conversation, or alone in it, or in the Trash, a message is shown by itself.
+    @Test func conversationOfASingleMessageIsTheMessage() {
+        let lone = thread(work, .inbox, nil, minutesAgo: 1), only = thread(work, .inbox, "E", minutesAgo: 2)
+        let binned = thread(work, .trash, "F", minutesAgo: 3), kept = thread(work, .inbox, "F", minutesAgo: 4)
+        let s = store([lone, only, binned, kept])
+        #expect(s.conversation(of: lone.id).map(\.id) == [lone.id])
+        #expect(s.conversation(of: only.id).map(\.id) == [only.id])
+        #expect(s.conversation(of: binned.id).map(\.id) == [binned.id, kept.id])
+        #expect(s.conversation(of: UUID()).isEmpty)
+    }
+
+    /// Every message of the conversation on screen keeps its inline images; opening another conversation drops them.
+    @Test func inlineImagesAreKeptForTheConversationOnScreen() {
+        let a = thread(work, .inbox, "C", minutesAgo: 2), b = thread(work, .sent, "C", minutesAgo: 1)
+        let c = thread(work, .inbox, "D", minutesAgo: 3)
+        let s = store([a, b, c])
+        let png = InlineImage(contentType: "image/png", data: Data([1]))
+        s.selection = [a.id]
+        s.addInlineImages(["a@y": png], for: a.id)
+        s.addInlineImages(["b@y": png], for: b.id)
+        #expect(s.inlineImages(for: a.id) == ["a@y": png])
+        #expect(s.inlineImages(for: b.id) == ["b@y": png])
+        s.selection = [c.id]
+        s.addInlineImages(["c@y": png], for: c.id)
+        #expect(s.inlineImages(for: a.id).isEmpty)
+        #expect(s.inlineImages(for: b.id).isEmpty)
+        #expect(s.inlineImages(for: c.id) == ["c@y": png])
     }
 
     func attachmentStore(_ names: [MailModel.Attachment], data: [Data]) -> (MailStore, Message.ID, URL) {

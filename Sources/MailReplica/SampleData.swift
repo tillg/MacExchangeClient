@@ -52,7 +52,17 @@ enum SampleData {
             Message(accountID: work.id, from: c("Elena Petrova", "elena@client.example"), to: meWork,
                     subject: "Contract draft v3",
                     body: "Alex, attached is v3 with legal's edits on sections 4 and 7. Can we sign off this week?\n\nBest,\nElena",
-                    date: ago(120), isRead: true, attachments: ["Contract_v3.pdf"]).withHTML(elenaHTML),
+                    date: ago(120), isRead: true, attachments: ["Contract_v3.pdf"]).withHTML(elenaHTML)
+                    .in("contract"),
+            // Elena's mail, Alex's answer (in Sent) and her reply: one conversation.
+            Message(accountID: work.id, from: meWork[0], to: [c("Elena Petrova", "elena@client.example")],
+                    subject: "Re: Contract draft v3",
+                    body: "Thanks Elena, legal is fine with sections 4 and 7. Let's sign Thursday.\n\nAlex",
+                    date: ago(100), isRead: true).with(.sent).in("contract"),
+            Message(accountID: work.id, from: c("Elena Petrova", "elena@client.example"), to: meWork,
+                    subject: "Re: Contract draft v3",
+                    body: "Thursday works. I'll bring two printed copies.\n\nBest,\nElena",
+                    date: ago(90), isRead: true).in("contract"),
             Message(accountID: icloud.id, from: me[0], to: [c("Sam Lee", "sam.lee@me.com")], subject: "Re: Concert tickets",
                     body: "Got them! Row 12.", date: ago(80), isRead: true).with(.sent),
             Message(accountID: work.id, from: meWork[0], to: [c("Priya Raman", "priya@northwind.example")],
@@ -179,6 +189,7 @@ enum SampleData {
 extension Message {
     func with(_ box: MailboxKind) -> Message { var m = self; m.mailbox = box; return m }
     func withHTML(_ html: String) -> Message { var m = self; m.html = html; return m }
+    func `in`(_ conversation: String) -> Message { var m = self; m.conversationID = conversation; return m }
 }
 
 /// A made-up newsletter in the usual table layout, with a hero image from the web (blocked until loaded).

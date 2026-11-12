@@ -9,7 +9,8 @@ public struct EWSBackend: MailBackend {
 
     /// Properties for list rows. FindItem and SyncFolderItems return names only for From/To, no addresses.
     static let summaryProps = ["item:Subject", "item:DateTimeReceived", "message:IsRead", "message:From",
-                               "item:HasAttachments", "item:Flag", "item:Preview", "item:DisplayTo", "item:DisplayCc"]
+                               "item:HasAttachments", "item:Flag", "item:Preview", "item:DisplayTo", "item:DisplayCc",
+                               "item:ConversationId"]
 
     static var summaryShape: String {
         "<m:ItemShape><t:BaseShape>IdOnly</t:BaseShape><t:AdditionalProperties>"
@@ -489,7 +490,7 @@ public struct EWSBackend: MailBackend {
     static func message(_ item: XMLNode) -> Message? {
         guard let rid = item.child("ItemId")?.attr("Id") else { return nil }
         let from = item.child("From").map(contact) ?? Contact(name: "", email: "")
-        return Message(accountID: UUID(), from: from, to: names(item.text("DisplayTo")), cc: names(item.text("DisplayCc")),
+        var m = Message(accountID: UUID(), from: from, to: names(item.text("DisplayTo")), cc: names(item.text("DisplayCc")),
                        subject: item.child("Subject")?.stringValue ?? "",
                        body: "", date: item.text("DateTimeReceived").flatMap(isoDate.date) ?? .distantPast,
                        isRead: item.text("IsRead") == "true",
@@ -497,6 +498,8 @@ public struct EWSBackend: MailBackend {
                        remoteID: rid, hasAttachments: item.text("HasAttachments") == "true",
                        serverPreview: item.child("Preview")?.stringValue ?? "", bodyLoaded: false,
                        isInvite: ["MeetingRequest", "MeetingCancellation"].contains(item.localName ?? ""))
+        m.conversationID = item.child("ConversationId")?.attr("Id")
+        return m
     }
 
     static func parseBody(_ item: XMLNode) -> MessageBody {

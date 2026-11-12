@@ -35,6 +35,7 @@ struct MailDatabaseTests {
                                        required: [Contact(name: "Me", email: "me@work.com")], optional: []))
         m.html = "<p>Hi</p>"
         m.htmlChecked = true
+        m.conversationID = "CONV"
         return m
     }
 
@@ -373,6 +374,28 @@ struct MailDatabaseTests {
         try db.write(StoreChanges(upserts: [n]))
         #expect(try db.search("fresh", accounts: nil) == [n.id])
         #expect(try reopen(url).prepareSearch() == false)
+    }
+
+    /// A database from before conversations gets the column, and its folders sync again from the start so every
+    /// message already on the Mac learns which conversation it belongs to. Nothing else is lost.
+    @Test func anOlderDatabaseGetsConversationsAndSyncsAgain() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let m = remote("A")
+        let sync = [SyncState(account: work.id, mailbox: .inbox, token: "T1", complete: true)]
+        try MailDatabase(url: url).write(StoreChanges(upserts: [m], sync: sync))
+        var raw: OpaquePointer?
+        #expect(sqlite3_open(url.path, &raw) == SQLITE_OK)
+        #expect(sqlite3_exec(raw, "ALTER TABLE messages DROP COLUMN conversation", nil, nil, nil) == SQLITE_OK)
+        sqlite3_close(raw)
+
+        let db = try reopen(url)
+        #expect(try db.messages() == [m])
+        #expect(try db.meta().sync == [SyncState(account: work.id, mailbox: .inbox, token: nil, complete: false)])
+        var c = m; c.conversationID = "C"
+        try db.write(StoreChanges(upserts: [c]))
+        #expect(try reopen(url).messages() == [c])
+        #expect(try reopen(url).meta().sync == [SyncState(account: work.id, mailbox: .inbox, token: nil, complete: false)])
     }
 
     /// A new database is searchable at once, without a rebuild.

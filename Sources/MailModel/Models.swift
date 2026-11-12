@@ -157,6 +157,8 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
     public var html: String?
     /// The body was fetched by a version that asks for HTML. Optional, so older caches load; those bodies are fetched once more.
     public var htmlChecked: Bool?
+    /// The server's conversation (Exchange ConversationId): the messages, received and sent, that belong together.
+    public var conversationID: String?
 
     public init(id: UUID = UUID(), accountID: UUID, mailbox: MailboxKind = .inbox, from: Contact, to: [Contact],
                 cc: [Contact] = [], subject: String, body: String, date: Date, isRead: Bool = false,

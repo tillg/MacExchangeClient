@@ -283,6 +283,26 @@ public final class MailStore {
 
     public var selectedMessage: Message? { selection.count == 1 ? selection.first.flatMap(message) : nil }
 
+    @ObservationIgnored private var conversationCache: (revision: Int, id: Message.ID, list: [Message])?
+
+    /// The message with the rest of its conversation, newest first, as Mail shows it: the same account, every
+    /// mailbox but Trash, Junk and Drafts (the message itself always). Empty if the message is gone.
+    public func conversation(of id: Message.ID) -> [Message] {
+        _ = messages.count  // registers the dependency for SwiftUI even when the cache answers
+        if let c = conversationCache, c.revision == revision, c.id == id { return c.list }
+        guard let m = message(id) else { return [] }
+        var list = [m]
+        if let conv = m.conversationID {
+            let skip: Set<MailboxKind> = [.trash, .junk, .drafts]
+            list = messages.filter {
+                $0.id == id || ($0.conversationID == conv && $0.accountID == m.accountID && !skip.contains($0.mailbox))
+            }
+            .sorted { $0.date > $1.date }
+        }
+        conversationCache = (revision, id, list)
+        return list
+    }
+
     public var title: String {
         switch selectedMailbox {
         case .smart(let s): s == .allInboxes ? "All Inboxes" : s.title
@@ -878,21 +898,28 @@ public final class MailStore {
 
     // MARK: Inline images
 
-    /// The `cid:` images of the message on screen. Only one message's, and never cached: they can be megabytes.
-    private var inline: (id: Message.ID, images: [String: InlineImage])?
+    /// The `cid:` images of the messages on screen. Never cached: they can be megabytes.
+    private var inline: [Message.ID: [String: InlineImage]] = [:]
 
-    public func inlineImages(for id: Message.ID) -> [String: InlineImage] { inline?.id == id ? inline!.images : [:] }
+    public func inlineImages(for id: Message.ID) -> [String: InlineImage] { inline[id] ?? [:] }
 
     /// For sample data and tests; replaces the images of any other message.
-    public func setInlineImages(_ images: [String: InlineImage], for id: Message.ID) { inline = (id, images) }
+    public func setInlineImages(_ images: [String: InlineImage], for id: Message.ID) { inline = [id: images] }
+
+    /// Keeps the images of the other messages of the conversation on screen, drops the rest.
+    func addInlineImages(_ images: [String: InlineImage], for id: Message.ID) {
+        let shown = Set(selectedMessage.map { conversation(of: $0.id).map(\.id) } ?? [])
+        inline = inline.filter { shown.contains($0.key) }
+        inline[id] = images
+    }
 
     /// Fetches the images the shown HTML body refers to with `cid:`. A failure leaves the body as it is.
     public func loadInlineImages(for id: Message.ID) async {
-        guard inline?.id != id, let m = message(id), let html = m.html, let rid = m.remoteID,
+        guard inline[id] == nil, let m = message(id), let html = m.html, let rid = m.remoteID,
               let backend = backends[m.accountID], !paused.contains(m.accountID) else { return }
         let ids = HTMLPage.contentIDs(in: html)
         guard !ids.isEmpty else { return }
-        do { setInlineImages(try await backend.inlineImages(remoteID: rid, contentIDs: ids), for: id) } catch {
+        do { addInlineImages(try await backend.inlineImages(remoteID: rid, contentIDs: ids), for: id) } catch {
             if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load images: \(error.localizedDescription)" }
         }
     }

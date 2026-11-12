@@ -30,6 +30,8 @@ struct EWSLiveTests {
         let page = try await b.sync(inbox, token: nil)
         #expect(!page.token.isEmpty)
         #expect(!page.upserts.isEmpty)
+        #expect(page.upserts.allSatisfy { $0.conversationID?.isEmpty == false })
+        #expect(newest.allSatisfy { $0.conversationID?.isEmpty == false })
         let next = try await b.sync(inbox, token: page.token)
         #expect(!next.token.isEmpty)
 
