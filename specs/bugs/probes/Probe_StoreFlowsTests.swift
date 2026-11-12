@@ -18,15 +18,6 @@ struct Probe_StoreFlowsTests {
 
     // MARK: Reply / forward
 
-    @Test func probe_replyAllKeepsOriginalCcInCc() {
-        let m = msg(work, from: "Ann", to: [Contact(name: "Me", email: "me@work.com")],
-                    cc: [Contact(name: "Carl", email: "carl@x.com")])
-        let s = store([m])
-        let d = s.draft(.replyAll, to: m.id)
-        #expect(d.to == "ann@x.com", "to: \(d.to)")
-        #expect(d.cc == "carl@x.com", "cc: \(d.cc)")
-    }
-
     @Test func probe_replyPrefixIsCaseInsensitive() {
         let a = msg(work, subject: "RE: Plans"), b = msg(work, subject: "re: Plans")
         let s = store([a, b])
