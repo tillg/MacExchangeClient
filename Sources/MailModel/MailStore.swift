@@ -16,10 +16,18 @@ public final class MailStore {
     @ObservationIgnored private var listCache: (revision: Int, key: ListKey, list: [Message])?
 
     public var selectedMailbox: MailboxRef = .smart(.allInboxes) {
-        didSet { if searchScope(selectedMailbox) != searchScope(oldValue) { searchTextChanged() } }
+        didSet {
+            if selectedMailbox != oldValue && !openedUnread.isEmpty { openedUnread = [] }
+            if searchScope(selectedMailbox) != searchScope(oldValue) { searchTextChanged() }
+        }
     }
-    public var selection: Set<Message.ID> = []
-    public var filterUnread = false
+    public var selection: Set<Message.ID> = [] {
+        didSet { if !openedUnread.isSubset(of: selection) { openedUnread.formIntersection(selection) } }
+    }
+    public var filterUnread = false { didSet { if filterUnread != oldValue && !openedUnread.isEmpty { openedUnread = [] } } }
+    /// Messages that were unread when opened. As in Mail, they stay in the unread-filtered list and in Unread
+    /// while selected, and leave once the selection moves on or the filter or mailbox changes.
+    private var openedUnread: Set<Message.ID> = []
     public var searchText = "" { didSet { if searchText != oldValue { searchTextChanged() } } }
     /// Searches the mail database's index (words, accounts or nil for all → IDs, newest first). Nil with
     /// sample data or until the index is ready: search then scans memory.
@@ -158,7 +166,7 @@ public final class MailStore {
     }
 
     private struct ListKey: Equatable {
-        var mailbox: MailboxRef, query: String, filterUnread: Bool, hits: Int
+        var mailbox: MailboxRef, query: String, filterUnread: Bool, hits: Int, openedUnread: Set<Message.ID>
     }
 
     /// Messages for the list pane: mailbox (or whole account/all mail while searching),
@@ -171,7 +179,9 @@ public final class MailStore {
         let useIndex = !typed.isEmpty && searcher != nil && fallbackQuery != typed
         let hits = useIndex ? searchHits : nil
         let q = useIndex ? hits?.query ?? "" : typed
-        let key = ListKey(mailbox: selectedMailbox, query: q, filterUnread: filterUnread, hits: hits == nil ? -1 : hitsGeneration)
+        let opened = openedUnread
+        let key = ListKey(mailbox: selectedMailbox, query: q, filterUnread: filterUnread, hits: hits == nil ? -1 : hitsGeneration,
+                          openedUnread: opened)
         _ = messages.count  // registers the dependency for SwiftUI even when the cache answers
         if let c = listCache, c.revision == revision, c.key == key { return c.list }
         if let hits, !q.isEmpty {
@@ -183,6 +193,11 @@ public final class MailStore {
             if !q.isEmpty {
                 guard inSearchScope(m), m.mailbox != .trash, m.mailbox != .junk else { return false }
                 return [m.subject, m.from.name, m.from.email, m.body].contains { $0.lowercased().contains(q) }
+            }
+            if !opened.isEmpty && opened.contains(m.id) {
+                var asOpened = m
+                asOpened.isRead = false
+                return contains(selectedMailbox, asOpened)
             }
             guard contains(selectedMailbox, m) else { return false }
             if filterUnread && m.isRead { return false }
@@ -265,7 +280,7 @@ public final class MailStore {
             // The list is ready unless mail changed meanwhile; then `visibleMessages` makes it again.
             if revision == snapshotRevision {
                 listCache = (revision, ListKey(mailbox: selectedMailbox, query: q, filterUnread: filterUnread,
-                                               hits: hitsGeneration), list)
+                                               hits: hitsGeneration, openedUnread: openedUnread), list)
             }
             if ids.count >= MailDatabase.searchLimit {
                 status = Self.limitNotice
@@ -419,7 +434,14 @@ public final class MailStore {
         update(ids) { $0.isRead = anyUnread }
     }
 
-    public func markSelectionRead() { update(selection) { $0.isRead = true } }
+    public func markSelectionRead() {
+        var opened: [Message.ID] = []
+        update(selection) { m in
+            if !m.isRead { opened.append(m.id) }
+            m.isRead = true
+        }
+        openedUnread.formUnion(opened)
+    }
 
     public func markAllRead(in ref: MailboxRef) {
         update(Set(messages.filter { contains(ref, $0) }.map(\.id))) { $0.isRead = true }

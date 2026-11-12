@@ -199,6 +199,70 @@ struct MailStoreTests {
         #expect(s.message(m.id)?.isRead == false)
     }
 
+    /// As in Mail: the message you open stays in the unread-filtered list while it is selected, and leaves
+    /// once the selection moves on.
+    @Test func unreadFilterKeepsTheOpenedMessageUntilTheSelectionMovesOn() {
+        let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
+        let s = store([a, b])
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.filterUnread = true
+        s.selection = [a.id]
+        s.markSelectionRead()  // what MessageListView does on selection change
+        #expect(s.message(a.id)?.isRead == true)
+        #expect(s.visibleMessages.map(\.id) == [a.id, b.id])
+        #expect(s.unreadCount(.account(work.id, .inbox)) == 1)
+        s.selection = [b.id]
+        s.markSelectionRead()
+        #expect(s.visibleMessages.map(\.id) == [b.id])
+        s.selection = []
+        #expect(s.visibleMessages.isEmpty)
+    }
+
+    @Test func unreadMailboxKeepsTheOpenedMessageUntilTheSelectionMovesOn() {
+        let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
+        let s = store([a, b])
+        s.selectedMailbox = .smart(.unread)
+        s.selection = [a.id]
+        s.markSelectionRead()
+        #expect(s.visibleMessages.map(\.id) == [a.id, b.id])
+        #expect(s.unreadCount(.smart(.unread)) == 1)
+        s.selection = [b.id]
+        #expect(s.visibleMessages.map(\.id) == [b.id])
+    }
+
+    /// Turning the filter off and on, or going to another mailbox and back, lets the opened message go.
+    @Test func theOpenedMessageLeavesWhenTheFilterOrMailboxChanges() {
+        let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
+        let s = store([a, b])
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.filterUnread = true
+        s.selection = [a.id]
+        s.markSelectionRead()
+        s.filterUnread = false
+        s.filterUnread = true
+        #expect(s.visibleMessages.map(\.id) == [b.id])
+
+        let s2 = store([a, b].map { var m = $0; m.isRead = false; return m })
+        s2.selectedMailbox = .smart(.unread)
+        s2.selection = [a.id]
+        s2.markSelectionRead()
+        s2.selectedMailbox = .smart(.allInboxes)
+        s2.selectedMailbox = .smart(.unread)
+        #expect(s2.visibleMessages.map(\.id) == [b.id])
+    }
+
+    /// Kept only as unread: deleting the opened message still takes it out of the list.
+    @Test func theOpenedMessageStillLeavesWhenDeleted() {
+        let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
+        let s = store([a, b])
+        s.selectedMailbox = .smart(.unread)
+        s.selection = [a.id]
+        s.markSelectionRead()
+        s.deleteSelection()
+        #expect(s.visibleMessages.map(\.id) == [b.id])
+        #expect(s.selection == [b.id])
+    }
+
     @Test func sendPutsMessageInSentOfAccount() {
         let s = store([])
         s.send(Draft(accountID: home.id, to: "x@y.com, Z <z@y.com>", subject: "S", body: "B"))
