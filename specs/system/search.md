@@ -59,26 +59,29 @@ Before the first answer of a search — no hits yet — the list shows the selec
   doesn't).
 - Indexed columns: `subject`, `from_name`, `from_email`, `to_list`, `cc_list`, `preview` (server preview), `body`
   (plain text, only when loaded). The HTML body isn't indexed.
-- SQL: join `messages_fts` with `messages`, optional `account IN (…)`, `ORDER BY date DESC LIMIT 2000`.
+- SQL: join `messages_fts` with `messages`, `mailbox NOT IN ('trash', 'junk')`, optional `account IN (…)`,
+  `ORDER BY date DESC LIMIT 2000`. Trash and Junk go before the limit, so their hits can't crowd out real ones.
 - Reads use a separate read-only connection on its own queue, so a background write doesn't block a search.
 
 ### Staleness
 
 The database lags memory by up to one save interval (15 s). Hits are matched against memory: a message deleted
 or moved since is shown where it is now, or not at all if gone. Mail that arrived or changed (subject, body loaded)
-since the last save is missing or matched by its old text until the save after it.
+since the last save is missing or matched by its old text until the save after it. A message taken out of Trash or
+Junk since the last save isn't found by the index until that save.
 
 ## Scope (both paths)
 
 - An account mailbox is selected: only that account. A smart mailbox: all accounts. The mailbox itself doesn't
   limit the search.
-- Messages whose `mailbox` is exactly `.trash` or `.junk` are left out (memory: in the filter; index: in `hitList`,
-  after the SQL limit). User folders below Trash or Junk are searched.
+- Messages whose `mailbox` is exactly `.trash` or `.junk` are left out (memory: in the filter; index: in SQL before the
+  limit, and again in `hitList` against memory). User folders below Trash or Junk are searched.
 - The unread filter is ignored while searching.
 - Results are sorted by date, newest first.
 
 ## Limits
 
-- At most 2,000 IDs from the index, taken before the Trash/Junk and account-in-memory filters, so fewer may show.
+- At most 2,000 IDs from the index, Trash and Junk already left out; the in-memory re-check (moved since the last
+  save, account) can show a few fewer.
 - No paging, no server search, no search of HTML-only text, no search tokens, scopes or suggestions.
 - No results: `ContentUnavailableView.search` ("No Results for …") in the list.

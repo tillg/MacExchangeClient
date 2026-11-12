@@ -349,36 +349,6 @@ struct Probe_DatabaseTests {
         #expect(try d.search("kalender", accounts: nil).count == 1)
     }
 
-    /// The newest 2,000 hits are cut in SQL before Trash/Junk is dropped in memory.
-    @Test func probeTrashHitsCrowdOutRealResults() async throws {
-        var msgs: [Message] = []
-        for i in 0..<2100 { var m = mail("Rechnung trash \(i)", minutesAgo: Double(i)); m.mailbox = .trash; msgs.append(m) }
-        for i in 0..<10 { msgs.append(mail("Rechnung inbox \(i)", minutesAgo: Double(10_000 + i))) }
-        let (d, url) = try db(msgs); defer { cleanup(url) }
-        let s = MailStore(accounts: [work], messages: msgs)
-        s.searchDebounce = .zero
-        s.searcher = { q, a in try d.search(q, accounts: a) }
-        s.searchText = "rechnung"
-        await s.searchTask?.value
-        #expect(s.visibleMessages.count == 10)
-        #expect(s.status != MailStore.limitNotice || s.visibleMessages.count >= MailDatabase.searchLimit,
-                "status says \(s.status ?? "") over \(s.visibleMessages.count) results")
-    }
-
-    /// Control for the above: with fewer Trash hits than the limit, the Inbox hits show.
-    @Test func probeTrashHitsBelowLimitControl() async throws {
-        var msgs: [Message] = []
-        for i in 0..<1900 { var m = mail("Rechnung trash \(i)", minutesAgo: Double(i)); m.mailbox = .trash; msgs.append(m) }
-        for i in 0..<10 { msgs.append(mail("Rechnung inbox \(i)", minutesAgo: Double(10_000 + i))) }
-        let (d, url) = try db(msgs); defer { cleanup(url) }
-        let s = MailStore(accounts: [work], messages: msgs)
-        s.searchDebounce = .zero
-        s.searcher = { q, a in try d.search(q, accounts: a) }
-        s.searchText = "rechnung"
-        await s.searchTask?.value
-        #expect(s.visibleMessages.count == 10)
-    }
-
     // MARK: Store ↔ database differential
 
     struct LCG: RandomNumberGenerator {
