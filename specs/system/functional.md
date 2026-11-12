@@ -101,7 +101,7 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
   - Body: an attribution line ("On <date>, Name <addr> wrote:") or a "Begin forwarded message:" block, then every
     line of the plain-text body (split on any line ending: `\r\n`, `\n`, `\r`) prefixed with "> ", joined with `\n`.
   - Reply: To = the sender's address; when the sender is the account's own address (compared without case), the
-    original To addresses instead (each once, mine left out). Reply All: To = sender and To addresses, Cc = the original Cc, both minus
+    original To addresses instead (each once, mine left out; if none is left, the sender's address). Reply All: To = sender and To addresses, Cc = the original Cc, both minus
     the account address (compared without case); each address once across both fields (compared without case,
     first occurrence kept, so To wins). Forward: To empty.
 - Original attachments: Forward always loads them. Replies follow Edit ▸ Include Attachments With Replies (Never,

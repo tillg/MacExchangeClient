@@ -26,7 +26,7 @@ Known limits of the current design, one line each. Open bugs (with repro probes 
 | Quitting the app doesn't ask about unsaved compose windows | `ComposeView.swift` |
 | Every message is held in memory; the list and counts are computed from memory, not the database | [architecture.md](architecture.md#components) |
 | Search is local only: no server search, HTML-only text isn't indexed, results capped at 2,000, the index lags memory up to 15 s | [search.md](search.md#limits) |
-| The memory fallback search (sample data, before the index exists) matches differently from the index: substring, fewer fields, no word splitting or accent folding | [search.md](search.md#memory-path) |
+| The memory fallback search (sample data, before the index exists) also matches inside words (`report` finds "Misreported"); otherwise it follows the index's rules | [search.md](search.md#memory-path) |
 | Bodies are fetched only when a message is shown, so most stored mail has no body to search or quote offline | [architecture.md](architecture.md#reading-from-the-server) |
 | Inline images and opened attachments aren't cached across launches; attachments are refetched after the temp folder is cleared | [storage.md](storage.md#what-lives-where) |
 | Remote images load straight from the sender's server; no privacy relay | [rendering.md](rendering.md#remote-content) |
