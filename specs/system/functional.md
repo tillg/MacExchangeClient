@@ -95,7 +95,9 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
   Subject, From picker with more than one account, Message Size when files are attached. Send (⇧⌘D) needs a
   non-empty To; Save Draft (⌘S).
 - Reply rules (`draft(_:to:)`):
-  - Subject gets "Re: " or "Fwd: " unless it already starts with exactly that prefix (case-sensitive).
+  - Subject gets "Re: " or "Fwd: ". A leading prefix of the same kind — `Re:`/`AW:` for replies, `Fwd:`/`Fw:`/`WG:`
+    for forwards, any case, with or without one space after the colon — is replaced by it, not stacked. A prefix of
+    the other kind stays (`FW: x` → `Re: FW: x`).
   - Body: an attribution line ("On <date>, Name <addr> wrote:") or a "Begin forwarded message:" block, then every
     line of the plain-text body (split on any line ending: `\r\n`, `\n`, `\r`) prefixed with "> ", joined with `\n`.
   - Reply: To = the sender's address. Reply All: To = sender and To addresses, Cc = the original Cc, both minus

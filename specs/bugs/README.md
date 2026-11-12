@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [028](BUG-028-reply-forward-prefix-case-sensitive.md) | P3 | MailStore | Reply/Forward stack prefixes: "RE: x" becomes "Re: RE: x", "Re:x" becomes "Re: Re:x" |
 | [029](BUG-029-reply-to-own-sent-message-addresses-self.md) | P3 | MailStore | Reply to a message in Sent addresses the reply to myself |
 | [030](BUG-030-local-save-draft-drops-cc.md) | P3 | MailStore | Save Draft without a server loses the Cc recipients |
 | [031](BUG-031-search-failed-notice-never-cleared.md) | P3 | MailStore | "Search failed: …" stays under the window title after the search is cleared or succeeds |

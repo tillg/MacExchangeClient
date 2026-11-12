@@ -18,20 +18,6 @@ struct Probe_StoreFlowsTests {
 
     // MARK: Reply / forward
 
-    @Test func probe_replyPrefixIsCaseInsensitive() {
-        let a = msg(work, subject: "RE: Plans"), b = msg(work, subject: "re: Plans")
-        let s = store([a, b])
-        #expect(s.draft(.reply, to: a.id).subject == "RE: Plans")
-        #expect(s.draft(.reply, to: b.id).subject == "re: Plans")
-    }
-
-    @Test func probe_forwardRecognisesFwAndFWD() {
-        let a = msg(work, subject: "FWD: Plans"), b = msg(work, subject: "fwd: Plans")
-        let s = store([a, b])
-        #expect(s.draft(.forward, to: a.id).subject == "FWD: Plans")
-        #expect(s.draft(.forward, to: b.id).subject == "fwd: Plans")
-    }
-
     @Test func probe_replyToOwnSentMessageGoesToRecipients() {
         let m = Message(accountID: work.id, mailbox: .sent, from: Contact(name: "Me", email: "me@work.com"),
                         to: [Contact(name: "Bo", email: "bo@x.com")], subject: "Plans", body: "x", date: .now)
@@ -226,12 +212,6 @@ struct Probe_StoreFlowsTests {
         let files = s.files([dir])
         #expect(files.map(\.name) == ["Prüfung 📁.zip"])
         #expect(files.first?.data.prefix(2) == Data("PK".utf8))
-    }
-
-    @Test func probe_reAndFwWithoutSpace() {
-        let a = msg(work, subject: "Re:Plans")
-        let s = store([a])
-        #expect(s.draft(.reply, to: a.id).subject == "Re:Plans")
     }
 
     @Test func probe_replyAllFromSentMessageGoesToRecipients() {
