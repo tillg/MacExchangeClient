@@ -934,6 +934,20 @@ struct MailStoreTests {
         #expect(s.outbox.map(\.change) == [.reply("M", ok)])
     }
 
+    /// A proposal with only a start or only an end is refused: Exchange would get a plain answer without it.
+    @Test func proposingANewTimeNeedsBothStartAndEnd() {
+        let (s, id) = inviteStore()
+        let time = Date(timeIntervalSince1970: 7200)
+        s.respond(InviteReply(response: .tentative, proposedStart: time), to: id)
+        #expect(s.outbox.isEmpty)
+        #expect(s.status == "The proposed meeting needs both a start and an end.")
+        s.status = nil
+        s.respond(InviteReply(response: .decline, proposedEnd: time), to: id)
+        #expect(s.outbox.isEmpty)
+        #expect(s.status != nil)
+        #expect(s.message(id)?.invite?.response == nil)
+    }
+
     @Test func answerWithCommentsIsWrittenAsAMessageToTheOrganizer() {
         var m = remote("M", subject: "Q4 review")
         m.invite = Invite(start: .now, end: .now.addingTimeInterval(1800), organizer: Contact(name: "Priya Raman", email: "priya@x.com"))

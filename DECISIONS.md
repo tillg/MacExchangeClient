@@ -286,3 +286,10 @@ edited: 2026-11-13
 - **Context:** BUG-031. After an index search failed, "Search failed: …" stayed under the title after the search was cleared and after the next search succeeded.
 - **Decision:** The failure text is cleared in the same places as the 2,000-results notice: when the search is cleared, and when a later index search succeeds (below the limit). Any other status is left alone.
 - **Why:** Both are notices about the current search; a stale failure tells the user search is still broken.
+
+## 00:50 — A proposal needs both a start and an end {#d-bug-032}
+
+- **Status:** decided
+- **Context:** BUG-032. A proposed new time with only a start or only an end was queued; EWS writes `ProposedStart`/`ProposedEnd` only as a pair, so the organizer got a plain answer and no proposal.
+- **Decision:** `respond(_:to:)` refuses such a reply with the status "The proposed meeting needs both a start and an end." and queues nothing, like the existing end-before-start check.
+- **Why:** The user would otherwise believe a time was proposed.

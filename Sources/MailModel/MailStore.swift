@@ -961,6 +961,11 @@ public final class MailStore {
 
     /// Answers an invite with options (comment, not sending, a proposed time).
     public func respond(_ reply: InviteReply, to id: Message.ID) {
+        // Exchange takes a proposal only as a pair; half of one would go out as a plain answer.
+        if (reply.proposedStart == nil) != (reply.proposedEnd == nil) {
+            status = "The proposed meeting needs both a start and an end."
+            return
+        }
         if let s = reply.proposedStart, let e = reply.proposedEnd, e <= s {
             status = "The proposed meeting must end after it starts."
             return
