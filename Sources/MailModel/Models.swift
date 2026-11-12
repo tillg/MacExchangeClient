@@ -338,6 +338,19 @@ public struct Attachment: Hashable, Codable, Sendable, ExpressibleByStringLitera
 
     public init(stringLiteral name: String) { self.init(name: name) }
 
+    private enum CodingKeys: String, CodingKey { case name, size, contentType }
+
+    /// Also reads a bare name, as builds up to b75308d wrote it (Cache.json and outbox rows still hold those).
+    public init(from decoder: Decoder) throws {
+        if let name = try? decoder.singleValueContainer().decode(String.self) {
+            self.init(name: name)
+            return
+        }
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(name: try c.decode(String.self, forKey: .name), size: try c.decodeIfPresent(Int.self, forKey: .size),
+                  contentType: try c.decodeIfPresent(String.self, forKey: .contentType))
+    }
+
     /// The name as a file name: the sender's name can't point into another folder.
     /// A "/" becomes ":", which the Finder shows as "/" again.
     public var fileName: String {

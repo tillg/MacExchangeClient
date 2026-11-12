@@ -246,6 +246,40 @@ struct MailDatabaseTests {
         #expect(try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s) == nil)
     }
 
+    /// Cache.json as written by builds up to b75308d, where attachments were plain names: it still imports,
+    /// with its waiting change.
+    @Test func cacheWithAttachmentNamesOnlyStillImports() async throws {
+        let json = #"{"accounts":["00000000-0000-0000-0000-000000000001",{"complete":["inbox"],"messages":[{"accountID":"00000000-0000-0000-0000-000000000001","attachments":["Rechnung.pdf"],"body":"Hallo","bodyLoaded":true,"category":"primary","cc":[],"date":800000000,"from":{"email":"ann@x.com","name":"Ann"},"hasAttachments":true,"id":"00000000-0000-0000-0000-000000000002","isRead":false,"isVIP":false,"mailbox":"inbox","remoteID":"R1","subject":"S","to":[]}],"outbox":[{"account":"00000000-0000-0000-0000-000000000001","change":{"move":{"_0":["R1"],"to":"archive"}},"id":"00000000-0000-0000-0000-000000000003","previous":[]}],"syncTokens":["inbox","T1"]}]}"#
+        let dir = tempURL().deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
+        try Data(json.utf8).write(to: cacheURL)
+        #expect(MailCache.load(from: cacheURL) != nil)
+        let acct = Account(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, name: "W", address: "w@x.com")
+        let s = MailStore(accounts: [acct], messages: [])
+        let db = try #require(try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s))
+        #expect(s.messages.first?.attachments == ["Rechnung.pdf"])
+        #expect(s.outbox.map(\.change) == [.move(["R1"], to: .archive)])
+        #expect(try db.messages().first?.attachments == ["Rechnung.pdf"])
+    }
+
+    /// An outbox row written before attachments had a size (9f0dcba..94d679c): `previous` holds the message
+    /// with attachment names only. The waiting change must not be dropped.
+    @Test func outboxRowWithAttachmentNamesOnlyStillLoads() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        _ = try MailDatabase(url: url)
+        let change = #"{"account":"00000000-0000-0000-0000-000000000001","change":{"move":{"_0":["R1"],"to":"archive"}},"id":"00000000-0000-0000-0000-000000000003","previous":[{"accountID":"00000000-0000-0000-0000-000000000001","attachments":["Vertrag.pdf"],"body":"x","bodyLoaded":true,"category":"primary","cc":[],"date":800000000,"from":{"email":"ann@x.com","name":"Ann"},"hasAttachments":true,"id":"00000000-0000-0000-0000-000000000002","isRead":true,"isVIP":false,"mailbox":"inbox","remoteID":"R1","subject":"S","to":[]}]}"#
+        var raw: OpaquePointer?
+        #expect(sqlite3_open(url.path, &raw) == SQLITE_OK)
+        #expect(sqlite3_exec(raw, "INSERT INTO outbox VALUES(0, CAST('\(change)' AS BLOB))", nil, nil, nil) == SQLITE_OK)
+        sqlite3_close(raw)
+        let outbox = try reopen(url).meta().outbox
+        #expect(outbox.map(\.change) == [.move(["R1"], to: .archive)])
+        #expect(outbox.first?.previous.first?.attachments == ["Vertrag.pdf"])
+    }
+
     // MARK: Search (FTS5)
 
     func mail(_ subject: String, from: Contact = Contact(name: "Ann", email: "ann@x.com"), to: [Contact] = [],
