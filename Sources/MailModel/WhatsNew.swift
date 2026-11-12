@@ -18,6 +18,7 @@ public enum WhatsNew {
             "The server field accepts the address however you paste it: with or without http://, with the /EWS/Exchange.asmx part, or with a stray space or line break.",
             "Opening an email that was attached to another email shows that email, not a file attached inside it.",
             "Pictures in the text of emails from some mail programs now show instead of an empty frame.",
+            "The message list stays smooth when it holds very long emails.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",

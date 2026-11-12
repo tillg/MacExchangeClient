@@ -224,11 +224,13 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
                           options: [.regularExpression, .caseInsensitive]) != nil
     }
 
-    /// First lines of the body, as shown under the subject in the list.
+    /// First lines of the body, as shown under the subject in the list. The list reads it on every render and
+    /// shows two lines, so only the start of the body is looked at, however long the mail.
     public var preview: String {
         if !bodyLoaded, let serverPreview { return serverPreview }
-        return body.split(whereSeparator: \.isNewline).filter { !$0.hasPrefix(">") }
+        let text = body.prefix(10_000).split(whereSeparator: \.isNewline).filter { !$0.hasPrefix(">") }
             .joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        return String(text.prefix(500))
     }
 }
 

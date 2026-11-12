@@ -157,3 +157,11 @@ edited: 2026-11-12
 - **Decision:** A referenced attachment is fetched when its type is `image/*`, `application/octet-stream`, or missing/empty. For the generic ones, `parseInlineImages` takes the type from the file name's extension (`UTType`), falling back to `application/octet-stream`.
 - **Why:** Covers the reported case (and attachments without a type) while keeping explicit non-image parts, which the HTML can't show as a picture anyway, out of the page. The type from the name lets WebKit decode the picture with a correct `data:` type.
 - **Alternatives:** Any type (rejected: contradicts an existing test; a mislabelled `text/html` part has no business inside an `<img>` data URI either).
+
+## 00:15 — The list preview looks at the first 10,000 characters only {#d-bug-017}
+
+- **Status:** decided
+- **Context:** BUG-017. `Message.preview` split, filtered and joined the whole body on every read; the list reads it on every render, so a 1 MB body cost 80–300 ms per row.
+- **Decision:** `preview` works on `body.prefix(10_000)` and returns at most 500 characters; the rules (lines starting with `>` left out, lines joined with a space) are unchanged. Measured 0.5 ms for the 1 MB body in a debug build; the test allows 50 ms.
+- **Why:** The row shows two lines. A bounded prefix is simpler than a cache in a value type (`Message` is a `Hashable` struct compared and stored everywhere; a cached field would have to be kept out of equality and Codable).
+- **Alternatives:** Cache the preview (rejected: see above). Trade-off accepted: a mail whose first 10,000 characters are all quoted lines shows an empty preview.
