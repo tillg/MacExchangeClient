@@ -780,6 +780,8 @@ public final class MailStore {
         case let .setRead(ids, v): try await b.setRead(ids, v)
         case let .setFlagged(ids, v): try await b.setFlagged(ids, v)
         case let .move(ids, box):
+            // Changes are written before refresh reads the folder list (e.g. a drop right after launch).
+            if remoteFolders[p.account] == nil { setRemoteFolders(try await b.folders(), account: p.account) }
             guard let folder = remoteFolders[p.account]?.first(where: { $0.role == box }) else {
                 throw MailError("There is no \(name(of: box, in: p.account)) folder on the server")
             }
@@ -793,6 +795,13 @@ public final class MailStore {
             // Without a sent answer Exchange may leave the invite in the Inbox; move it like the others.
             // If the server already moved it, that fails harmlessly.
             if !r.send, let trash = remoteFolders[p.account]?.first(where: { $0.role == .trash }),
+               let map = try? await b.move([id], to: trash) {
+                renameRemote(map, account: p.account)
+            }
+        case let .removeFromCalendar(id):
+            try await b.removeFromCalendar(id)
+            // Like an unsent answer: if Exchange leaves the cancellation in the Inbox, move it; if not, this fails harmlessly.
+            if let trash = remoteFolders[p.account]?.first(where: { $0.role == .trash }),
                let map = try? await b.move([id], to: trash) {
                 renameRemote(map, account: p.account)
             }
@@ -844,9 +853,14 @@ public final class MailStore {
         answer(id, response: reply.response, reply: reply) { .reply($0, reply) }
     }
 
+    /// Takes a cancelled meeting off the calendar; the cancellation goes to Trash, as after an answer.
+    public func removeFromCalendar(_ id: Message.ID) {
+        answer(id, response: nil, reply: nil) { .removeFromCalendar($0) }
+    }
+
     /// Records the answer and moves the invite to Trash at once, as Exchange does after an answer
     /// (no move request: the server moves it itself). The next message is selected, as after Delete.
-    private func answer(_ id: Message.ID, response: InviteResponse, reply: InviteReply?,
+    private func answer(_ id: Message.ID, response: InviteResponse?, reply: InviteReply?,
                         _ change: (String) -> ServerChange) {
         guard let old = message(id), old.invite != nil else { return }
         let apply: (Set<Message.ID>) -> Void = { _ in

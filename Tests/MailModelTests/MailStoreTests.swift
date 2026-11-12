@@ -682,6 +682,31 @@ struct MailStoreTests {
         #expect(s.message(id)?.mailbox == .inbox)
     }
 
+    @Test func removingACancelledMeetingFromTheCalendarTrashesTheMessageAndSelectsTheNext() {
+        let (s, id) = inviteStore()
+        s.apply(SyncResult(upserts: [remote("N", minutesAgo: 5)], deletedRemoteIDs: [], token: "t2", more: false),
+                account: work.id, mailbox: .inbox)
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.selection = [id]
+        s.removeFromCalendar(id)
+        #expect(s.message(id)?.mailbox == .trash)
+        #expect(s.selection == [self.id(s, "N")])
+        #expect(s.outbox.map(\.change) == [.removeFromCalendar("M")])
+        s.failed(s.outbox[0], "Denied")
+        #expect(s.message(id)?.mailbox == .inbox)
+    }
+
+    /// Invites cached before cancellations were told apart load their body once more, to learn which they are.
+    @Test func cachedInviteWithoutCancellationStateIsReadAgain() {
+        var m = remote("M")
+        m.invite = Invite(start: .now, end: .now)
+        m.bodyLoaded = true
+        m.htmlChecked = true
+        #expect(m.needsBody)
+        m.invite?.isCancellation = false
+        #expect(!m.needsBody)
+    }
+
     func inviteStore() -> (MailStore, Message.ID) {
         var m = remote("M")
         m.invite = Invite(start: Date(timeIntervalSince1970: 3600), end: Date(timeIntervalSince1970: 5400))

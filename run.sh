@@ -39,6 +39,10 @@ bundle() {
     done
     iconutil -c icns "$set_dir" -o "$APP/Contents/Resources/AppIcon.icns"
   fi
+  # Build number: one up per build, kept in .build-number (not in git). About shows it and the build time.
+  BUILD=$(( $(cat .build-number 2>/dev/null || echo 0) + 1 ))
+  echo "$BUILD" > .build-number
+  BUILT=$(date '+%Y-%m-%d %H:%M')
   cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -49,8 +53,15 @@ bundle() {
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1</string>
+  <key>CFBundleVersion</key><string>$BUILD</string>
+  <key>NSHumanReadableCopyright</key><string>Built $BUILT</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>UTExportedTypeDeclarations</key><array><dict>
+    <key>UTTypeIdentifier</key><string>local.mailreplica.messages</string>
+    <key>UTTypeDescription</key><string>MailReplica Messages</string>
+    <key>UTTypeConformsTo</key><array><string>public.data</string></array>
+  </dict></array>
 </dict></plist>
 PLIST
   if [ -n "$IDENTITY" ]; then
@@ -58,6 +69,8 @@ PLIST
   else
     codesign -f -s - -i MailReplica "$APP" 2>/dev/null
   fi
+  # Register the bundle, so the system knows the drag type above (dragging messages onto the sidebar needs it).
+  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
 }
 case "$1" in
   build) swift build && sign && bundle ;;

@@ -4,6 +4,8 @@ import SwiftUI
 struct SidebarView: View {
     @Environment(MailStore.self) private var store
     @State private var dropTarget: Row?
+    /// Opens a closed mailbox that a drag rests on, as Mail does, so its subfolders can be reached.
+    @State private var springOpen: Task<Void, Never>?
     /// Mailboxes whose disclosure triangle is open. Mail starts with them closed.
     @State private var expanded: Set<MailboxRef> = []
     /// An account's Inbox is in Favorites too; this says which of the two rows was clicked, so only it is highlighted.
@@ -120,7 +122,18 @@ struct SidebarView: View {
             .dropDestination(for: MessageDrag.self) { items, _ in
                 store.drop(Set(items.flatMap(\.ids)), on: ref)
             } isTargeted: { on in
-                if on { dropTarget = tag } else if dropTarget == tag { dropTarget = nil }
+                if on {
+                    dropTarget = tag
+                    springOpen?.cancel()
+                    guard !favorite, hasChildren(ref), !expanded.contains(ref) else { return }
+                    springOpen = Task {
+                        try? await Task.sleep(for: .milliseconds(700))
+                        if !Task.isCancelled, dropTarget == tag { expanded.insert(ref) }
+                    }
+                } else if dropTarget == tag {
+                    dropTarget = nil
+                    springOpen?.cancel()
+                }
             }
             .listRowBackground(
                 dropTarget == tag && store.canDrop(on: ref)

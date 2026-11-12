@@ -185,7 +185,7 @@ struct EWSParsingTests {
             <m:Folders><t:Folder><t:FolderId Id="F1"/><t:DisplayName>Posteingang</t:DisplayName></t:Folder>
             <t:Folder><t:FolderId Id="F2"/><t:DisplayName>Archiv</t:DisplayName><t:TotalCount>30</t:TotalCount></t:Folder></m:Folders>
             """)
-        #expect(EWSBackend.archiveFolder(d) == RemoteFolder(role: .archive, id: "F2", totalCount: 30))
+        #expect(EWSBackend.archiveFolder(d.all("Folder")) == RemoteFolder(role: .archive, id: "F2", totalCount: 30))
     }
 
     @Test func folderTreeKeepsMailFoldersNestedUnderTheirParents() throws {
@@ -205,11 +205,20 @@ struct EWSParsingTests {
             + f("O", "Outbox", parent: "R") + f("C", "Clients", parent: "R", cls: nil) + f("AR", "Archive", parent: "R")
             + "</t:Folders></m:RootFolder></m:FindFolderResponse>")
         let known = [RemoteFolder(role: .inbox, id: "I"), RemoteFolder(role: .archive, id: "AR")]
-        #expect(EWSBackend.folderTree(d, known: known, skip: ["O"]) == [
+        #expect(EWSBackend.folderTree(d.all("Folder"), known: known, skip: ["O"]) == [
             RemoteFolder(role: .folder("L"), id: "L", totalCount: 3, name: "Launch", parent: .folder("P")),
             RemoteFolder(role: .folder("P"), id: "P", totalCount: 3, name: "Projects", parent: .inbox),
             RemoteFolder(role: .folder("C"), id: "C", totalCount: 3, name: "Clients", parent: nil),
         ])
+    }
+
+    /// Exchange returns at most 1000 folders per FindFolder; a mailbox with more is read page by page.
+    @Test func folderListContinuesUntilTheLastPage() throws {
+        let more = try doc(#"<m:FindFolderResponse><m:RootFolder IndexedPagingOffset="1000" TotalItemsInView="1232" IncludesLastItemInRange="false"/></m:FindFolderResponse>"#)
+        let last = try doc(#"<m:FindFolderResponse><m:RootFolder IndexedPagingOffset="1232" TotalItemsInView="1232" IncludesLastItemInRange="true"/></m:FindFolderResponse>"#)
+        #expect(EWSBackend.nextFolderOffset(more) == 1000)
+        #expect(EWSBackend.nextFolderOffset(last) == nil)
+        #expect(EWSBackend.findFoldersRequest(offset: 1000).contains(#"<m:IndexedPageFolderView MaxEntriesReturned="1000" Offset="1000" BasePoint="Beginning"/>"#))
     }
 
     @Test func archiveFolderPrefersTheTopLevelOne() throws {
@@ -218,7 +227,7 @@ struct EWSParsingTests {
             <t:Folder><t:FolderId Id="I"/><t:ParentFolderId Id="R"/><t:DisplayName>Inbox</t:DisplayName></t:Folder>
             <t:Folder><t:FolderId Id="TOP"/><t:ParentFolderId Id="R"/><t:DisplayName>Archive</t:DisplayName></t:Folder></m:Folders>
             """)
-        #expect(EWSBackend.archiveFolder(d)?.id == "TOP")
+        #expect(EWSBackend.archiveFolder(d.all("Folder"))?.id == "TOP")
     }
 
     @Test func getFolderSkipsMissingFolders() throws {
@@ -249,6 +258,21 @@ struct EWSParsingTests {
         #expect(EWSClient.mapError(URLError(.notConnectedToInternet), credentialsRejected: true) is URLError)
     }
 
+    /// A cancellation ("Abgesagt: …") carries the meeting too, marked as cancelled; Outlook offers only Remove from Calendar.
+    @Test func meetingCancellationIsMarkedAndRemovedWithRemoveItem() throws {
+        let d = try doc("""
+            <t:MeetingCancellation><t:ItemId Id="C1"/><t:Body BodyType="Text">Sorry</t:Body>
+            <t:Start>2026-11-13T09:00:00Z</t:Start><t:End>2026-11-13T10:00:00Z</t:End></t:MeetingCancellation>
+            """)
+        let item = try #require(d.first("MeetingCancellation"))
+        #expect(EWSBackend.parseBody(item).invite?.isCancellation == true)
+        #expect(EWSBackend.message(item)?.isInvite == true)
+        let request = try #require(try doc(summary).first("Message"))
+        #expect(EWSBackend.parseBody(request).invite == nil)
+        #expect(EWSBackend.removeFromCalendarRequest("C&1") == #"<m:CreateItem MessageDisposition="SaveOnly"><m:Items>"#
+            + #"<t:RemoveItem><t:ReferenceItemId Id="C&amp;1"/></t:RemoveItem></m:Items></m:CreateItem>"#)
+    }
+
     @Test func meetingRequestBodyCarriesTheInvite() throws {
         let d = try doc("""
             <t:MeetingRequest><t:ItemId Id="M1"/><t:Body BodyType="Text">Agenda</t:Body>
@@ -268,6 +292,7 @@ struct EWSParsingTests {
         #expect(invite.required.map(\.name) == ["Ann"])
         #expect(invite.optional.map(\.name) == ["Bob"])
         #expect(!invite.isAllDay)
+        #expect(invite.isCancellation == false)
         #expect(EWSBackend.message(item)?.isInvite == true)
         let plain = try #require(try doc(summary).first("Message"))
         #expect(EWSBackend.parseBody(plain).invite == nil)

@@ -174,7 +174,8 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
     /// The body must be fetched: never loaded, or loaded from a server before HTML was asked for or
     /// before attachments had a size (needed to open them as Mail does).
     public var needsBody: Bool {
-        !bodyLoaded || (remoteID != nil && (htmlChecked != true || attachments.contains { $0.size == nil }))
+        !bodyLoaded || (remoteID != nil && (htmlChecked != true || attachments.contains { $0.size == nil }
+            || (invite != nil && invite?.isCancellation == nil)))  // invites cached before cancellations were told apart
     }
 
     /// The HTML loads images, styles or fonts from the web. They are blocked until the user allows them, so

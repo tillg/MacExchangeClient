@@ -91,9 +91,16 @@ enum SampleData {
                            required: [c("Alex Morgan", work.address), c("Jonas Weber", "jonas@northwind.example"),
                                       c("Elena Petrova", "elena@northwind.example"), c("Sam Okafor", "sam@northwind.example")],
                            optional: [c("Mia Chen", "mia@northwind.example")]))
+        // A cancelled meeting: Outlook offers only Remove from Calendar.
+        let cancelled = Message(
+            accountID: work.id, from: c("Priya Raman", "priya@northwind.example"), to: meWork,
+            subject: "Canceled: Design sync", body: "We have to skip this week's design sync.\n\nPriya",
+            date: ago(1.5),
+            invite: Invite(start: at(10), end: at(11), organizer: c("Priya Raman", "priya@northwind.example"),
+                           required: [c("Alex Morgan", work.address)], isCancellation: true))
         // Attachments get made-up content, so they open, and its size.
         var files: [Message.ID: [Data]] = [:]
-        let all = (msgs + [invite]).map { m in
+        let all = (msgs + [invite, cancelled]).map { m in
             var m = m
             files[m.id] = m.attachments.map { sampleFile($0.name, message: m.subject) }
             m.attachments = zip(m.attachments, files[m.id]!).map { Attachment(name: $0.name, size: $1.count) }

@@ -13,9 +13,13 @@ public struct Invite: Hashable, Codable, Sendable {
     public var response: InviteResponse?
     /// How it was given (comment, sent or not, proposed time). Optional for caches written before it existed.
     public var reply: InviteReply?
+    /// A cancellation (EWS MeetingCancellation): it can only be removed from the calendar. Nil in older caches.
+    public var isCancellation: Bool?
 
     public init(start: Date, end: Date, location: String = "", isAllDay: Bool = false, organizer: Contact? = nil,
-                required: [Contact] = [], optional: [Contact] = [], response: InviteResponse? = nil) {
+                required: [Contact] = [], optional: [Contact] = [], response: InviteResponse? = nil,
+                isCancellation: Bool? = nil) {
+        self.isCancellation = isCancellation
         self.start = start; self.end = end; self.location = location; self.isAllDay = isAllDay
         self.organizer = organizer; self.required = required; self.optional = optional; self.response = response
     }

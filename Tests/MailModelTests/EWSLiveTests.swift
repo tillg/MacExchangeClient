@@ -59,11 +59,12 @@ struct EWSLiveTests {
         let b = try #require(Self.backend)
         let folders = try await b.folders()
         let standard = folders.filter { $0.role.isStandard }, own = folders.filter { !$0.role.isStandard }
-        let deep = try await b.client.call("""
-            <m:FindFolder Traversal="Deep"><m:FolderShape><t:BaseShape>IdOnly</t:BaseShape></m:FolderShape>\
-            <m:ParentFolderIds><t:DistinguishedFolderId Id="msgfolderroot"/></m:ParentFolderIds></m:FindFolder>
-            """)
-        let ids = Set(deep.all("FolderId").compactMap { $0.attr("Id") })
+        var ids = Set<String>(), offset: Int? = 0
+        while let o = offset {
+            let page = try await b.client.call(EWSBackend.findFoldersRequest(offset: o))
+            ids.formUnion(page.all("FolderId").compactMap { $0.attr("Id") })
+            offset = EWSBackend.nextFolderOffset(page)
+        }
         print("FOLDERS standard \(standard.count), own \(own.count), nested \(own.filter { $0.parent != nil }.count), deep \(ids.count)")
         #expect(standard.allSatisfy { ids.contains($0.id) })
         #expect(Set(own.map(\.id)).isDisjoint(with: standard.map(\.id)))

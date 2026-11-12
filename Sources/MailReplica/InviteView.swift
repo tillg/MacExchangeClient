@@ -22,33 +22,45 @@ struct InviteCard: View {
                     }
                 }
                 .padding(.top, 2)
-                HStack(spacing: 8) {
-                    answer(.accept, "Accept", "checkmark")
-                    answer(.tentative, "Tentative", "questionmark")
-                    answer(.decline, "Decline", "xmark")
-                    Menu {
-                        Button("Tentative and Propose New Time…") { write(.tentative, proposing: true) }
-                        Button("Decline and Propose New Time…") { write(.decline, proposing: true) }
-                    } label: {
-                        Label("Propose New Time", systemImage: "clock").font(.system(size: 12))
+                if invite.isCancellation == true {
+                    // Outlook offers only this for a cancellation.
+                    Button { store.removeFromCalendar(message.id) } label: {
+                        Label("Remove from Calendar", systemImage: "xmark").font(.system(size: 12))
                     }
-                    .fixedSize()
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .padding(.top, 4)
+                } else {
+                    HStack(spacing: 8) {
+                        answer(.accept, "Accept", "checkmark")
+                        answer(.tentative, "Tentative", "questionmark")
+                        answer(.decline, "Decline", "xmark")
+                        Menu {
+                            Button("Tentative and Propose New Time…") { write(.tentative, proposing: true) }
+                            Button("Decline and Propose New Time…") { write(.decline, proposing: true) }
+                        } label: {
+                            Label("Propose New Time", systemImage: "clock").font(.system(size: 12))
+                        }
+                        .fixedSize()
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .padding(.top, 4)
                 }
-                .menuStyle(.button)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .padding(.top, 4)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
 
-            if let r = invite.response {
-                banner(answered(r), "checkmark.circle", .blue)
-            } else {
-                banner("Please respond.", "info.circle", .blue)
+            if invite.isCancellation != true {
+                if let r = invite.response {
+                    banner(answered(r), "checkmark.circle", .blue)
+                } else {
+                    banner("Please respond.", "info.circle", .blue)
+                }
             }
             let conflicts = invite.conflicts(in: store.dayEvents[message.id] ?? [], subject: message.subject)
-            if !conflicts.isEmpty {
+            if invite.isCancellation != true, !conflicts.isEmpty {
                 banner(conflicts.count == 1 ? "This meeting conflicts with another event on your calendar."
                        : "This meeting conflicts with \(conflicts.count) other events on your calendar.",
                        "exclamationmark.triangle", .yellow)

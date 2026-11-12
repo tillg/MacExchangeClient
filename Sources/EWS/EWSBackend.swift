@@ -30,14 +30,12 @@ public struct EWSBackend: MailBackend {
         var result = Self.parseGetFolder(doc)
         let outbox = doc.all("GetFolderResponseMessage").dropFirst(Self.distinguished.count).first?.first("FolderId")?.attr("Id")
         // Every mail folder, nested. Outlook's Archive folder is a normal top-level folder; there is no distinguished ID for it.
-        let found = try await client.call("""
-            <m:FindFolder Traversal="Deep"><m:FolderShape><t:BaseShape>IdOnly</t:BaseShape>\
-            <t:AdditionalProperties><t:FieldURI FieldURI="folder:DisplayName"/><t:FieldURI FieldURI="folder:TotalCount"/>\
-            <t:FieldURI FieldURI="folder:ParentFolderId"/><t:FieldURI FieldURI="folder:FolderClass"/>\
-            <t:ExtendedFieldURI PropertyTag="0x10F4" PropertyType="Boolean"/>\
-            </t:AdditionalProperties></m:FolderShape>\
-            <m:ParentFolderIds><t:DistinguishedFolderId Id="msgfolderroot"/></m:ParentFolderIds></m:FindFolder>
-            """)
+        var found: [XMLNode] = [], offset: Int? = 0
+        while let o = offset {
+            let page = try await client.call(Self.findFoldersRequest(offset: o))
+            found += page.all("Folder")
+            offset = Self.nextFolderOffset(page).flatMap { $0 > o ? $0 : nil }  // never the same page twice
+        }
         if let archive = Self.archiveFolder(found) { result.append(archive) }
         return result + Self.folderTree(found, known: result, skip: Set([outbox].compactMap { $0 }))
     }
@@ -205,7 +203,8 @@ public struct EWSBackend: MailBackend {
         return Invite(start: start, end: end, location: item.child("Location")?.stringValue ?? "",
                       isAllDay: item.child("IsAllDayEvent")?.stringValue == "true",
                       organizer: item.child("Organizer")?.child("Mailbox").map(contact),
-                      required: attendees("RequiredAttendees"), optional: attendees("OptionalAttendees"))
+                      required: attendees("RequiredAttendees"), optional: attendees("OptionalAttendees"),
+                      isCancellation: item.localName == "MeetingCancellation")
     }
 
     // MARK: Write-back
@@ -230,6 +229,16 @@ public struct EWSBackend: MailBackend {
         }
         return "<m:CreateItem MessageDisposition=\"\(reply.send ? "SendAndSaveCopy" : "SaveOnly")\"><m:Items>"
             + "<t:\(tag)>\(inner)</t:\(tag)></m:Items></m:CreateItem>"
+    }
+
+    public func removeFromCalendar(_ remoteID: String) async throws {
+        _ = try await client.call(Self.removeFromCalendarRequest(remoteID))
+    }
+
+    /// Outlook's Remove from Calendar for a cancellation: takes the meeting off the calendar, tells no one.
+    static func removeFromCalendarRequest(_ id: String) -> String {
+        "<m:CreateItem MessageDisposition=\"SaveOnly\"><m:Items>"
+            + "<t:RemoveItem><t:ReferenceItemId Id=\"\(xmlEscape(id))\"/></t:RemoveItem></m:Items></m:CreateItem>"
     }
 
     public func setRead(_ ids: [String], _ read: Bool) async throws {
@@ -398,10 +407,28 @@ public struct EWSBackend: MailBackend {
         }
     }
 
+    /// One page of every folder below the mailbox root. Exchange returns at most 1000 per call.
+    static func findFoldersRequest(offset: Int) -> String {
+        """
+        <m:FindFolder Traversal="Deep"><m:FolderShape><t:BaseShape>IdOnly</t:BaseShape>\
+        <t:AdditionalProperties><t:FieldURI FieldURI="folder:DisplayName"/><t:FieldURI FieldURI="folder:TotalCount"/>\
+        <t:FieldURI FieldURI="folder:ParentFolderId"/><t:FieldURI FieldURI="folder:FolderClass"/>\
+        <t:ExtendedFieldURI PropertyTag="0x10F4" PropertyType="Boolean"/>\
+        </t:AdditionalProperties></m:FolderShape>\
+        <m:IndexedPageFolderView MaxEntriesReturned="1000" Offset="\(offset)" BasePoint="Beginning"/>\
+        <m:ParentFolderIds><t:DistinguishedFolderId Id="msgfolderroot"/></m:ParentFolderIds></m:FindFolder>
+        """
+    }
+
+    /// Where the next FindFolder page starts, or nil after the last one.
+    static func nextFolderOffset(_ doc: XMLDocument) -> Int? {
+        guard let root = doc.first("RootFolder"), root.attr("IncludesLastItemInRange") == "false" else { return nil }
+        return Int(root.attr("IndexedPagingOffset") ?? "")
+    }
+
     /// A top-level folder named Archive; Outlook creates it under the mailbox root, not in the Inbox.
-    static func archiveFolder(_ doc: XMLDocument) -> RemoteFolder? {
+    static func archiveFolder(_ folders: [XMLNode]) -> RemoteFolder? {
         let names: Set<String> = ["archive", "archiv"]
-        let folders = doc.all("Folder")
         let ids = Set(folders.compactMap { $0.child("FolderId")?.attr("Id") })
         let matches = folders.filter { names.contains(($0.text("DisplayName") ?? "").lowercased()) }
         let topLevel = matches.first { !ids.contains($0.child("ParentFolderId")?.attr("Id") ?? "") }
@@ -412,10 +439,10 @@ public struct EWSBackend: MailBackend {
     /// The user's own mail folders from a deep FindFolder, each with its parent. Calendar, contacts and other
     /// non-mail folders, hidden folders and `skip` (with everything under them) are left out; `known` folders
     /// keep their standard role. A parent that isn't in the result is the mailbox root: the folder is top-level.
-    static func folderTree(_ doc: XMLDocument, known: [RemoteFolder], skip: Set<String>) -> [RemoteFolder] {
+    static func folderTree(_ folders: [XMLNode], known: [RemoteFolder], skip: Set<String>) -> [RemoteFolder] {
         struct F { let id: String, parent: String, name: String, count: Int, mail: Bool }
         // `Folder` elements only: CalendarFolder, ContactsFolder, TasksFolder and SearchFolder are other tags.
-        let all = doc.all("Folder").compactMap { f -> F? in
+        let all = folders.compactMap { f -> F? in
             guard let id = f.child("FolderId")?.attr("Id") else { return nil }
             let cls = f.text("FolderClass")
             let hidden = f.child("ExtendedProperty")?.text("Value")?.lowercased() == "true"
@@ -469,7 +496,7 @@ public struct EWSBackend: MailBackend {
                        flag: item.child("Flag")?.text("FlagStatus") == "Flagged" ? .red : nil,
                        remoteID: rid, hasAttachments: item.text("HasAttachments") == "true",
                        serverPreview: item.child("Preview")?.stringValue ?? "", bodyLoaded: false,
-                       isInvite: item.localName == "MeetingRequest")
+                       isInvite: ["MeetingRequest", "MeetingCancellation"].contains(item.localName ?? ""))
     }
 
     static func parseBody(_ item: XMLNode) -> MessageBody {

@@ -38,6 +38,34 @@ struct EWSLiveWriteTests {
         #expect(try await state(newID, in: moved) == nil)
     }
 
+    /// A message dropped on a subfolder right after launch, before the store has read the server's folder list
+    /// (changes are written before that list is read), still moves there on the server.
+    @MainActor @Test(.enabled(if: EWSLiveWriteTests.backend != nil)) func dropOnSubfolderBeforeFolderListLoads() async throws {
+        let b = try #require(Self.backend)
+        let test = try await folder("MailReplica-Test", in: #"<t:DistinguishedFolderId Id="msgfolderroot"/>"#, b)
+        let moved = try await folder("Moved", in: #"<t:FolderId Id="\#(xmlEscape(test.id))"/>"#, b)
+        let rid = try await createMessage(in: test, b)
+
+        let acct = Account(name: "Exchange", address: "")
+        let s = MailStore(accounts: [], messages: [])
+        s.add(acct, backend: b)
+        var m = try #require(try await b.newest(in: test, limit: 50).first { $0.remoteID == rid })
+        m.accountID = acct.id
+        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "t", more: false),
+                account: acct.id, mailbox: .folder(test.id))
+        let local = try #require(s.messages.first { $0.remoteID == rid })
+
+        #expect(s.drop([local.id], on: .account(acct.id, .folder(moved.id))))
+        await s.refresh(history: false)
+
+        #expect(s.outbox.isEmpty)
+        let now = try #require(s.message(local.id))
+        #expect(now.mailbox == .folder(moved.id))
+        let onServer = try await b.newest(in: moved, limit: 50).first { $0.remoteID == now.remoteID }
+        #expect(onServer != nil)
+        try await b.delete([now.remoteID ?? rid])
+    }
+
     /// Adds a file to a saved message the way sending with attachments does, and reads it back. Doesn't send.
     @Test(.enabled(if: EWSLiveWriteTests.backend != nil)) func attachmentAddedToASavedMessageReadsBack() async throws {
         let b = try #require(Self.backend)
