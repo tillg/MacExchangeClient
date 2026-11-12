@@ -63,6 +63,21 @@ struct HTMLPageTests {
         #expect(page.contains(#"<img src="cid:unknown@x">"#))         // stays, and stays hidden
     }
 
+    /// The content type comes from the sender: only a plain `type/subtype` goes into the page, never markup.
+    @Test func inlineImageContentTypeCannotInjectMarkup() {
+        let html = #"<img src="cid:a@x">"#
+        func page(_ type: String) -> String {
+            HTMLPage.document(html, allowRemote: false, inline: ["a@x": InlineImage(contentType: type, data: Data([1]))])
+        }
+        let evil = page(#"image/png" onload="x" data-x=""#)
+        #expect(!evil.contains("onload"))
+        #expect(evil.contains(#"<img src="data:application/octet-stream;base64,AQ==">"#))
+        #expect(!page("image/png><script>x</script>").contains("<script>"))
+        #expect(page(#"image/png; name="a.png""#).contains(#"<img src="data:image/png;base64,AQ==">"#))
+        #expect(page("Image/SVG+XML").contains(#"<img src="data:image/svg+xml;base64,AQ==">"#))
+        #expect(page("").contains(#"<img src="data:application/octet-stream;base64,AQ==">"#))
+    }
+
     @Test func onlyWebAndMailLinksAreOpened() {
         #expect(HTMLPage.opensLink("https://x.example/a"))
         #expect(HTMLPage.opensLink("HTTP://x.example"))

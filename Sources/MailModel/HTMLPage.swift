@@ -10,7 +10,7 @@ public enum HTMLPage {
     /// References without an image stay `cid:` and hidden.
     public static func document(_ html: String, allowRemote: Bool, inline: [String: InlineImage] = [:]) -> String {
         let html = inline.isEmpty ? html : replacingContentIDs(in: html) { id in
-            inline[id].map { "data:\($0.contentType);base64,\($0.data.base64EncodedString())" }
+            inline[id].map { "data:\(safeType($0.contentType));base64,\($0.data.base64EncodedString())" }
         }
         let csp = allowRemote
             ? "default-src 'none'; style-src * 'unsafe-inline'; img-src * data:; font-src * data:"
@@ -32,6 +32,15 @@ public enum HTMLPage {
             </style>
             <div id="\(bodyID)">\(html)</div>
             """
+    }
+
+    /// The sender's content type, reduced to a lowercased `type/subtype` of token characters (parameters dropped),
+    /// else `application/octet-stream`: it goes into an attribute, so it must never carry quotes or markup.
+    static func safeType(_ contentType: String) -> String {
+        let t = contentType.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false).first
+            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() } ?? ""
+        let token = "[a-z0-9!#$&^_.+-]+"
+        return t.range(of: "^\(token)/\(token)$", options: .regularExpression) != nil ? t : "application/octet-stream"
     }
 
     /// The content IDs the HTML refers to with `cid:` (in `src`, `background` or CSS `url()`).

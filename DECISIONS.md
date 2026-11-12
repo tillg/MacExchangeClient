@@ -172,3 +172,11 @@ edited: 2026-11-12
 - **Context:** BUG-018. `hasRemoteContent` missed `srcset`, `<link href>`, `poster` and `url(&quot;…&quot;)`, so the CSP silently blocked those resources and the Load Remote Content banner never appeared.
 - **Decision:** The regex also matches `poster=` like `src=`; any `https?:` candidate inside a `srcset` value; `href` only inside a `<link …>` tag (an `<a href>` loads nothing); and `url(` followed by `"`, `'` or their entity forms (`&quot;`, `&apos;`, `&#34;`, `&#39;`, `&#x22;`, `&#x27;`).
 - **Why:** These are what the CSP blocks; a false positive only shows a banner, a false negative hides content without telling.
+
+## 00:19 — Inline image content types are validated, not escaped {#d-bug-019}
+
+- **Status:** decided
+- **Context:** BUG-019. `HTMLPage.document` put the attachment's `ContentType` (sender-controlled) unescaped into `src="data:…"`, so a `"` in it could inject attributes or markup into the message page.
+- **Decision:** `HTMLPage.safeType` drops parameters after `;`, trims and lowercases, and accepts only `token/token` (RFC 6838 name characters `a-z 0-9 ! # $ & ^ _ . + -`). Anything else becomes `application/octet-stream`.
+- **Why:** A whitelist is safer than escaping: an escaped `&quot;` would still produce a nonsense type and a broken picture, while a valid type is all a `data:` URI needs. WebKit should decode `<img>` data by its bytes, so the fallback type likely still shows real pictures (⚠️ from memory, not checked in the app).
+- **Alternatives:** HTML-escape the type (rejected: keeps garbage in the URI; whitelisting covers it).
