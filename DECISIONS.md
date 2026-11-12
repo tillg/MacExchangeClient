@@ -272,3 +272,10 @@ edited: 2026-11-13
 - **Context:** BUG-029. Reply always went to the sender, so replying to a message from Sent (or a sent card in a conversation) addressed it to myself.
 - **Decision:** When the sender is the account's own address (compared without case), Reply goes to the original To recipients (each once, my own address left out). Cc stays empty, as for any Reply.
 - **Why:** That is what Mail and Outlook do; a reply to yourself is never what's meant.
+
+## 00:48 — A local Save Draft keeps Cc {#d-bug-030}
+
+- **Status:** decided
+- **Context:** BUG-030. Without a server, `saveDraft` built the Drafts message without `cc`; `send` and `failed` already kept it.
+- **Decision:** Pass `cc: Contact.parseList(d.cc)` as they do.
+- **Why:** A saved draft must keep what was typed.

@@ -174,4 +174,14 @@ struct MailStoreRulesTests {
         #expect(d.to == "bo@x.com, cy@x.com", "to: \(d.to)")
         #expect(d.cc == "")
     }
+
+    // MARK: Drafts
+
+    /// Save Draft without a server keeps what was typed in Cc.
+    @Test func localSaveDraftKeepsCc() {
+        let s = store([])
+        s.saveDraft(Draft(accountID: work.id, to: "a@x.com", cc: "c@x.com, Di <d@x.com>", subject: "S", body: "B"))
+        let d = s.messages.first { $0.mailbox == .drafts }
+        #expect(d?.cc.map(\.email) == ["c@x.com", "d@x.com"])
+    }
 }

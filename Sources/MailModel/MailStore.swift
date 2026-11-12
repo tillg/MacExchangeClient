@@ -1458,7 +1458,8 @@ public final class MailStore {
             return scheduleFlush()
         }
         let m = Message(accountID: acct.id, mailbox: .drafts, from: Contact(name: acct.name, email: acct.address),
-                        to: Contact.parseList(d.to), subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
+                        to: Contact.parseList(d.to), cc: Contact.parseList(d.cc),
+                        subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
                         body: d.text, date: .now, isRead: true, attachments: d.attachments.map(\.attachment))
         add(m)
         if !d.attachments.isEmpty { setAttachmentData(d.attachments.map(\.data), for: m.id) }
