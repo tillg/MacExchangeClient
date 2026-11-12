@@ -66,3 +66,42 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [091](BUG-091-moving-placed-picture-not-a-change.md) | P4 | Models | Moving a picture to another place in the text doesn't count as a change, so closing the window discards it without asking |
 | [092](BUG-092-refresh-before-restore-duplicates-inbox.md) | P4 | MailStore | A refresh that runs before launch has restored the stored Inbox duplicates Inbox messages |
 | [093](BUG-093-server-deletion-keeps-queued-changes.md) | P4 | MailStore | Changes queued for a message that the server reports deleted stay in the outbox and are sent anyway |
+| [094](BUG-094-save-while-original-files-load-discards-message.md) | P2 | MailStore | Closing a forward while its original files are still loading: Save in the sheet throws the message away |
+| [095](BUG-095-send-in-flight-at-quit-sent-again-after-relaunch.md) | P2 | MailStore | A send that is on its way when the app quits (or crashes) is sent again at the next launch |
+| [096](BUG-096-unreachable-account-blocks-other-accounts-outbox.md) | P2 | MailStore | One unreachable account holds up every other account's changes and sends |
+| [097](BUG-097-preconnect-reaches-sender-server.md) | P2 | HTMLPage | <link rel="preconnect"> in a blocked mail opens a connection to the sender's server, so opening the mail is reported although remote content is blocked |
+| [098](BUG-098-unreachable-account-stops-other-accounts-history.md) | P3 | MailStore | One unreachable account stops the background history and background checks of every other account |
+| [099](BUG-099-invite-answered-in-multiselection-erased-by-delete.md) | P3 | MailStore | An invite answered while it is part of a multi-selection stays selected in Trash; Delete then erases it |
+| [100](BUG-100-mail-check-clears-couldnt-send-and-other-account-errors.md) | P3 | MailStore | Each mail check clears the status: "Couldn't send …" and another account's error disappear |
+| [101](BUG-101-send-from-account-without-password.md) | P3 | MailStore | Send from an Exchange account without a Keychain password: shown in Sent though nothing is sent, or queued with no word |
+| [102](BUG-102-invite-answer-comment-lost-on-network-error.md) | P3 | MailStore | Respond with Comments that fails with a network error is undone and the typed comment is lost |
+| [103](BUG-103-message-changed-on-server-keeps-old-body.md) | P3 | MailStore | A draft changed on the server keeps its old loaded body: new subject, old text and files |
+| [104](BUG-104-answered-invite-shows-unanswered-after-sync.md) | P3 | Invite | An invite answered here shows "Please respond" again once Exchange has moved it to Deleted Items |
+| [105](BUG-105-failed-send-with-files-leaves-half-draft-in-exchange.md) | P3 | EWS | A send or Save Draft with files that fails after the message was created leaves a copy without its files in Exchange's Drafts |
+| [106](BUG-106-meta-refresh-about-blank-wipes-message.md) | P3 | HTMLPage | A mail with <meta http-equiv="refresh" content="0;url=about:blank"> (or a link to about:blank) replaces its own body with an empty page |
+| [107](BUG-107-autofocus-collapses-message.md) | P3 | HTMLPage | A mail with an autofocus form field shrinks to a few pixels: the page scrolls to the field at load and the height is measured relative to that scroll |
+| [108](BUG-108-measure-ignores-body-padding-and-out-of-flow.md) | P3 | HTMLPage | Height counts only the wrapper's box: body padding and absolutely positioned content are cut off |
+| [109](BUG-109-height-not-remeasured-after-page-changes.md) | P3 | HTMLPage | The body's height is never re-measured when the page grows after load (lazy images, <details>, interactive mail): the end is cut off |
+| [110](BUG-110-viewport-relative-heights-feed-back.md) | P3 | HTMLPage | Mail with window-relative heights (MailChimp height="100%" table, 100vh) is measured against the view's own height: after widening the window it never gets shorter, and 100vh blocks push the end out |
+| [111](BUG-111-apple-mail-quotes-without-quote-bar.md) | P3 | HTMLPage | Apple Mail quotes (<blockquote type="cite">) show as a plain 40px indent instead of Mail's quote bar |
+| [112](BUG-112-apple-mail-pictures-overflow-window.md) | P3 | HTMLPage | Pictures sent from Apple Mail (img.Apple-web-attachment) show at full pixel width, far wider than the window |
+| [113](BUG-113-combining-character-after-file-mark-breaks-placement.md) | P4 | Models | A combining character right after a placed file breaks the file marks: pictures change place, a stray U+FFFC is sent, Exclude removes the wrong file |
+| [114](BUG-114-rtl-lines-sent-left-to-right-in-html.md) | P4 | Models | Hebrew/Arabic lines turn left-to-right (left-aligned, punctuation on the wrong side) once a placed picture makes the mail HTML |
+| [115](BUG-115-address-shown-twice-when-no-display-name.md) | P4 | MailStore | Senders without a display name appear as "a@x.com <a@x.com>" in the forward header, the reply attribution and an invite answer's To |
+| [116](BUG-116-forward-header-lacks-recipients-and-time-zone.md) | P4 | MailStore | The forward header leaves out To and Cc (and the date has no time zone), so the forward loses who the original went to |
+| [117](BUG-117-second-new-message-reuses-window.md) | P4 | Models | A second New Message (or a second Reply to the same message) brings the first compose window forward instead of opening a new one |
+| [118](BUG-118-size-estimate-walks-whole-body-each-render.md) | P4 | Models | Message Size: the estimate walks the whole body by character on every render (about 40 ms per keystroke in a 400 KB reply with a file) |
+| [119](BUG-119-mark-read-or-unflag-leaves-hidden-selection.md) | P4 | MailStore | Mark as Read with the unread filter on, or Clear Flag in Flagged, leaves the messages selected after they left the list |
+| [120](BUG-120-unchanged-messages-rewritten-on-save.md) | P4 | MailStore | Actions that change nothing still rewrite their rows: Mark All as Read on a read mailbox rewrites every message |
+| [121](BUG-121-queued-moves-store-full-message-copies.md) | P4 | MailStore | Queued changes keep a full copy of every message: archiving an opened Inbox makes a 35 MB outbox, rewritten after one more flag |
+| [122](BUG-122-mark-all-read-while-loading-misses-later-mail.md) | P4 | MailStore | Mark All as Read while launch is still loading leaves the mail loaded afterwards unread |
+| [123](BUG-123-same-time-messages-swap-after-relaunch.md) | P4 | MailStore | Messages with the same time swap places in Flagged (and other mixed lists) after a relaunch |
+| [124](BUG-124-every-exchange-account-named-exchange.md) | P4 | EWS | Every Exchange account is called "Exchange": two accounts can't be told apart |
+| [125](BUG-125-mailbox-selected-during-check-not-checked.md) | P4 | MailStore | Selecting a mailbox while a check is running doesn't check it (README: "at once when you select a mailbox") |
+| [126](BUG-126-paging-never-ends-when-server-repeats-page.md) | P4 | MailStore | Quick check and history page forever when the server answers "more" with the same SyncState |
+| [127](BUG-127-folder-list-without-inbox-silently-kept.md) | P4 | EWS | If GetFolder answers the standard folders with errors, the check ends silently and the Inbox is not checked again until relaunch |
+| [128](BUG-128-fixed-footer-covers-last-lines.md) | P4 | HTMLPage | A position:fixed footer/header in a mail permanently covers the message's last (or first) lines |
+| [129](BUG-129-apple-mail-list-styles.md) | P4 | HTMLPage | Apple Mail dash lists show bullets, and nested numbered lists show 1. 1. 1. instead of 1. a. i. |
+| [130](BUG-130-contenteditable-mail-is-editable.md) | P4 | HTMLPage | A mail with contenteditable can be edited in the message view (the reader can type into received mail) |
+| [131](BUG-131-embedded-pictures-hidden-when-remote-blocked.md) | P4 | HTMLPage | With remote content blocked, embedded (data:) pictures are hidden when given via srcset/<picture> or with a leading space in src |
+| [132](BUG-132-pending-search-shows-mailbox-instead-of-results.md) | P4 | MailStore | While the next search answer is on its way, the list jumps back to the plain mailbox (or "No Results") when the previous results came from memory |
