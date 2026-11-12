@@ -29,6 +29,7 @@ public enum WhatsNew {
             "Mail in folders you deleted (now inside Trash) no longer shows in Flagged, in search or next to a message's replies.",
             "Reply All lists each person only once.",
             "Reply All keeps the people who were copied in Cc instead of moving them to To.",
+            "Replying to “RE:”, “AW:” or “FW:” subjects from Outlook no longer piles up a second “Re:” or “Fwd:”.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",

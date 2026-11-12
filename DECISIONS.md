@@ -257,3 +257,11 @@ edited: 2026-11-13
 - **Context:** BUG-027. Reply All put sender, To and Cc all into To and left Cc empty.
 - **Decision:** To = original sender + original To; Cc = original Cc. My own address is left out of both, and each address appears once across both fields (To wins, as it comes first; compared without case).
 - **Why:** That is what Mail and Outlook do; people who were only copied stay copied.
+
+## 00:45 — Reply and forward prefixes: recognised in any case, normalised to "Re: " / "Fwd: " {#d-bug-028}
+
+- **Status:** decided (lead's rule; differs from the probes, which expected the original prefix kept as typed)
+- **Context:** BUG-028. Only an exact `Re: ` / `Fwd: ` was recognised, so Outlook's `RE:` / `FW:`, `Re:x` without a space and German `AW:` / `WG:` got a second prefix.
+- **Decision:** A leading `Re:` or `AW:` (reply, Reply All) or `Fwd:`, `Fw:` or `WG:` (forward), in any case and with or without one space after the colon, is replaced by `Re: ` or `Fwd: `. The colon must follow the letters directly, so "Report:" or "Fwiw:" aren't prefixes. A prefix of the other kind stays (`FW: x` → `Re: FW: x`). Only the first prefix is looked at.
+- **Why:** One prefix of each kind, in Mail's spelling, is what Mail shows; normalising also turns `AW:` into the prefix the reader's client recognises.
+- **Alternatives:** Keep the existing prefix as typed (the probes' expectation; rejected per the lead: the subject line would mix spellings within one thread). Strip a whole chain of prefixes (rejected: more than asked; the stack only grows when other clients add to it).

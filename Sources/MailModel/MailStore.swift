@@ -1298,8 +1298,10 @@ public final class MailStore {
     public func draft(_ kind: ReplyKind, to id: Message.ID, includeAttachments: IncludeAttachments = .never) -> Draft {
         guard let m = message(id) else { return Draft(accountID: accounts[0].id) }
         let me = account(m.accountID)?.address
-        let prefix = kind == .forward ? "Fwd: " : "Re: "
-        let subject = m.subject.hasPrefix(prefix) ? m.subject : prefix + m.subject
+        // A prefix of the same kind already there (any case, with or without a space; AW:/WG: from German
+        // Outlook) is replaced by the standard one rather than stacked.
+        let (prefix, existing) = kind == .forward ? ("Fwd: ", /^(?i:fwd|fw|wg): ?/) : ("Re: ", /^(?i:re|aw): ?/)
+        let subject = prefix + m.subject.replacing(existing, with: "", maxReplacements: 1)
         let df = DateFormatter(); df.dateStyle = .medium; df.timeStyle = .short
         // Any line ending: Exchange bodies use CRLF, which is one Character in Swift, not "\n".
         let quoted = m.body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map { "> \($0)" }

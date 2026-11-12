@@ -142,4 +142,25 @@ struct MailStoreRulesTests {
         #expect(d.to == "ann@x.com, bo@x.com", "to: \(d.to)")
         #expect(d.cc == "carl@x.com", "cc: \(d.cc)")
     }
+
+    /// An existing reply or forward prefix is recognised in any case, with or without a space, also Outlook's
+    /// German AW: and WG:; it becomes "Re: " or "Fwd: " instead of getting a second one.
+    @Test func replyAndForwardPrefixesAreNormalisedNotStacked() {
+        func subject(_ kind: ReplyKind, _ original: String) -> String {
+            let m = msg(work, subject: original)
+            return store([m]).draft(kind, to: m.id).subject
+        }
+        for re in ["Re: Plans", "RE: Plans", "re: Plans", "Re:Plans", "AW: Plans", "aw:Plans", "Plans"] {
+            #expect(subject(.reply, re) == "Re: Plans", "\(re)")
+            #expect(subject(.replyAll, re) == "Re: Plans", "\(re)")
+        }
+        for fwd in ["Fwd: Plans", "FWD: Plans", "fwd:Plans", "Fw: Plans", "FW: Plans", "WG: Plans", "wg:Plans", "Plans"] {
+            #expect(subject(.forward, fwd) == "Fwd: Plans", "\(fwd)")
+        }
+        // A prefix of the other kind stays; words that only start like one aren't prefixes.
+        #expect(subject(.reply, "FW: Plans") == "Re: FW: Plans")
+        #expect(subject(.forward, "RE: Plans") == "Fwd: RE: Plans")
+        #expect(subject(.reply, "Report: Q3") == "Re: Report: Q3")
+        #expect(subject(.forward, "Fwiw: hi") == "Fwd: Fwiw: hi")
+    }
 }
