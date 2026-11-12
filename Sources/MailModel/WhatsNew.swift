@@ -24,6 +24,7 @@ public enum WhatsNew {
             "Attachments with very long names open and save again; the name is shortened and keeps its ending, like .pdf.",
             "Replies with a picture in the text keep the quoted email's line breaks instead of running it into one paragraph.",
             "Messages with a picture in the text keep your extra spaces, tabs and indented lines, so lined-up columns stay lined up.",
+            "When the server turns down one change, only that change is undone; your later moves stay, and a message you erased doesn't come back.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",

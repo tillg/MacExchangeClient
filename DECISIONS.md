@@ -218,3 +218,11 @@ edited: 2026-11-13
   - Bugs found by two hunters are filed once, with "Also seen by" in the file.
   - Findings that an existing test pins as intended behaviour are not filed. Example: Exchange Send and Save Draft show nothing locally until the next sync (`sendFromServerAccountQueuesAndAddsNothingLocally`), although the README says "show at once". This contradiction is left for the user to decide.
   - Every filed bug was re-run against the current HEAD before filing.
+
+## 00:37 — A refused change undoes only what it set, while that still holds {#d-bug-023}
+
+- **Status:** decided
+- **Context:** BUG-023. `failed()` copied mailbox, read state, flag and invite back from the snapshot of the refused change, and re-added the message if it was gone. A refused read change so undid a later queued move, and a refused move brought back a message erased afterwards.
+- **Decision:** `failed()` restores only the property the refused change touched, and only if it still holds the value that change set: read state for `setRead`, flag for `setFlagged`, mailbox for `move`. Invite answers restore the invite (and the mailbox, if still in Trash) while the answer is still the one refused. Only a refused erase (`delete`) re-adds a message that is gone; any other refused change leaves a vanished message vanished.
+- **Why:** README: "If the server refuses a change, it is undone" — that change, not later ones the outbox will still send. A value that changed again since belongs to a newer change.
+- **Alternatives:** Skip messages that have later queued changes (rejected: also skips the refused property, which the server never got).
