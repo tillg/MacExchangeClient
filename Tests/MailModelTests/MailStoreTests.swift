@@ -284,6 +284,17 @@ struct MailStoreTests {
         #expect(s.draft(.reply, to: s.messages[0].id).subject == "Re: Plans")
     }
 
+    /// Addresses are compared without case: Reply All never goes back to my own address.
+    @Test func replyAllLeavesOutMyAddressWhateverItsCase() {
+        var m = msg(work)
+        m.to = [Contact(name: "Me", email: "Me@Work.COM"), Contact(name: "Bo", email: "bo@x.com")]
+        m.cc = [Contact(name: "Me too", email: "ME@WORK.COM")]
+        let s = store([m])
+        let d = s.draft(.replyAll, to: m.id)
+        let emails = Contact.parseList(d.to + "," + d.cc).map { $0.email.lowercased() }
+        #expect(emails == ["ann@x.com", "bo@x.com"], "to: \(d.to) cc: \(d.cc)")
+    }
+
     @Test func replyToReDoesNotStackPrefix() {
         let m = msg(work, subject: "Re: Plans")
         let s = store([m])

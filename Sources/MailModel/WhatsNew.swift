@@ -32,6 +32,7 @@ public enum WhatsNew {
             "Text pasted from Word or a PDF no longer stops a message, draft or meeting answer from being sent.",
             "Recipients copied from Outlook work in To and Cc: separated by semicolons, and with names like \"Doe, John\".",
             "With the unread filter or in Unread, the message you open stays in the list until you move on, as in Apple Mail.",
+            "Reply All no longer sends a copy to yourself when your address is written in capitals.",
         ]),
         ChangeLogDay(date: "2026-11-11", features: [
             "Nicely formatted emails now look the way the sender designed them, with their pictures.",

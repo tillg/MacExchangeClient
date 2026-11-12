@@ -95,3 +95,10 @@ edited: 2026-11-12
 - **Decision:** `MailStore` remembers the messages that were unread when `markSelectionRead` opened them. In `visibleMessages` they are judged as unread while they stay selected. They leave when the selection moves on, the filter is toggled, or another mailbox is selected. Only the read state is waived: a deleted or moved opened message leaves the list as before. Sidebar counts, Mark All as Read and drops use the real read state.
 - **Why:** Lets the user read through unread mail with the filter on, and keeps next/previous anchored, as in Mail.
 - **Alternatives:** Keep every selected read message visible. Rejected: a message that was already read when the filter was turned on would show under the filter, and a hidden selection could reappear.
+
+## 23:49 — Own address compared without case in Reply All {#d-bug-007}
+
+- **Status:** decided
+- **Context:** BUG-007. Reply All dropped the account's own address only on an exact match, so `Me@Work.COM` stayed in To.
+- **Decision:** Compare lowercased, as `addsNewRecipient` already does.
+- **Why:** Exchange treats addresses case-insensitively; Mail never puts your own address in a Reply All.
