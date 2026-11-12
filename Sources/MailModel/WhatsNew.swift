@@ -11,6 +11,9 @@ public struct ChangeLogDay: Identifiable, Sendable {
 /// add a day (or extend today's) whenever a change is something a user would notice.
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
+        ChangeLogDay(date: "2026-11-13", features: [
+            "If the mail kept by an older version can't be read, the app keeps a copy of it, starts fresh and saves your mail again.",
+        ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",
             "Search is now instant, even in mailboxes with many thousands of messages.",

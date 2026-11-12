@@ -378,13 +378,24 @@ public final class MailDatabase: @unchecked Sendable {
     /// Moves the old JSON cache into a new database, once: loads it into `store` (decoding off the main
     /// thread), writes everything under a temporary name, checks the count, and only then gives the database
     /// its name and renames the cache to `Cache.json.imported`. Interrupted at any point, the next launch
-    /// imports again. Returns nil when there is no cache to import.
+    /// imports again. Returns nil when there is no cache to import. A cache that can't be decoded is renamed
+    /// to `Cache.json.unreadable` (never deleted) and an empty database is created: mail comes back from the server.
     @MainActor
     public static func importCache(from cacheURL: URL = MailCache.defaultURL, into url: URL = defaultURL,
                                    store: MailStore) async throws -> MailDatabase? {
         guard FileManager.default.fileExists(atPath: cacheURL.path) else { return nil }
         guard let cache = await Task.detached(priority: .userInitiated, operation: { MailCache.load(from: cacheURL) }).value else {
-            throw DatabaseError(errorDescription: "The old mail cache couldn't be read")
+            var aside = cacheURL.appendingPathExtension("unreadable")
+            var n = 2
+            while FileManager.default.fileExists(atPath: aside.path) {
+                aside = cacheURL.appendingPathExtension("unreadable-\(n)")
+                n += 1
+            }
+            try FileManager.default.moveItem(at: cacheURL, to: aside)
+            let db = try await Task.detached(priority: .userInitiated) { try MailDatabase(url: url) }.value
+            store.status = "The old mail cache couldn't be read. It was kept as \(aside.lastPathComponent); "
+                + "mail is downloaded again from the server."
+            return db
         }
         store.restore(cache)
         let everything = store.storedState()

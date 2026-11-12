@@ -246,6 +246,31 @@ struct MailDatabaseTests {
         #expect(try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s) == nil)
     }
 
+    /// A Cache.json that can't be decoded is set aside (never deleted) and an empty database is created, so the
+    /// next launch doesn't fail the same way again; mail comes back from the server.
+    @Test func anUnreadableCacheIsSetAsideAndTheDatabaseIsCreated() async throws {
+        let dir = tempURL().deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
+        let broken = Data("{\"accounts\": [ truncated".utf8)
+        try broken.write(to: cacheURL)
+        // Launch after launch, as AppSetup.loadMail does: import while there is no database.
+        var errors: [String] = []
+        var last: MailStore?
+        for _ in 0..<3 where !FileManager.default.fileExists(atPath: dbURL.path) {
+            let s = MailStore(accounts: [work], messages: [])
+            last = s
+            do { _ = try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s) } catch { errors.append(error.localizedDescription) }
+        }
+        #expect(errors.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: dbURL.path))
+        #expect(try MailDatabase(url: dbURL).count() == 0)
+        #expect(!FileManager.default.fileExists(atPath: cacheURL.path))
+        #expect(try Data(contentsOf: dir.appendingPathComponent("Cache.json.unreadable")) == broken)
+        #expect(last?.status?.contains("Cache.json.unreadable") == true)
+    }
+
     /// Cache.json as written by builds up to b75308d, where attachments were plain names: it still imports,
     /// with its waiting change.
     @Test func cacheWithAttachmentNamesOnlyStillImports() async throws {

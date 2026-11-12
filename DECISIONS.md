@@ -109,3 +109,12 @@ edited: 2026-11-12
 - **Context:** BUG-008. Quoting split the body on `"\n"`; in Swift `"\r\n"` is one `Character`, so a CRLF body (Exchange's) got `> ` only on its first line.
 - **Decision:** Split on every newline character (`\r\n`, `\n`, `\r`, and the other Unicode line separators); the quoted lines are joined with `\n`.
 - **Why:** The compose window and the sent text use `\n`; mixing in `\r` would only cause the same problem elsewhere.
+
+## 00:01 — An unreadable Cache.json is set aside, the database starts empty {#d-bug-009}
+
+- **Status:** decided
+- **Context:** BUG-009. Without `Mail.sqlite`, a `Cache.json` that couldn't be decoded made `importCache` throw on every launch, so the database was never created and nothing was ever saved again.
+- **Decision:** `importCache` renames the file to `Cache.json.unreadable` (`.unreadable-2`, … if that exists), creates an empty database, returns it and sets a status line naming the kept file. Mail is downloaded again from the server.
+- **Why:** Everything in the cache except local-only state (flag colours, unsent changes) is on the server; refusing to create the database protected nothing. The user's file is never deleted, so it can still be recovered by hand.
+- **Alternatives:** Delete the file (rejected: never delete user data); keep throwing and ask the user (rejected: no UI for it, and the app is unusable meanwhile).
+- **Note:** The clock passed midnight during this run, so What's New lines from here on go to a new day, 2026-11-13, as CLAUDE.md asks ("today's day").
