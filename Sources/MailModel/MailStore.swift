@@ -674,7 +674,14 @@ public final class MailStore {
         case let .send(d): try await b.send(d)
         case let .saveDraft(d): try await b.saveDraft(d)
         case let .respond(id, r): try await b.respond(id, InviteReply(response: r))
-        case let .reply(id, r): try await b.respond(id, r)
+        case let .reply(id, r):
+            try await b.respond(id, r)
+            // Without a sent answer Exchange may leave the invite in the Inbox; move it like the others.
+            // If the server already moved it, that fails harmlessly.
+            if !r.send, let trash = remoteFolders[p.account]?.first(where: { $0.role == .trash }),
+               let map = try? await b.move([id], to: trash) {
+                renameRemote(map, account: p.account)
+            }
         }
     }
 
@@ -711,14 +718,7 @@ public final class MailStore {
 
     /// Answers an invite: shown at once, then sent. Exchange tells the organizer and updates the calendar.
     public func respond(_ r: InviteResponse, to id: Message.ID) {
-        guard let i = messages.firstIndex(where: { $0.id == id }), messages[i].invite != nil else { return }
-        let old = messages[i]
-        changedIDs.insert(id)
-        messages[i].invite?.response = r
-        messages[i].invite?.reply = nil
-        guard let rid = old.remoteID else { return }
-        outbox.append(PendingChange(account: old.accountID, change: .respond(rid, r), previous: [old]))
-        scheduleFlush()
+        answer(id, response: r, reply: nil) { .respond($0, r) }
     }
 
     /// Answers an invite with options (comment, not sending, a proposed time).
@@ -727,13 +727,24 @@ public final class MailStore {
             status = "The proposed meeting must end after it starts."
             return
         }
-        guard let i = messages.firstIndex(where: { $0.id == id }), messages[i].invite != nil else { return }
-        let old = messages[i]
-        changedIDs.insert(id)
-        messages[i].invite?.response = reply.response
-        messages[i].invite?.reply = reply
+        answer(id, response: reply.response, reply: reply) { .reply($0, reply) }
+    }
+
+    /// Records the answer and moves the invite to Trash at once, as Exchange does after an answer
+    /// (no move request: the server moves it itself). The next message is selected, as after Delete.
+    private func answer(_ id: Message.ID, response: InviteResponse, reply: InviteReply?,
+                        _ change: (String) -> ServerChange) {
+        guard let old = message(id), old.invite != nil else { return }
+        let apply: (Set<Message.ID>) -> Void = { _ in
+            guard let i = self.messages.firstIndex(where: { $0.id == id }) else { return }
+            self.changedIDs.insert(id)
+            self.messages[i].invite?.response = response
+            self.messages[i].invite?.reply = reply
+            self.messages[i].mailbox = .trash
+        }
+        if selection == [id] { actOnSelection(apply) } else { apply([id]) }
         guard let rid = old.remoteID else { return }
-        outbox.append(PendingChange(account: old.accountID, change: .reply(rid, reply), previous: [old]))
+        outbox.append(PendingChange(account: old.accountID, change: change(rid), previous: [old]))
         scheduleFlush()
     }
 

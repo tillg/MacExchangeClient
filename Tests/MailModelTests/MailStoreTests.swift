@@ -640,6 +640,26 @@ struct MailStoreTests {
         #expect(s.outbox.map(\.change) == [.respond("M", .accept), .respond("M", .decline)])
     }
 
+    @Test func answeredInviteLeavesTheInboxAtOnceAndTheNextMessageIsSelected() {
+        let (s, id) = inviteStore()
+        s.apply(SyncResult(upserts: [remote("N", minutesAgo: 5)], deletedRemoteIDs: [], token: "t2", more: false),
+                account: work.id, mailbox: .inbox)
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.selection = [id]
+        s.respond(.accept, to: id)
+        #expect(s.message(id)?.mailbox == .trash)
+        #expect(s.selection == [self.id(s, "N")])
+        // Exchange moves it itself: no move request is queued.
+        #expect(s.outbox.map(\.change) == [.respond("M", .accept)])
+        // The inbox sync still lists it until the server has the answer; it stays out of the Inbox.
+        var again = remote("M"); again.invite = s.message(id)?.invite
+        s.apply(SyncResult(upserts: [again], deletedRemoteIDs: [], token: "t3", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(id)?.mailbox == .trash)
+        // Refused: back in the Inbox.
+        s.failed(s.outbox[0], "Denied")
+        #expect(s.message(id)?.mailbox == .inbox)
+    }
+
     func inviteStore() -> (MailStore, Message.ID) {
         var m = remote("M")
         m.invite = Invite(start: Date(timeIntervalSince1970: 3600), end: Date(timeIntervalSince1970: 5400))

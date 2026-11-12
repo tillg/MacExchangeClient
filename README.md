@@ -19,6 +19,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
   - when and where, with the required and optional attendees;
   - Accept, Tentative and Decline menus, as in Outlook: Respond with Comments, Respond without Comments, or Do Not Send a Response (only the calendar changes). With Comments opens a message window to the organizer, with the subject Exchange will use ("Declined: …"); its text becomes the comment;
   - Propose New Time, together with Tentative or Decline, in the same message window with a new start and end;
+  - an answered invite moves to Trash right away, as Exchange will do, and the next message is selected;
   - "Please respond" until you have answered, and a yellow note when the meeting overlaps other events;
   - the invite's day from your Exchange calendar next to the text, with overlapping events side by side and the invite's slot hatched.
 
