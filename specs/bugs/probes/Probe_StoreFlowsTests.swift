@@ -149,35 +149,6 @@ struct Probe_StoreFlowsTests {
 
     // MARK: Batch 2
 
-    @Test func probe_searchFailedNoticeGoesWhenSearchCleared() async {
-        let s = store([msg(work, subject: "Lunch")])
-        s.searchDebounce = .zero
-        s.searcher = { _, _ in throw DatabaseError(errorDescription: "broken") }
-        s.searchText = "lun"
-        await s.searchTask?.value
-        #expect(s.status?.contains("broken") == true)
-        s.searchText = ""
-        #expect(s.status == nil, "status: \(String(describing: s.status))")
-    }
-
-    @Test func probe_searchFailedNoticeGoesAfterNextSuccess() async {
-        let m = msg(work, subject: "Lunch")
-        let s = store([m])
-        s.searchDebounce = .zero
-        let fail = Fail()
-        s.searcher = { q, _ in if fail.on { throw DatabaseError(errorDescription: "broken") }; return [m.id] }
-        fail.on = true
-        s.searchText = "lun"
-        await s.searchTask?.value
-        fail.on = false
-        s.searchText = "lunch"
-        await s.searchTask?.value
-        #expect(s.searchHits?.query == "lunch")
-        #expect(s.status == nil, "status: \(String(describing: s.status))")
-    }
-
-    final class Fail: @unchecked Sendable { var on = false }
-
     @Test func probe_saveAllAttachmentsSameNames() async throws {
         var m = msg(work)
         m.attachments = [Attachment(name: "scan.pdf"), Attachment(name: "scan.pdf"), Attachment(name: "scan.pdf")]

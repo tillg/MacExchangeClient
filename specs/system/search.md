@@ -38,12 +38,13 @@ query of the SQLite FTS5 index. Design history: [../change/fast-search.md](../ch
    `messages` (`hitList`, in 8 parallel chunks). The answer is dropped if the task was cancelled, or the text or
    scope changed meanwhile.
 3. On success: `searchHits = (query, ids)`; the list is cached for the current revision. If the index returned
-   2,000 IDs, `status` becomes "Showing the newest 2,000 results"; otherwise that notice is cleared.
+   2,000 IDs, `status` becomes "Showing the newest 2,000 results"; otherwise that notice, or a "Search failed"
+   notice, is cleared.
 4. On error: `fallbackQuery = query` (memory answers this query) and `status` is "Search failed: …".
 5. After every successful background save, `searchAgain()` runs the current query again without debounce, so mail
    written in the last ≤15 s becomes findable.
-6. Clearing the field cancels the task, drops the hits and the fallback, and clears the 2,000 notice (not a "Search
-   failed" notice).
+6. Clearing the field cancels the task, drops the hits and the fallback, and clears the 2,000 notice or a "Search
+   failed" notice. Any other status stays.
 
 What the list shows meanwhile: the latest answer's results (the previous query's while the next is on its way).
 Before the first answer of a search — no hits yet — the list shows the selected mailbox's normal content.
