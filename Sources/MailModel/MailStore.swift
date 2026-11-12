@@ -1316,7 +1316,9 @@ public final class MailStore {
         }
         var to = "", cc = ""
         switch kind {
-        case .reply: to = m.from.email
+        case .reply:
+            // Replying to my own message (from Sent, or in a conversation) goes to its recipients, as in Mail.
+            to = m.from.email.lowercased() == me?.lowercased() ? addresses(m.to) : m.from.email
         case .replyAll:
             to = addresses([m.from] + m.to)
             cc = addresses(m.cc)

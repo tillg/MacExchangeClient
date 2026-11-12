@@ -265,3 +265,10 @@ edited: 2026-11-13
 - **Decision:** A leading `Re:` or `AW:` (reply, Reply All) or `Fwd:`, `Fw:` or `WG:` (forward), in any case and with or without one space after the colon, is replaced by `Re: ` or `Fwd: `. The colon must follow the letters directly, so "Report:" or "Fwiw:" aren't prefixes. A prefix of the other kind stays (`FW: x` → `Re: FW: x`). Only the first prefix is looked at.
 - **Why:** One prefix of each kind, in Mail's spelling, is what Mail shows; normalising also turns `AW:` into the prefix the reader's client recognises.
 - **Alternatives:** Keep the existing prefix as typed (the probes' expectation; rejected per the lead: the subject line would mix spellings within one thread). Strip a whole chain of prefixes (rejected: more than asked; the stack only grows when other clients add to it).
+
+## 00:46 — Reply to my own message goes to its recipients {#d-bug-029}
+
+- **Status:** decided (Mail's behaviour from memory ⚠️)
+- **Context:** BUG-029. Reply always went to the sender, so replying to a message from Sent (or a sent card in a conversation) addressed it to myself.
+- **Decision:** When the sender is the account's own address (compared without case), Reply goes to the original To recipients (each once, my own address left out). Cc stays empty, as for any Reply.
+- **Why:** That is what Mail and Outlook do; a reply to yourself is never what's meant.

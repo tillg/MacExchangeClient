@@ -30,6 +30,7 @@ public enum WhatsNew {
             "Reply All lists each person only once.",
             "Reply All keeps the people who were copied in Cc instead of moving them to To.",
             "Replying to “RE:”, “AW:” or “FW:” subjects from Outlook no longer piles up a second “Re:” or “Fwd:”.",
+            "Reply to a message you sent goes to the people you sent it to, not to yourself.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",

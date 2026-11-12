@@ -163,4 +163,15 @@ struct MailStoreRulesTests {
         #expect(subject(.reply, "Report: Q3") == "Re: Report: Q3")
         #expect(subject(.forward, "Fwiw: hi") == "Fwd: Fwiw: hi")
     }
+
+    /// Reply to a message I sent goes to its recipients, as in Mail.
+    @Test func replyToOwnSentMessageGoesToRecipients() {
+        let m = Message(accountID: work.id, mailbox: .sent, from: Contact(name: "Me", email: "Me@Work.com"),
+                        to: [Contact(name: "Bo", email: "bo@x.com"), Contact(name: "Cy", email: "cy@x.com")],
+                        cc: [Contact(name: "Di", email: "di@x.com")], subject: "Plans", body: "x", date: .now)
+        let s = store([m])
+        let d = s.draft(.reply, to: m.id)
+        #expect(d.to == "bo@x.com, cy@x.com", "to: \(d.to)")
+        #expect(d.cc == "")
+    }
 }
