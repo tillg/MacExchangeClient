@@ -53,12 +53,6 @@ struct Probe_ModelTests {
 
     // MARK: HTMLPage
 
-    @Test func inlineContentTypeIsNotMarkup() {
-        let evil = InlineImage(contentType: #"image/png" onload="x" data-x=""#, data: Data([1]))
-        let page = HTMLPage.document(#"<img src="cid:a@x">"#, allowRemote: false, inline: ["a@x": evil])
-        #expect(!page.contains(#"onload="x""#))
-    }
-
     @Test func cidInsideWordsIsNotAReference() {
         #expect(HTMLPage.contentIDs(in: "<p>Placid:lake and acid:rain, Lucid:dreams</p>").isEmpty)
     }

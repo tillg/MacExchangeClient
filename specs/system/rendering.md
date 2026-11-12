@@ -58,7 +58,8 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
 - `MailStore.loadInlineImages` asks the backend for those IDs once per message and keeps them in memory only, for
   the messages of the conversation on screen.
 - `document(_:allowRemote:inline:)` replaces each reference with a known image by
-  `data:<contentType>;base64,<data>`, inserting the content type as received. Unknown references stay `cid:` and
+  `data:<type>;base64,<data>`. `<type>` is `HTMLPage.safeType(contentType)`: parameters after `;` dropped, trimmed,
+  lowercased, and kept only if it is `token/token` (`a-z 0-9 ! # $ & ^ _ . + -`), else `application/octet-stream`. Unknown references stay `cid:` and
   are hidden by the style above.
 
 ## List preview

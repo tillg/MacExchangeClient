@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [019](BUG-019-inline-image-content-type-injected-into-page.md) | P3 | HTMLPage | Inline image content type is inserted unescaped into the page, breaking out of the src attribute |
 | [020](BUG-020-long-attachment-name-cannot-be-saved.md) | P3 | Models | Attachments whose name exceeds 255 bytes cannot be opened/saved (File name too long) |
 | [021](BUG-021-draft-html-crlf-lines-merged.md) | P3 | Models | Draft.html merges CRLF lines into one, so quoted text arrives as one paragraph when a picture is placed |
 | [022](BUG-022-draft-html-collapses-spaces.md) | P3 | Models | Draft.html collapses runs of spaces and tabs (indented text/tables lose their layout) |
