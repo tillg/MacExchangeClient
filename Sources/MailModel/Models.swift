@@ -110,18 +110,47 @@ public struct Contact: Hashable, Codable, Sendable {
         return parts.compactMap(\.first).map(String.init).joined().uppercased()
     }
 
-    /// Parses "a@b.com, Name <c@d.com>".
+    /// Parses "a@b.com, Name <c@d.com>; \"Doe, John\" <e@f.com>". Commas and semicolons separate recipients,
+    /// except inside double quotes or `<>`; the quotes around a name are removed. A piece without an address
+    /// followed by one with `<…>` is a name with a comma written without quotes (Outlook's `Last, First <addr>`).
     public static func parseList(_ s: String) -> [Contact] {
-        s.split(separator: ",").compactMap { raw in
-            let t = raw.trimmingCharacters(in: .whitespaces)
-            guard !t.isEmpty else { return nil }
-            if let lt = t.firstIndex(of: "<"), let gt = t.lastIndex(of: ">"), lt < gt {
-                let name = t[..<lt].trimmingCharacters(in: .whitespaces)
-                let email = String(t[t.index(after: lt)..<gt])
+        var pieces: [String] = [], piece = "", quoted = false, escaped = false, inAngle = false
+        for c in s {
+            if escaped { escaped = false } else if quoted && c == "\\" { escaped = true } else if c == "\"" { quoted.toggle() }
+            else if !quoted && c == "<" { inAngle = true } else if !quoted && c == ">" { inAngle = false }
+            else if !quoted && !inAngle && (c == "," || c == ";") { pieces.append(piece); piece = ""; continue }
+            piece.append(c)
+        }
+        pieces.append(piece)
+        pieces = pieces.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        var merged: [String] = []
+        for p in pieces {
+            if let last = merged.last, !last.contains("@"), !last.contains("<"), !last.contains("\""), p.contains("<") {
+                merged[merged.count - 1] = last + ", " + p
+            } else {
+                merged.append(p)
+            }
+        }
+        return merged.map { t in
+            if let lt = t.lastIndex(of: "<"), let gt = t.lastIndex(of: ">"), lt < gt {
+                let name = unquoted(t[..<lt].trimmingCharacters(in: .whitespacesAndNewlines))
+                let email = t[t.index(after: lt)..<gt].trimmingCharacters(in: .whitespacesAndNewlines)
                 return Contact(name: name.isEmpty ? email : name, email: email)
             }
             return Contact(name: t, email: t)
         }
+    }
+
+    /// A name without the double quotes around it, and `\"` or `\\` inside as plain characters.
+    private static func unquoted(_ name: String) -> String {
+        guard name.count >= 2, name.hasPrefix("\""), name.hasSuffix("\"") else { return name }
+        var out = "", escaped = false
+        for c in name.dropFirst().dropLast() {
+            if !escaped && c == "\\" { escaped = true; continue }
+            escaped = false
+            out.append(c)
+        }
+        return out
     }
 }
 
