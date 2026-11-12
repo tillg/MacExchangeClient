@@ -27,4 +27,18 @@ struct MessageTests {
     @Test func previewOfAShortBodyIsTheWholeBodyWithoutQuotes() {
         #expect(message("Hi\r\n> quoted\r\n\nBye ").preview == "Hi Bye")
     }
+
+    /// Every way a mail can load something from the web makes the Load Remote Content banner appear.
+    @Test func remoteContentIncludesSrcsetLinkPosterAndEntityQuotedURL() {
+        func html(_ h: String) -> Message { var m = message(""); m.html = h; return m }
+        #expect(html(#"<img srcset="https://t.example/p.png 1x">"#).hasRemoteContent)
+        #expect(html(#"<img src="cid:a" srcset="cid:a 1x, https://t.example/p2.png 2x">"#).hasRemoteContent)
+        #expect(html(#"<link rel="stylesheet" href="https://t.example/s.css">"#).hasRemoteContent)
+        #expect(html("<LINK HREF=http://t.example/s.css rel=stylesheet>").hasRemoteContent)
+        #expect(html(#"<video poster="https://t.example/p.jpg"></video>"#).hasRemoteContent)
+        #expect(html(#"<td style="background-image:url(&quot;https://t.example/bg.png&quot;)">"#).hasRemoteContent)
+        #expect(html(#"<td style="background-image:url(&#39;https://t.example/bg.png&#39;)">"#).hasRemoteContent)
+        // Links to the web load nothing by themselves.
+        #expect(!html(#"<a href="https://x.example">link</a><img srcset="cid:a 1x">"#).hasRemoteContent)
+    }
 }

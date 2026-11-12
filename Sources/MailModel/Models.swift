@@ -220,7 +220,11 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
     /// opening a message doesn't tell the sender it was read.
     public var hasRemoteContent: Bool {
         guard let html else { return false }
-        return html.range(of: #"(src|background)\s*=\s*["']?\s*https?:|url\(\s*["']?\s*https?:|@import"#,
+        // src, background, poster; any candidate of srcset; <link href> (stylesheets, fonts); url() quoted
+        // directly or with an entity (`&quot;`, `&#39;`, as Outlook writes inside style attributes); @import.
+        let quote = #"(?:["']|&quot;|&apos;|&#0*3[49];|&#x0*2[27];)?"#
+        return html.range(of: #"(src|background|poster)\s*=\s*["']?\s*https?:|srcset\s*=\s*["']?[^"'>]*https?:"#
+                          + #"|<link\b[^>]*\bhref\s*=\s*["']?\s*https?:|url\(\s*"# + quote + #"\s*https?:|@import"#,
                           options: [.regularExpression, .caseInsensitive]) != nil
     }
 

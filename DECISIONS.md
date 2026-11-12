@@ -165,3 +165,10 @@ edited: 2026-11-12
 - **Decision:** `preview` works on `body.prefix(10_000)` and returns at most 500 characters; the rules (lines starting with `>` left out, lines joined with a space) are unchanged. Measured 0.5 ms for the 1 MB body in a debug build; the test allows 50 ms.
 - **Why:** The row shows two lines. A bounded prefix is simpler than a cache in a value type (`Message` is a `Hashable` struct compared and stored everywhere; a cached field would have to be kept out of equality and Codable).
 - **Alternatives:** Cache the preview (rejected: see above). Trade-off accepted: a mail whose first 10,000 characters are all quoted lines shows an empty preview.
+
+## 00:17 — Remote content detection: srcset, <link href>, poster, entity-quoted url() {#d-bug-018}
+
+- **Status:** decided
+- **Context:** BUG-018. `hasRemoteContent` missed `srcset`, `<link href>`, `poster` and `url(&quot;…&quot;)`, so the CSP silently blocked those resources and the Load Remote Content banner never appeared.
+- **Decision:** The regex also matches `poster=` like `src=`; any `https?:` candidate inside a `srcset` value; `href` only inside a `<link …>` tag (an `<a href>` loads nothing); and `url(` followed by `"`, `'` or their entity forms (`&quot;`, `&apos;`, `&#34;`, `&#39;`, `&#x22;`, `&#x27;`).
+- **Why:** These are what the CSP blocks; a false positive only shows a banner, a false negative hides content without telling.

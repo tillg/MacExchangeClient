@@ -19,6 +19,7 @@ public enum WhatsNew {
             "Opening an email that was attached to another email shows that email, not a file attached inside it.",
             "Pictures in the text of emails from some mail programs now show instead of an empty frame.",
             "The message list stays smooth when it holds very long emails.",
+            "Load Remote Content now also appears for emails whose pictures or styles from the internet were blocked without notice.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",
