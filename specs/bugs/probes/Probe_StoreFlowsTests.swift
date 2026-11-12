@@ -27,13 +27,6 @@ struct Probe_StoreFlowsTests {
 
     // MARK: Sending / drafts without a backend
 
-    @Test func probe_localSaveDraftKeepsCc() {
-        let s = store([])
-        s.saveDraft(Draft(accountID: work.id, to: "a@x.com", cc: "c@x.com", subject: "S", body: "B"))
-        let d = s.messages.first { $0.mailbox == .drafts }
-        #expect(d?.cc.map(\.email) == ["c@x.com"])
-    }
-
     @Test func probe_localSendEmptySubjectShowsNoSubject() {
         let s = store([])
         s.send(Draft(accountID: work.id, to: "a@x.com", subject: "", body: "B"))

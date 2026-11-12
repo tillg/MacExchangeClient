@@ -117,7 +117,7 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
 - Closing a window with user changes (not the original's files) asks "Save this message as a draft?" (Save / Cancel
   / Don't Save). Invite answers close without asking.
 - Send on an Exchange account queues `send`; without a server the message is added to Sent. Save Draft likewise
-  queues `saveDraft` or adds a local Drafts message.
+  queues `saveDraft` or adds a local Drafts message (with To and Cc).
 
 ## Meeting invites
 
