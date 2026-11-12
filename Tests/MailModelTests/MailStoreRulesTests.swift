@@ -61,4 +61,18 @@ struct MailStoreRulesTests {
         s.failed(s.outbox[1], "refused")  // the move to Archive: since moved on to Junk
         #expect(s.message(m.id)?.mailbox == .junk)
     }
+
+    // MARK: Multi-selection actions
+
+    /// Move to Junk on a mixed selection moves all of it to Junk; only an all-Junk selection goes back to the Inbox.
+    @Test func junkOnMixedSelectionMovesAllToJunk() {
+        let a = msg(work, .junk, subject: "a", flag: .red), b = msg(work, subject: "b", flag: .red)
+        let s = store([a, b])
+        s.toggleJunk([a.id, b.id])
+        #expect(s.message(a.id)?.mailbox == .junk)
+        #expect(s.message(b.id)?.mailbox == .junk)
+        s.toggleJunk([a.id, b.id])
+        #expect(s.message(a.id)?.mailbox == .inbox)
+        #expect(s.message(b.id)?.mailbox == .inbox)
+    }
 }

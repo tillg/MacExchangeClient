@@ -401,8 +401,10 @@ public final class MailStore {
 
     public func archive(_ ids: Set<Message.ID>) { move(ids, to: .archive) }
 
+    /// Move to Junk; when every message is already in Junk, Not Junk (back to the Inbox).
     public func toggleJunk(_ ids: Set<Message.ID>) {
-        keepingSelectionVisible(ids) { update(ids) { $0.mailbox = $0.mailbox == .junk ? .inbox : .junk } }
+        let allJunk = !messages.contains { ids.contains($0.id) && $0.mailbox != .junk }
+        keepingSelectionVisible(ids) { update(ids) { $0.mailbox = allJunk ? .inbox : .junk } }
     }
 
     /// Runs a move or delete of `ids`. Selected messages it takes out of the list (or erases) don't stay

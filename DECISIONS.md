@@ -226,3 +226,11 @@ edited: 2026-11-13
 - **Decision:** `failed()` restores only the property the refused change touched, and only if it still holds the value that change set: read state for `setRead`, flag for `setFlagged`, mailbox for `move`. Invite answers restore the invite (and the mailbox, if still in Trash) while the answer is still the one refused. Only a refused erase (`delete`) re-adds a message that is gone; any other refused change leaves a vanished message vanished.
 - **Why:** README: "If the server refuses a change, it is undone" — that change, not later ones the outbox will still send. A value that changed again since belongs to a newer change.
 - **Alternatives:** Skip messages that have later queued changes (rejected: also skips the refused property, which the server never got).
+
+## 00:38 — Move to Junk on a mixed selection moves all to Junk {#d-bug-024}
+
+- **Status:** decided (Mail's behaviour from memory ⚠️)
+- **Context:** BUG-024. `toggleJunk` flipped each message on its own, so a mixed selection (e.g. in Flagged, which lists Junk mail) sent the junk ones to the Inbox and the rest to Junk.
+- **Decision:** If any selected message is not in Junk, all of them move to Junk. Only when every one is in Junk does the action work as Not Junk and move them to the Inbox.
+- **Why:** The command reads "Move to Junk"; one action for the whole selection matches Mark as Read and Toggle Flag in this app.
+- **Alternatives:** Disable the command for mixed selections (rejected: no such rule elsewhere in the app).
