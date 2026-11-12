@@ -126,3 +126,11 @@ edited: 2026-11-12
 - **Decision:** `EWSBackend.isoDate` trims blanks, reads a fraction of any length (added to the whole seconds), and reads a time without `Z` or `±hh:mm` as UTC.
 - **Why:** EWS sends UTC unless the request sets a `TimeZoneContext`, which this client never does; so a zone-less value is most likely UTC. A wrong zone would shift a time by hours; dropping the item or showing year 1 is worse.
 - **Alternatives:** Read zone-less times in the Mac's zone (rejected: the server, not the Mac, decides the zone, and it is UTC by default).
+
+## 00:06 — Every character reference XML forbids becomes U+FFFD {#d-bug-011}
+
+- **Status:** decided
+- **Context:** BUG-011. `EWSClient.sanitize` only replaced references to C0 controls; `&#xFFFE;`, `&#xFFFF;` and surrogate references (hex or decimal) still failed the whole page.
+- **Decision:** `sanitize` now finds every numeric character reference and checks its value against XML 1.0's `Char` production. References to anything outside it (C0 controls but tab/LF/CR, surrogates, U+FFFE, U+FFFF, values past U+10FFFF or too large to read) become `&#xFFFD;`. Valid references stay as they are.
+- **Why:** Checking the number is complete by construction; extending the regex range by range would miss the next case (e.g. `&#x110000;`).
+- **Alternatives:** Add the ranges to the regex (rejected: hard to read, and decimal surrogate ranges need a long alternation).

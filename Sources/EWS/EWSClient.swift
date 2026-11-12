@@ -52,17 +52,30 @@ public final class EWSClient: Sendable {
     }
 
     /// Exchange writes control characters from old mails as references like `&#8;`, which XML 1.0 forbids
-    /// and `XMLDocument` rejects, failing the whole page. They become U+FFFD instead.
+    /// and `XMLDocument` rejects, failing the whole page. So are references to U+FFFE, U+FFFF, surrogates and
+    /// numbers past U+10FFFF. They all become U+FFFD instead.
     static func sanitize(_ data: Data) -> Data {
         guard data.range(of: Data("&#".utf8)) != nil else { return data }
-        let s = String(decoding: data, as: UTF8.self)
-        let range = NSRange(s.startIndex..., in: s)
-        guard invalidCharRef.firstMatch(in: s, range: range) != nil else { return data }
-        return Data(invalidCharRef.stringByReplacingMatches(in: s, range: range, withTemplate: "&#xFFFD;").utf8)
+        let s = String(decoding: data, as: UTF8.self) as NSString
+        var out = "", last = 0
+        for m in charRef.matches(in: s as String, range: NSRange(location: 0, length: s.length)) {
+            let digits = s.substring(with: m.range(at: 1))
+            let value = digits.first == "x" || digits.first == "X" ? UInt32(digits.dropFirst(), radix: 16) : UInt32(digits)
+            if let v = value, isXMLChar(v) { continue }
+            out += s.substring(with: NSRange(location: last, length: m.range.location - last)) + "&#xFFFD;"
+            last = m.range.location + m.range.length
+        }
+        guard last > 0 else { return data }
+        return Data((out + s.substring(from: last)).utf8)
     }
 
-    static let invalidCharRef = try! NSRegularExpression(
-        pattern: "&#(?:x0*(?:[0-8bcef]|1[0-9a-f])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));", options: .caseInsensitive)
+    static let charRef = try! NSRegularExpression(pattern: "&#(x[0-9a-f]+|[0-9]+);", options: .caseInsensitive)
+
+    /// XML 1.0's `Char`: tab, line feed, carriage return, and everything from U+0020 except surrogates, U+FFFE and U+FFFF.
+    static func isXMLChar(_ v: UInt32) -> Bool {
+        v == 0x9 || v == 0xA || v == 0xD || (0x20...0xD7FF).contains(v) || (0xE000...0xFFFD).contains(v)
+            || (0x10000...0x10FFFF).contains(v)
+    }
 
     /// A request cancelled because the server rejected the password is a sign-in failure, not a network error.
     static func mapError(_ error: Error, credentialsRejected: Bool) -> Error {

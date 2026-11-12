@@ -255,6 +255,19 @@ struct EWSParsingTests {
         #expect(d.text("s") == "x\u{FFFD}y\u{FFFD}z\u{FFFD}\t\n\r &#8;")
     }
 
+    /// U+FFFE, U+FFFF and surrogates are just as illegal in XML 1.0 as C0 controls, in hex or decimal form.
+    @Test func nonCharacterReferencesDontBreakParsing() throws {
+        for ref in ["&#xFFFE;", "&#xFFFF;", "&#65534;", "&#65535;", "&#xD800;", "&#xdfff;", "&#55296;", "&#57343;",
+                    "&#x110000;", "&#99999999999999999999;"] {
+            let raw = "<a><s>x\(ref)y</s></a>"
+            let d = try? XMLDocument(data: EWSClient.sanitize(Data(raw.utf8)))
+            #expect(d?.text("s") == "x\u{FFFD}y", "\(ref) fails the page")
+        }
+        // Valid references next to them are kept.
+        let d = try XMLDocument(data: EWSClient.sanitize(Data("<a><s>&#xD7FF;&#xFFFE;&#xE000;&#xFFFD;&#x10000;</s></a>".utf8)))
+        #expect(d.text("s") == "\u{D7FF}\u{FFFD}\u{E000}\u{FFFD}\u{10000}")
+    }
+
     /// Text pasted from Word or a PDF can carry form feeds or vertical tabs, which XML 1.0 forbids: they are left
     /// out of requests, so Send, Save and invite answers still work. Tab, line feed and carriage return stay.
     @Test func charactersXMLForbidsAreLeftOutOfRequests() throws {
