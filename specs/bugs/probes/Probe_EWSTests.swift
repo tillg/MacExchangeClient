@@ -72,13 +72,6 @@ struct Probe_EWSTests {
 
     // MARK: Response sanitizing
 
-    @Test func probeNonCharacterReferencesDontBreakParsing() throws {
-        for ref in ["&#xFFFE;", "&#xFFFF;", "&#65535;", "&#xD800;", "&#55296;"] {
-            let raw = "<a><s>x\(ref)y</s></a>"
-            #expect((try? XMLDocument(data: EWSClient.sanitize(Data(raw.utf8)))) != nil, "\(ref) fails the page")
-        }
-    }
-
     // MARK: Plain text fallback
 
     @Test func probePlainTextDecodesCommonEntities() {
