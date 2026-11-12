@@ -383,6 +383,26 @@ struct MailDatabaseTests {
         #expect(Set(try db.search("shared", accounts: nil)) == [w.id, h.id])
     }
 
+    /// Trash and Junk are left out before the 2,000 limit, so newer hits there can't crowd out real ones.
+    @Test func trashAndJunkHitsDontCrowdOutResults() async throws {
+        var msgs: [Message] = []
+        for i in 0..<2100 {
+            var m = mail("Rechnung trash \(i)", minutesAgo: Double(i)); m.mailbox = i % 2 == 0 ? .trash : .junk
+            msgs.append(m)
+        }
+        for i in 0..<10 { msgs.append(mail("Rechnung inbox \(i)", minutesAgo: Double(10_000 + i))) }
+        let (db, url) = try searchable(msgs)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        #expect(try db.search("rechnung", accounts: nil).count == 10)
+        let s = MailStore(accounts: [work], messages: msgs)
+        s.searchDebounce = .zero
+        s.searcher = { q, a in try db.search(q, accounts: a) }
+        s.searchText = "rechnung"
+        await s.searchTask?.value
+        #expect(s.visibleMessages.count == 10)
+        #expect(s.status != MailStore.limitNotice, "status says \(s.status ?? "") over \(s.visibleMessages.count) results")
+    }
+
     /// A database from before search: no index, version 0. `prepareSearch` builds the index once.
     @Test func anOlderDatabaseGetsItsSearchIndexOnce() throws {
         let url = tempURL()

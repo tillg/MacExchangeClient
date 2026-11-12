@@ -195,7 +195,8 @@ public final class MailDatabase: @unchecked Sendable {
     }
 
     /// IDs of stored messages matching `query`, newest first. Every word must match the start of a word in
-    /// any field. Scope and Trash/Junk filtering is the caller's job (the database may lag memory).
+    /// any field. Trash and Junk are left out here, before the limit, so their hits can't crowd out the rest;
+    /// the caller checks scope and mailbox again against memory (the database may lag it).
     public func search(_ query: String, accounts: Set<UUID>?, limit: Int = searchLimit) throws -> [Message.ID] {
         guard let match = Self.matchExpression(query), accounts?.isEmpty != true else { return [] }
         return try readQueue.sync {
@@ -210,7 +211,8 @@ public final class MailDatabase: @unchecked Sendable {
             var ids: [Message.ID] = []
             try self.query("""
                 SELECT m.id FROM messages_fts f JOIN messages m ON m.rowid = f.rowid
-                WHERE messages_fts MATCH ?\(scope) ORDER BY m.date DESC LIMIT \(max(limit, 0))
+                WHERE messages_fts MATCH ? AND m.mailbox NOT IN ('\(MailboxKind.trash.rawValue)', '\(MailboxKind.junk.rawValue)')\(scope)
+                ORDER BY m.date DESC LIMIT \(max(limit, 0))
                 """, [match] + (accounts ?? []).map(\.uuidString), on: reader) { r in
                 if let id = UUID(uuidString: r.text(0)) { ids.append(id) }
             }
