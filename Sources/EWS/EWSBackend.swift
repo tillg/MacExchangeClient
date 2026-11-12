@@ -139,9 +139,13 @@ public struct EWSBackend: MailBackend {
             + "<m:AttachmentIds><t:AttachmentId Id=\"\(xmlEscape(id))\"/></m:AttachmentIds></m:GetAttachment>"
     }
 
-    /// A file's content, or an attached message's MIME source.
+    /// A file's content, or an attached message's MIME source. Only the returned attachment itself is read, never
+    /// the files or messages attached inside an attached message.
     static func parseAttachmentContent(_ doc: XMLDocument) -> Data? {
-        let b64 = doc.first("FileAttachment")?.text("Content") ?? doc.first("ItemAttachment")?.text("MimeContent")
+        guard let a = doc.first("Attachments")?.elementChildren.first else { return nil }
+        let b64 = a.localName == "ItemAttachment"
+            ? a.elementChildren.lazy.compactMap { $0.child("MimeContent")?.stringValue }.first
+            : a.child("Content")?.stringValue
         return b64.flatMap { Data(base64Encoded: $0, options: .ignoreUnknownCharacters) }
     }
 

@@ -183,6 +183,20 @@ struct EWSParsingTests {
         #expect(EWSBackend.parseAttachmentContent(message) == Data([4, 5]))
     }
 
+    /// An attached message that itself carries files or messages: its own MIME source, not a nested one's content.
+    @Test func attachedMessageContentIsItsOwnMimeNotANestedAttachment() throws {
+        let d = try doc("""
+            <m:GetAttachmentResponse><m:ResponseMessages><m:GetAttachmentResponseMessage ResponseClass="Success">
+            <m:ResponseCode>NoError</m:ResponseCode><m:Attachments><t:ItemAttachment><t:AttachmentId Id="A"/><t:Name>Mail</t:Name>
+            <t:Message><t:ItemId Id="X"/>
+            <t:Attachments><t:FileAttachment><t:AttachmentId Id="N"/><t:Name>n.txt</t:Name><t:Content>TkVTVEVE</t:Content></t:FileAttachment>
+            <t:ItemAttachment><t:Message><t:MimeContent>SU5ORVI=</t:MimeContent></t:Message></t:ItemAttachment></t:Attachments>
+            <t:MimeContent CharacterSet="UTF-8">TUlNRQ==</t:MimeContent>
+            </t:Message></t:ItemAttachment></m:Attachments></m:GetAttachmentResponseMessage></m:ResponseMessages></m:GetAttachmentResponse>
+            """)
+        #expect(EWSBackend.parseAttachmentContent(d) == Data("MIME".utf8))
+    }
+
     @Test func archiveFolderFoundByLocalizedName() throws {
         let d = try doc("""
             <m:Folders><t:Folder><t:FolderId Id="F1"/><t:DisplayName>Posteingang</t:DisplayName></t:Folder>
