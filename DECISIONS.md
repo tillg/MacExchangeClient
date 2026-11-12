@@ -134,3 +134,11 @@ edited: 2026-11-12
 - **Decision:** `sanitize` now finds every numeric character reference and checks its value against XML 1.0's `Char` production. References to anything outside it (C0 controls but tab/LF/CR, surrogates, U+FFFE, U+FFFF, values past U+10FFFF or too large to read) become `&#xFFFD;`. Valid references stay as they are.
 - **Why:** Checking the number is complete by construction; extending the regex range by range would miss the next case (e.g. `&#x110000;`).
 - **Alternatives:** Add the ranges to the regex (rejected: hard to read, and decimal surrogate ranges need a long alternation).
+
+## 00:08 — The server field is normalised; http:// is upgraded to https {#d-bug-012}
+
+- **Status:** decided
+- **Context:** BUG-012. `ewsURL` trimmed only spaces and treated anything not starting with `https://` as a bare host, so `http://…`, `host/EWS/Exchange.asmx`, `host/` or a pasted trailing newline gave a wrong URL, and a blank field passed the "Invalid server" check.
+- **Decision:** `ExchangeAccount.ewsURL` trims blanks and line breaks, drops `https://` or `http://` (any case), trailing `/` and a trailing `/EWS/Exchange.asmx` (any case), then builds `https://<rest>/EWS/Exchange.asmx`. A rest that is empty, starts with `/` or contains blanks gives nil. A rest whose path ends in `.asmx` (a non-standard endpoint) is used as given, as full https URLs were before. A path in front of the standard one (a proxy prefix) is kept.
+- **Why:** `http://` is upgraded rather than honoured: EWS with Basic/NTLM over plain http would expose the password, and Exchange serves EWS over https. Users paste the URL from Outlook or IT mails in all these forms.
+- **Alternatives:** Honour `http://` (rejected: clear-text credentials); refuse it with an error (rejected: the user can't do anything better than https anyway); strip every path and keep only the host (rejected: breaks servers behind a path prefix).

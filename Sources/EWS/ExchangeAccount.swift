@@ -15,10 +15,20 @@ public struct ExchangeAccount: Codable, Hashable, Sendable {
         self.id = id; self.email = email; self.username = username; self.server = server
     }
 
+    /// The server field as typed or pasted: a host (with port), or a URL. Blanks and line breaks around it, a
+    /// trailing `/` and the standard `/EWS/Exchange.asmx` are dropped; `http://` is upgraded to https, since the
+    /// password must not travel in clear text. A path ending in `.asmx` is used as given. Nil for a blank field.
     public var ewsURL: URL? {
-        let s = server.trimmingCharacters(in: .whitespaces)
-        if s.lowercased().hasPrefix("https://") { return URL(string: s) }
-        return URL(string: "https://\(s)/EWS/Exchange.asmx")
+        var s = server.trimmingCharacters(in: .whitespacesAndNewlines)
+        for scheme in ["https://", "http://"] where s.lowercased().hasPrefix(scheme) { s.removeFirst(scheme.count) }
+        while s.hasSuffix("/") { s.removeLast() }
+        let standard = "/EWS/Exchange.asmx"
+        if s.lowercased().hasSuffix(standard.lowercased()) { s.removeLast(standard.count) }
+        while s.hasSuffix("/") { s.removeLast() }
+        guard !s.isEmpty, !s.hasPrefix("/"), s.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { return nil }
+        let path = s.lowercased().hasSuffix(".asmx") && s.contains("/") ? "" : standard
+        guard let url = URL(string: "https://\(s)\(path)"), url.host?.isEmpty == false else { return nil }
+        return url
     }
 
     public var account: Account { Account(id: id, name: "Exchange", address: email) }

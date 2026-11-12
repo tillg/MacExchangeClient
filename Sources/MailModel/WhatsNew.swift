@@ -15,6 +15,7 @@ public enum WhatsNew {
             "If the mail kept by an older version can't be read, the app keeps a copy of it, starts fresh and saves your mail again.",
             "Messages no longer show up dated in the year 1, and more meeting invitations show their details and answer buttons.",
             "A folder no longer fails to load because of one old message with unusual characters in it.",
+            "The server field accepts the address however you paste it: with or without http://, with the /EWS/Exchange.asmx part, or with a stray space or line break.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",

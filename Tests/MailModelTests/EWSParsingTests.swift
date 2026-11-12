@@ -248,6 +248,23 @@ struct EWSParsingTests {
                 == "x.example.com")
     }
 
+    /// Whatever form the server is typed or pasted in, the URL is the same; http is upgraded, blank is invalid.
+    @Test func serverFieldIsNormalised() {
+        let url = { ExchangeAccount(email: "", username: "", server: $0).ewsURL?.absoluteString }
+        let standard = "https://mail.example.com/EWS/Exchange.asmx"
+        for s in ["mail.example.com", " mail.example.com\n", "mail.example.com/", "mail.example.com/EWS/Exchange.asmx",
+                  "mail.example.com/ews/exchange.asmx/", "http://mail.example.com/EWS/Exchange.asmx", "HTTP://mail.example.com",
+                  "https://mail.example.com/EWS/Exchange.asmx\n", "\thttps://mail.example.com/\r\n", "HTTPS://mail.example.com"] {
+            #expect(url(s) == standard, "\(s.debugDescription)")
+        }
+        #expect(url("mail.example.com:8443") == "https://mail.example.com:8443/EWS/Exchange.asmx")
+        #expect(url("https://mail.example.com/proxy/EWS/Exchange.asmx") == "https://mail.example.com/proxy/EWS/Exchange.asmx")
+        #expect(url("https://mail.example.com/ews/Other.asmx") == "https://mail.example.com/ews/Other.asmx")
+        for s in ["", "   ", "\n", "https://", "http:// ", "/EWS/Exchange.asmx", "mail example.com"] {
+            #expect(url(s) == nil, "\(s.debugDescription)")
+        }
+    }
+
     @Test func controlCharacterReferencesDontBreakParsing() throws {
         let raw = "<a><s>x&#8;y&#x1F;z&#X0b;&#9;&#10;&#13;&#32;&amp;#8;</s></a>"
         #expect((try? XMLDocument(data: Data(raw.utf8))) == nil)
