@@ -1255,7 +1255,8 @@ public final class MailStore {
         let prefix = kind == .forward ? "Fwd: " : "Re: "
         let subject = m.subject.hasPrefix(prefix) ? m.subject : prefix + m.subject
         let df = DateFormatter(); df.dateStyle = .medium; df.timeStyle = .short
-        let quoted = m.body.split(separator: "\n", omittingEmptySubsequences: false).map { "> \($0)" }
+        // Any line ending: Exchange bodies use CRLF, which is one Character in Swift, not "\n".
+        let quoted = m.body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map { "> \($0)" }
             .joined(separator: "\n")
         let header = kind == .forward
             ? "\n\nBegin forwarded message:\n\nFrom: \(m.from.name) <\(m.from.email)>\nSubject: \(m.subject)\nDate: \(df.string(from: m.date))\n\n"

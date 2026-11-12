@@ -295,6 +295,17 @@ struct MailStoreTests {
         #expect(emails == ["ann@x.com", "bo@x.com"], "to: \(d.to) cc: \(d.cc)")
     }
 
+    /// Exchange bodies use CRLF: every line is quoted whatever its line ending, and the quote uses "\n".
+    @Test func replyQuotesEveryLineWhateverItsLineEnding() {
+        let m = msg(work)
+        let s = store([m])
+        s.setBody(MessageBody(text: "first\r\nsecond\nthird\rfourth\r\n\r\nlast", attachments: []), for: m.id)
+        let d = s.draft(.reply, to: m.id)
+        #expect(d.body.hasSuffix("\n\n> first\n> second\n> third\n> fourth\n> \n> last"), "body: \(d.body.debugDescription)")
+        #expect(!d.body.unicodeScalars.contains("\r"))
+        #expect(s.draft(.forward, to: m.id).body.hasSuffix("> fourth\n> \n> last"))
+    }
+
     @Test func replyToReDoesNotStackPrefix() {
         let m = msg(work, subject: "Re: Plans")
         let s = store([m])

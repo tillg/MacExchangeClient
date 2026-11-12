@@ -102,3 +102,10 @@ edited: 2026-11-12
 - **Context:** BUG-007. Reply All dropped the account's own address only on an exact match, so `Me@Work.COM` stayed in To.
 - **Decision:** Compare lowercased, as `addsNewRecipient` already does.
 - **Why:** Exchange treats addresses case-insensitively; Mail never puts your own address in a Reply All.
+
+## 23:51 — Reply quoting splits on any line ending {#d-bug-008}
+
+- **Status:** decided
+- **Context:** BUG-008. Quoting split the body on `"\n"`; in Swift `"\r\n"` is one `Character`, so a CRLF body (Exchange's) got `> ` only on its first line.
+- **Decision:** Split on every newline character (`\r\n`, `\n`, `\r`, and the other Unicode line separators); the quoted lines are joined with `\n`.
+- **Why:** The compose window and the sent text use `\n`; mixing in `\r` would only cause the same problem elsewhere.
