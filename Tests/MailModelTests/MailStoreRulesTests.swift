@@ -75,4 +75,48 @@ struct MailStoreRulesTests {
         #expect(s.message(a.id)?.mailbox == .inbox)
         #expect(s.message(b.id)?.mailbox == .inbox)
     }
+
+    // MARK: Folders inside Trash
+
+    /// Exchange keeps a deleted folder (and its subfolders) inside Deleted Items: its mail counts as Trash.
+    func trashTree(_ s: MailStore) {
+        s.setFolders([Folder(box: .folder("D"), name: "Old", parent: .trash),
+                      Folder(box: .folder("E"), name: "Older", parent: .folder("D")),
+                      Folder(box: .folder("K"), name: "Kept", parent: nil)], account: work.id)
+    }
+
+    @Test func conversationLeavesOutTrashSubfolders() {
+        let a = msg(work, subject: "a", minutesAgo: 1, rid: "1", conv: "C"),
+            b = msg(work, .folder("D"), subject: "b", minutesAgo: 2, rid: "2", conv: "C"),
+            c = msg(work, .folder("E"), subject: "c", minutesAgo: 3, rid: "3", conv: "C"),
+            k = msg(work, .folder("K"), subject: "k", minutesAgo: 4, rid: "4", conv: "C")
+        let s = store([a, b, c, k])
+        trashTree(s)
+        #expect(s.conversation(of: a.id).map(\.id) == [a.id, k.id])
+    }
+
+    @Test func flaggedLeavesOutTrashSubfolders() {
+        let a = msg(work, .folder("D"), subject: "a", flag: .red), b = msg(work, .folder("E"), subject: "b", flag: .red),
+            k = msg(work, .folder("K"), subject: "k", flag: .red)
+        let s = store([a, b, k])
+        #expect(s.count(.smart(.flagged)) == 3)  // read before the folders are known: the cache must not stick
+        trashTree(s)
+        #expect(s.count(.smart(.flagged)) == 1)
+        s.selectedMailbox = .smart(.flagged)
+        #expect(s.visibleMessages.map(\.subject) == ["k"])
+    }
+
+    @Test func searchLeavesOutTrashSubfolders() async throws {
+        let a = msg(work, .folder("D"), subject: "Report a"), b = msg(work, .folder("E"), subject: "Report b"),
+            k = msg(work, .folder("K"), subject: "Report k")
+        let s = store([a, b, k])
+        trashTree(s)
+        s.searchText = "report"
+        #expect(s.visibleMessages.map(\.subject) == ["Report k"])  // memory
+        s.searchDebounce = .zero
+        s.searcher = { _, _ in [a.id, b.id, k.id] }
+        await s.searchTask?.value
+        #expect(s.searchHits?.query == "report")
+        #expect(s.visibleMessages.map(\.subject) == ["Report k"])  // index hits, checked against memory
+    }
 }

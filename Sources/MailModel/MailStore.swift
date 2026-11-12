@@ -8,7 +8,7 @@ import Observation
 public final class MailStore {
     public var accounts: [Account]
     public private(set) var messages: [Message] { didSet { revision &+= 1 } }
-    /// Bumped on every change to `messages`; the caches below are valid for one revision.
+    /// Bumped on every change to `messages` (and `folders`); the caches below are valid for one revision.
     @ObservationIgnored private var revision = 0
     /// Changes when the messages change, to skip saving an unchanged cache.
     public var changeCount: Int { revision }
@@ -54,7 +54,12 @@ public final class MailStore {
     public var progress: SyncProgress?
 
     /// Each account's folders of its own, as a tree (see `children(of:account:)`).
-    public private(set) var folders: [UUID: [Folder]] = [:] { didSet { foldersChanged = true } }
+    public private(set) var folders: [UUID: [Folder]] = [:] {
+        didSet { foldersChanged = true; foldersInTrash = Self.foldersInTrash(folders); revision &+= 1 }
+    }
+    /// Each account's folders inside Trash, at any depth (Exchange keeps deleted folders there): their mail
+    /// counts as deleted, like Trash's own.
+    @ObservationIgnored private var foldersInTrash: [UUID: Set<MailboxKind>] = [:]
 
     private var backends: [UUID: any MailBackend] = [:]
     private var remoteFolders: [UUID: [RemoteFolder]] = [:]
@@ -117,11 +122,32 @@ public final class MailStore {
         folders[account] = remote.filter { !$0.role.isStandard }.map { Folder(box: $0.role, name: $0.name, parent: $0.parent) }
     }
 
+    nonisolated private static func foldersInTrash(_ folders: [UUID: [Folder]]) -> [UUID: Set<MailboxKind>] {
+        folders.compactMapValues { list in
+            var inTrash: Set<MailboxKind> = [.trash], grew = true
+            while grew {
+                grew = false
+                for f in list where !inTrash.contains(f.box) {
+                    if let p = f.parent, inTrash.contains(p) { inTrash.insert(f.box); grew = true }
+                }
+            }
+            inTrash.remove(.trash)
+            return inTrash.isEmpty ? nil : inTrash
+        }
+    }
+
+    /// In Trash or in a folder inside it.
+    nonisolated private static func isDeleted(_ m: Message, _ inTrash: [UUID: Set<MailboxKind>]) -> Bool {
+        m.mailbox == .trash || inTrash[m.accountID]?.contains(m.mailbox) == true
+    }
+
+    private func isDeleted(_ m: Message) -> Bool { Self.isDeleted(m, foldersInTrash) }
+
     func contains(_ ref: MailboxRef, _ m: Message) -> Bool {
         switch ref {
         case .smart(.allInboxes): m.mailbox == .inbox
         case .smart(.vip): m.isVIP && m.mailbox == .inbox
-        case .smart(.flagged): m.flag != nil && m.mailbox != .trash
+        case .smart(.flagged): m.flag != nil && !isDeleted(m)
         case .smart(.unread): !m.isRead && m.mailbox == .inbox
         case let .account(id, kind): m.accountID == id && m.mailbox == kind
         }
@@ -154,7 +180,7 @@ public final class MailStore {
                 if m.isVIP { smart[.vip, default: (0, 0)].total += 1; smart[.vip, default: (0, 0)].unread += u }
                 if u == 1 { smart[.unread, default: (0, 0)].total += 1; smart[.unread, default: (0, 0)].unread += 1 }
             }
-            if m.flag != nil && m.mailbox != .trash {
+            if m.flag != nil && !isDeleted(m) {
                 smart[.flagged, default: (0, 0)].total += 1; smart[.flagged, default: (0, 0)].unread += u
             }
         }
@@ -185,13 +211,13 @@ public final class MailStore {
         _ = messages.count  // registers the dependency for SwiftUI even when the cache answers
         if let c = listCache, c.revision == revision, c.key == key { return c.list }
         if let hits, !q.isEmpty {
-            let list = Self.hitList(messages, hits.ids, scope: searchScope(selectedMailbox))
+            let list = Self.hitList(messages, hits.ids, scope: searchScope(selectedMailbox), inTrash: foldersInTrash)
             listCache = (revision, key, list)
             return list
         }
         let list = messages.filter { m in
             if !q.isEmpty {
-                guard inSearchScope(m), m.mailbox != .trash, m.mailbox != .junk else { return false }
+                guard inSearchScope(m), !isDeleted(m), m.mailbox != .junk else { return false }
                 return [m.subject, m.from.name, m.from.email, m.body].contains { $0.lowercased().contains(q) }
             }
             if !opened.isEmpty && opened.contains(m.id) {
@@ -208,16 +234,17 @@ public final class MailStore {
         return list
     }
 
-    /// The index's hits as they are in memory now: in scope, not in Trash or Junk, newest first.
+    /// The index's hits as they are in memory now: in scope, not in Trash (or a folder inside it) or Junk, newest first.
     /// Split across the cores: one pass over 180,000 messages takes about 45 ms in a debug build.
-    nonisolated private static func hitList(_ msgs: [Message], _ hits: Set<Message.ID>, scope: Set<UUID>?) -> [Message] {
+    nonisolated private static func hitList(_ msgs: [Message], _ hits: Set<Message.ID>, scope: Set<UUID>?,
+                                            inTrash: [UUID: Set<MailboxKind>]) -> [Message] {
         let chunks = 8, size = (msgs.count + chunks - 1) / chunks
         nonisolated(unsafe) let parts = UnsafeMutableBufferPointer<[Message]>.allocate(capacity: chunks)
         _ = parts.initialize(from: repeatElement([], count: chunks))
         defer { parts.deinitialize(); parts.deallocate() }
         DispatchQueue.concurrentPerform(iterations: chunks) { c in
             parts[c] = msgs[min(c * size, msgs.count)..<min((c + 1) * size, msgs.count)].filter { m in
-                hits.contains(m.id) && scope?.contains(m.accountID) != false && m.mailbox != .trash && m.mailbox != .junk
+                hits.contains(m.id) && scope?.contains(m.accountID) != false && !isDeleted(m, inTrash) && m.mailbox != .junk
             }
         }
         return parts.flatMap { $0 }.sorted { $0.date > $1.date }
@@ -267,12 +294,12 @@ public final class MailStore {
     private func runSearch(_ q: String) async {
         guard let searcher else { return }
         let scope = searchScope(selectedMailbox)
-        let snapshot = messages, snapshotRevision = revision
+        let snapshot = messages, snapshotRevision = revision, inTrash = foldersInTrash
         do {
             // Detached, so neither the query nor the pass over all messages runs on the main actor.
             let (ids, hits, list) = try await Task.detached(priority: .userInitiated) {
                 let ids = try await searcher(q, scope), hits = Set(ids)
-                return (ids, hits, Self.hitList(snapshot, hits, scope: scope))
+                return (ids, hits, Self.hitList(snapshot, hits, scope: scope, inTrash: inTrash))
             }.value
             guard !Task.isCancelled, normalizedSearch == q, searchScope(selectedMailbox) == scope else { return }
             fallbackQuery = nil
@@ -301,7 +328,7 @@ public final class MailStore {
     @ObservationIgnored private var conversationCache: (revision: Int, id: Message.ID, list: [Message])?
 
     /// The message with the rest of its conversation, newest first, as Mail shows it: the same account, every
-    /// mailbox but Trash, Junk and Drafts (the message itself always). Empty if the message is gone.
+    /// mailbox but Trash (and folders inside it), Junk and Drafts (the message itself always). Empty if the message is gone.
     public func conversation(of id: Message.ID) -> [Message] {
         _ = messages.count  // registers the dependency for SwiftUI even when the cache answers
         if let c = conversationCache, c.revision == revision, c.id == id { return c.list }
@@ -310,7 +337,8 @@ public final class MailStore {
         if let conv = m.conversationID {
             let skip: Set<MailboxKind> = [.trash, .junk, .drafts]
             list = messages.filter {
-                $0.id == id || ($0.conversationID == conv && $0.accountID == m.accountID && !skip.contains($0.mailbox))
+                $0.id == id || ($0.conversationID == conv && $0.accountID == m.accountID && !skip.contains($0.mailbox)
+                                && !isDeleted($0))
             }
             .sorted { $0.date > $1.date }
         }

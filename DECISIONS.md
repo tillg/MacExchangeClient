@@ -234,3 +234,12 @@ edited: 2026-11-13
 - **Decision:** If any selected message is not in Junk, all of them move to Junk. Only when every one is in Junk does the action work as Not Junk and move them to the Inbox.
 - **Why:** The command reads "Move to Junk"; one action for the whole selection matches Mark as Read and Toggle Flag in this app.
 - **Alternatives:** Disable the command for mixed selections (rejected: no such rule elsewhere in the app).
+
+## 00:40 — Folders inside Trash count as Trash {#d-bug-025}
+
+- **Status:** decided
+- **Context:** BUG-025. Exchange moves a deleted folder into Deleted Items, so its mail arrives with a folder whose `parent` chain reaches `.trash`. Conversations, Flagged (list and count) and search only compared `mailbox == .trash`.
+- **Decision:** `MailStore` keeps, per account, the set of folders inside Trash at any depth (worked out from `folders` whenever they change). Every place that leaves out Trash also leaves those out: conversations, the Flagged list and count, the memory search and the check of the index's hits against memory. Changing `folders` now also bumps `revision`, so cached counts and lists follow a new folder tree. Junk's subfolders are unchanged.
+- **Why:** Mail in a deleted folder is deleted mail. Worked out once per folder change, the per-message check is one dictionary lookup, so the 70k-message timings are unchanged.
+- **Known limit:** The database's search still leaves out only `trash` and `junk` before its 2,000-hit limit (it doesn't know the folder tree), so hits in deleted folders can take up places in that limit before memory drops them. Rare (deleted folders with many matching messages); left as is.
+- **Alternatives:** Walk each message's parent chain on every check (rejected: per-message cost in the 70k paths).

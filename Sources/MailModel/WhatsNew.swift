@@ -26,6 +26,7 @@ public enum WhatsNew {
             "Messages with a picture in the text keep your extra spaces, tabs and indented lines, so lined-up columns stay lined up.",
             "When the server turns down one change, only that change is undone; your later moves stay, and a message you erased doesn't come back.",
             "Move to Junk on several messages moves all of them to Junk, even if some were there already.",
+            "Mail in folders you deleted (now inside Trash) no longer shows in Flagged, in search or next to a message's replies.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",
