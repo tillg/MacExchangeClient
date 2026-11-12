@@ -174,14 +174,6 @@ struct Probe_EWSTests {
         #expect(EWSBackend.parseBody(d.first("Message")!).text == "Hello")
     }
 
-    @Test func probeInlineImageWithGenericContentType() throws {
-        let d = try doc("""
-            <t:Message><t:Attachments><t:FileAttachment><t:AttachmentId Id="A1"/><t:Name>image001.png</t:Name>
-            <t:ContentType>application/octet-stream</t:ContentType><t:ContentId>image001.png@01D</t:ContentId></t:FileAttachment></t:Attachments></t:Message>
-            """)
-        #expect(EWSBackend.inlineAttachmentIDs(d.first("Message")!, wanted: ["image001.png@01D"]) == ["A1"])
-    }
-
     @Test func probePlainTextOnHugeHTMLIsFast() {
         let html = "<html><head><style>p{}</style></head><body>" + String(repeating: "<p>Hello <b>world</b> &amp; more</p>\n", count: 100_000) + "</body></html>"
         let t = Date()

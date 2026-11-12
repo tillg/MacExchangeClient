@@ -90,8 +90,10 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
   `ItemAttachment` gets `.eml` appended and type `message/rfc822`; size from `Size`. Content: the first
   element under `m:Attachments` only: a `FileAttachment`'s own `Content`, or the `MimeContent` directly under an
   `ItemAttachment`'s item (never a nested attachment's), base64-decoded.
-- **Inline images** (`inlineAttachmentIDs`): `FileAttachment`s with `ContentType` starting `image/` and a
-  `ContentId` (trimmed of `<`, `>`, space) in the wanted set, inline or not; keyed by that ID.
+- **Inline images** (`inlineAttachmentIDs`): `FileAttachment`s with `ContentType` starting `image/`, or generic
+  (`application/octet-stream`, missing or empty), and a `ContentId` (trimmed of `<`, `>`, space) in the wanted set,
+  inline or not; keyed by that ID. A generic type is replaced by the one for the `Name`'s extension (`UTType`), else
+  stays `application/octet-stream`.
 - **Invite** (`parseInvite`): built for any item with `Start` and `End` (not only meeting requests): location, all-day,
   organizer, required and optional `Attendee/Mailbox`; `isCancellation` when the element is `MeetingCancellation`.
 - **Events:** `LegacyFreeBusyStatus` Free/Tentative/Busy → same; OOF and WorkingElsewhere → away; else unknown.
