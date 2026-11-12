@@ -1,7 +1,7 @@
 ---
 title: "Storage"
 created: 2026-11-12
-edited: 2026-11-12
+edited: 2026-11-13
 ---
 
 # Storage
@@ -105,8 +105,9 @@ There is no general migration framework. On open:
 Runs when `Mail.sqlite` doesn't exist (`MailDatabase.importCache`); the sidebar shows "Updating Mail Storage…".
 
 1. No `Cache.json`: nothing to import; a new empty database is created by the normal path.
-2. Decode the cache off the main thread. If it can't be decoded, the import throws "The old mail cache couldn't be
-   read", the database isn't created, and the same happens on every launch.
+2. Decode the cache off the main thread. If it can't be decoded, it is renamed to `Cache.json.unreadable`
+   (`.unreadable-2`, … if taken; never deleted), an empty database is created and returned, and the status says the
+   old cache couldn't be read and names the kept file. Mail is then downloaded again from the server.
    Caches from builds whose attachments were plain names decode (see `Attachment` in [domain-model.md](domain-model.md)).
 3. `store.restore(cache)`: messages (skipping known `remoteID`s), sync tokens, outbox, complete folders, folder trees.
 4. Write everything into `Mail.sqlite.importing` (old leftovers removed first) and check the row count.

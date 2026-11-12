@@ -1,7 +1,7 @@
 ---
 title: "Limitations"
 created: 2026-11-12
-edited: 2026-11-12
+edited: 2026-11-13
 ---
 
 # Limitations
@@ -34,6 +34,5 @@ Known limits of the current design, one line each. Open bugs (with repro probes 
 | No rules, categories, VIP management, Remind Me, Follow Up, Mute, separate message windows or conversation grouping in the list | Root `README.md` |
 | No schema migration framework: the conversation column and the search index are the only upgrades, detected ad hoc | [storage.md](storage.md#migrations) |
 | After the first sign-in (launched without accounts) the database isn't opened until relaunch: nothing is saved and search scans memory (`AppSetup.loadMail` runs once at launch) | `AccountsSettings.swift`, `MailReplicaApp.swift` |
-| An unreadable `Cache.json` blocks creating the database; nothing is saved until it is removed | [storage.md](storage.md#import-from-cachejson) |
 | Builds need the macOS 26.5 SDK for the app and a separate build folder for tests (Command Line Tools only) | `CLAUDE.md` |
 | Sync with a server has no automated test without a live account (`EWS_USER`, `EWS_SERVER`); mocks aren't used | Root `README.md`, [../bugs/README.md](../bugs/README.md) |

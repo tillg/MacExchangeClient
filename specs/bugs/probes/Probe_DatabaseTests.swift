@@ -259,20 +259,6 @@ struct Probe_DatabaseTests {
 
     // MARK: Corrupt / missing files
 
-    @Test func probeCorruptCacheJSONDoesNotBlockTheDatabaseForever() async throws {
-        let dir = tempURL().deletingLastPathComponent(); defer { try? FileManager.default.removeItem(at: dir) }
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
-        try Data("{\"accounts\": [ truncated".utf8).write(to: cacheURL)
-        // Launch after launch, as AppSetup.loadMail does: import while there is no database.
-        var errors: [String] = []
-        for _ in 0..<3 where !FileManager.default.fileExists(atPath: dbURL.path) {
-            let s = MailStore(accounts: [work], messages: [])
-            do { _ = try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s) } catch { errors.append(error.localizedDescription) }
-        }
-        #expect(FileManager.default.fileExists(atPath: dbURL.path), "after 3 launches: \(errors)")
-    }
-
     @Test func probeCacheJSONRoundTripsEveryField() throws {
         let url = tempURL().deletingLastPathComponent().appendingPathComponent("Cache.json")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
