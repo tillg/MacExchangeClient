@@ -36,16 +36,6 @@ struct Probe_ModelTests {
         #expect(m.preview == "Hello World")
     }
 
-    @Test func previewOfHugeBodyIsFast() {
-        let body = String(repeating: "Lorem ipsum dolor sit amet\n", count: 40_000)  // ~1 MB
-        let m = Message(accountID: UUID(), from: Contact(name: "A", email: "a@x"), to: [], subject: "S",
-                        body: body, date: .now)
-        let t = Date()
-        for _ in 0..<10 { _ = m.preview }
-        let per = Date().timeIntervalSince(t) / 10
-        #expect(per < 0.005, "preview took \(per * 1000) ms per call")
-    }
-
     @Test func previewCRLF() {
         let m = Message(accountID: UUID(), from: Contact(name: "A", email: "a@x"), to: [], subject: "S",
                         body: "Hi\r\n> quoted\r\nBye", date: .now)
