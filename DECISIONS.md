@@ -243,3 +243,10 @@ edited: 2026-11-13
 - **Why:** Mail in a deleted folder is deleted mail. Worked out once per folder change, the per-message check is one dictionary lookup, so the 70k-message timings are unchanged.
 - **Known limit:** The database's search still leaves out only `trash` and `junk` before its 2,000-hit limit (it doesn't know the folder tree), so hits in deleted folders can take up places in that limit before memory drops them. Rare (deleted folders with many matching messages); left as is.
 - **Alternatives:** Walk each message's parent chain on every check (rejected: per-message cost in the 70k paths).
+
+## 00:42 — Reply All names each address once {#d-bug-026}
+
+- **Status:** decided
+- **Context:** BUG-026. Reply All joined sender, To and Cc without removing repeats, so a sender also in Cc, or one address in two spellings of case, appeared twice.
+- **Decision:** Addresses are compared without case; the first occurrence is kept (sender before To before Cc), with its spelling.
+- **Why:** Exchange treats addresses case-insensitively; Mail lists each person once.

@@ -1311,7 +1311,10 @@ public final class MailStore {
         switch kind {
         case .reply: to = m.from.email
         case .replyAll:
-            to = ([m.from] + m.to + m.cc).map(\.email).filter { $0.lowercased() != me?.lowercased() }.joined(separator: ", ")
+            // Each address once, whatever its case; the first occurrence is kept.
+            var seen = Set<String>()
+            to = ([m.from] + m.to + m.cc).map(\.email)
+                .filter { $0.lowercased() != me?.lowercased() && seen.insert($0.lowercased()).inserted }.joined(separator: ", ")
         case .forward: break
         }
         var d = Draft(accountID: m.accountID, to: to, subject: subject, body: header + quoted)

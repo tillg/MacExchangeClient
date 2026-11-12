@@ -119,4 +119,16 @@ struct MailStoreRulesTests {
         #expect(s.searchHits?.query == "report")
         #expect(s.visibleMessages.map(\.subject) == ["Report k"])  // index hits, checked against memory
     }
+
+    // MARK: Replies
+
+    /// Reply All names each address once, whatever its case; the first occurrence is kept.
+    @Test func replyAllHasNoDuplicateRecipients() {
+        let m = msg(work, from: "Ann", to: [Contact(name: "Me", email: "me@work.com"), Contact(name: "Bo", email: "bo@x.com")],
+                    cc: [Contact(name: "Ann", email: "ann@x.com"), Contact(name: "Bo", email: "BO@x.com")])
+        let s = store([m])
+        let d = s.draft(.replyAll, to: m.id)
+        let emails = Contact.parseList(d.to + "," + d.cc).map(\.email)
+        #expect(emails == ["ann@x.com", "bo@x.com"], "to: \(d.to) cc: \(d.cc)")
+    }
 }
