@@ -321,17 +321,31 @@ extension Draft {
             s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
                 .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
         }
+        // Text, with its runs of spaces and tabs kept as Mail writes them: a space after a space (or at the start
+        // of a line) becomes `&nbsp;`, so they alternate; a tab goes in a `white-space:pre` span.
+        func text(_ s: Substring, atLineStart: Bool) -> String {
+            guard s.contains(where: { $0 == " " || $0 == "\t" }) else { return escape(s) }
+            var out = "", afterSpace = atLineStart
+            for c in s {
+                switch c {
+                case " ": out += afterSpace ? "&nbsp;" : " "; afterSpace.toggle()
+                case "\t": out += "<span class=\"Apple-tab-span\" style=\"white-space:pre\">\t</span>"; afterSpace = false
+                default: out += escape(Substring(String(c))); afterSpace = false
+                }
+            }
+            return out
+        }
         var k = 0
         // Any line ending: "\r\n" (as in quoted Exchange text) is one Character, not "\n".
         let lines = body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map { line -> String in
             var out = "", run = Substring()
             for c in line {
                 guard c == Self.fileMark else { run.append(c); continue }
-                out += escape(run); run = ""
+                out += text(run, atLineStart: out.isEmpty); run = ""
                 if let id = contentID(k) { out += "<img src=\"cid:\(id)\" alt=\"\(escape(Substring(attachments[k].name)))\">" }
                 k += 1
             }
-            out += escape(run)
+            out += text(run, atLineStart: out.isEmpty)
             return "<div>\(out.isEmpty ? "<br>" : out)</div>"
         }
         return "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\"></head>"

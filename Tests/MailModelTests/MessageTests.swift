@@ -67,4 +67,16 @@ struct MessageTests {
         }
         #expect(!h.contains("\r"))
     }
+
+    /// Runs of spaces and tabs survive in the HTML, as Mail writes them: spaces alternate with `&nbsp;` (also at the
+    /// start of a line), tabs go in a `white-space:pre` span. Single spaces between words stay plain.
+    @Test func draftHTMLKeepsRunsOfSpacesAndTabs() {
+        let tab = #"<span class="Apple-tab-span" style="white-space:pre">\#t</span>"#
+        let h = Draft(accountID: UUID(), body: "Name    Qty\n  Apple 3\nx\ty\n\t\tz \n ").html { _ in nil }
+        #expect(h.contains("<div>Name &nbsp; &nbsp;Qty</div>"), "\(h)")
+        #expect(h.contains("<div>&nbsp; Apple 3</div>"))
+        #expect(h.contains("<div>x\(tab)y</div>"))
+        #expect(h.contains("<div>\(tab)\(tab)z </div>"))
+        #expect(h.contains("<div>&nbsp;</div>"))
+    }
 }

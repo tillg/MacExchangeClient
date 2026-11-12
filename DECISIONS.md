@@ -195,3 +195,11 @@ edited: 2026-11-12
 - **Context:** BUG-021. `Draft.html` split on `"\n"`; `"\r\n"` is one `Character` in Swift, so quoted Exchange text (CRLF) became one `<div>` when a picture was placed.
 - **Decision:** Split on every newline character (`isNewline`: `\r\n`, `\n`, `\r`, U+2028 and the others), one `<div>` per line, as BUG-008 did for quoting.
 - **Why:** Same root cause and rule as BUG-008; the plain-text path already kept these breaks.
+
+## 00:26 — Draft HTML keeps runs of spaces with &nbsp; and tabs in a pre span {#d-bug-022}
+
+- **Status:** decided (Mail's markup from memory ⚠️)
+- **Context:** BUG-022. `Draft.html` wrote spaces and tabs as they were; HTML collapses them, so indentation and aligned columns were lost whenever a picture made the mail go out as HTML.
+- **Decision:** Within each piece of text, a space that follows a space, or starts a line, becomes `&nbsp;`, so plain spaces and `&nbsp;` alternate (`a␣␣␣b` → `a &nbsp; b`); single spaces between words stay plain. A tab becomes `<span class="Apple-tab-span" style="white-space:pre">⇥</span>`, as Mail writes it. The alternation restarts after a picture mark (the existing test `picturesInTheTextGoOutInline` pins `and  bye` where a file mark was left out).
+- **Why:** `&nbsp;` alternation is what Mail (and most clients) send and every client renders, including Outlook's Word engine, which ignores some CSS; `white-space: pre-wrap` on the body would also be simpler but isn't reliably honoured there. Alternating instead of all-`&nbsp;` keeps long runs breakable at line ends.
+- **Alternatives:** `white-space: pre-wrap` on `<body>` (rejected: less compatible, as the lead noted); expand tabs to spaces (rejected: tab stops lose alignment in proportional fonts either way, and Mail keeps the tab).
