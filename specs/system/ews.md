@@ -14,9 +14,10 @@ is made, retries, undo): [architecture.md](architecture.md). Types: [domain-mode
 
 - `ExchangeAccount`: `id`, `email`, `username` (`DOMAIN\user`), `server`; saved as JSON in UserDefaults
   (`exchangeAccounts`). Its `Account` is named "Exchange" with the email as address.
-- `ewsURL`: `server` trimmed of spaces and tabs. If it starts with `https://` (any case) it is used as is; anything
-  else becomes `https://<server>/EWS/Exchange.asmx` (so `http://…`, a host with a path, a trailing `/` or a newline
-  give a wrong URL).
+- `ewsURL`: `server` trimmed of blanks and line breaks; a leading `https://` or `http://` (any case), trailing `/`
+  and a trailing `/EWS/Exchange.asmx` (any case) are dropped, then it becomes `https://<rest>/EWS/Exchange.asmx`
+  (`http` is upgraded, never used). A rest whose path ends in `.asmx` is used as given; a path prefix in front of
+  the standard path is kept. Nil when the rest is empty, starts with `/` or contains blanks.
 - `backend()`: nil without a valid URL or without a Keychain password for `username` (service `MailReplica-EWS`).
 - Sign In (Settings ▸ Accounts) calls `folders()` with the typed or stored password before saving anything.
 

@@ -14,34 +14,6 @@ struct Probe_EWSTests {
     }
     func request(_ body: String) throws -> XMLDocument { try XMLDocument(xmlString: EWSClient.envelope(body)) }
 
-    // MARK: Account / URL
-
-    @Test func probeServerWithHTTPScheme() {
-        let url = ExchangeAccount(email: "", username: "", server: "http://mail.example.com/EWS/Exchange.asmx").ewsURL
-        #expect(url?.host == "mail.example.com")
-        #expect(url?.path == "/EWS/Exchange.asmx")
-    }
-
-    @Test func probeServerHostWithPathButNoScheme() {
-        let url = ExchangeAccount(email: "", username: "", server: "mail.example.com/EWS/Exchange.asmx").ewsURL
-        #expect(url?.absoluteString == "https://mail.example.com/EWS/Exchange.asmx")
-    }
-
-    @Test func probeServerWithTrailingNewline() {
-        let url = ExchangeAccount(email: "", username: "", server: "mail.example.com\n").ewsURL
-        #expect(url?.absoluteString == "https://mail.example.com/EWS/Exchange.asmx")
-    }
-
-    @Test func probeServerFullURLWithTrailingNewline() {
-        let url = ExchangeAccount(email: "", username: "", server: "https://mail.example.com/EWS/Exchange.asmx\n").ewsURL
-        #expect(url?.absoluteString == "https://mail.example.com/EWS/Exchange.asmx")
-    }
-
-    @Test func probeServerWithTrailingSlash() {
-        let url = ExchangeAccount(email: "", username: "", server: "mail.example.com/").ewsURL
-        #expect(url?.absoluteString == "https://mail.example.com/EWS/Exchange.asmx")
-    }
-
     // MARK: Dates
 
     @Test func probeReceivedDateWithOffset() throws {
@@ -245,9 +217,6 @@ struct Probe_EWSTests {
         #expect(Date().timeIntervalSince(t) < 5)
     }
 
-    @Test func probeServerWhitespaceOnly() {
-        #expect(ExchangeAccount(email: "", username: "", server: "   ").ewsURL == nil)
-    }
 
     @Test func probeServerInnerSpace() {
         #expect(ExchangeAccount(email: "", username: "", server: "mail example.com").ewsURL == nil)
