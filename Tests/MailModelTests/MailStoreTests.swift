@@ -1261,6 +1261,23 @@ struct MailStoreTests {
         #expect(try Data(contentsOf: b) == Data([1]))
     }
 
+    /// A name longer than a file name may be (255 bytes) is shortened, keeping its extension, so the attachment
+    /// still opens and saves, also a second time.
+    @Test func attachmentsWithVeryLongNamesOpenAndSave() async throws {
+        let name = String(repeating: "Überweisungsbestätigung ", count: 12) + ".pdf"  // ~330 bytes
+        let (s, id, dir) = attachmentStore([MailModel.Attachment(name: name)], data: [Data([1])])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = try #require(await s.attachmentFile(0, of: id), "status: \(String(describing: s.status))")
+        // A file URL spells names decomposed; the file system gets (and counts) them as given, here composed.
+        let bytes = { (u: URL) in u.lastPathComponent.precomposedStringWithCanonicalMapping.utf8.count }
+        #expect(bytes(file) <= 255 && file.lastPathComponent.hasSuffix(".pdf"))
+        #expect(try Data(contentsOf: file) == Data([1]))
+        let target = dir.appendingPathComponent("Downloads")
+        let a = try #require(await s.saveAttachment(0, of: id, to: target))
+        let b = try #require(await s.saveAttachment(0, of: id, to: target))
+        #expect(a != b && bytes(b) <= 255 && b.lastPathComponent.hasSuffix(" 2.pdf"))
+    }
+
     /// Quick Look shows every attachment of the message, starting at the chosen one.
     @Test func quickLookOpensAllAttachmentsAtTheChosenOne() async throws {
         let (s, id, dir) = attachmentStore(["a.txt", "b.txt"], data: [Data([1]), Data([2])])

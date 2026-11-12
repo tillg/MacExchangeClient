@@ -1055,7 +1055,7 @@ public final class MailStore {
         let ext = (name as NSString).pathExtension, base = (name as NSString).deletingPathExtension
         var url = folder.appendingPathComponent(name), n = 2
         while FileManager.default.fileExists(atPath: url.path) {
-            url = folder.appendingPathComponent(ext.isEmpty ? "\(base) \(n)" : "\(base) \(n).\(ext)")
+            url = folder.appendingPathComponent(Attachment.fileName(base, ending: ext.isEmpty ? " \(n)" : " \(n).\(ext)"))
             n += 1
         }
         return url

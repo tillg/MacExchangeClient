@@ -394,9 +394,25 @@ public struct Attachment: Hashable, Codable, Sendable, ExpressibleByStringLitera
     }
 
     /// The name as a file name: the sender's name can't point into another folder.
-    /// A "/" becomes ":", which the Finder shows as "/" again.
+    /// A "/" becomes ":", which the Finder shows as "/" again. A name over 255 bytes is shortened, keeping its extension.
     public var fileName: String {
         let n = name.replacingOccurrences(of: "/", with: ":").replacingOccurrences(of: "\0", with: "")
-        return n.isEmpty || n == "." || n == ".." ? "Attachment" : n
+        guard !(n.isEmpty || n == "." || n == "..") else { return "Attachment" }
+        let ext = (n as NSString).pathExtension
+        guard !ext.isEmpty, ext.utf8.count <= 32 else { return Self.fileName(n, ending: "") }
+        return Self.fileName((n as NSString).deletingPathExtension, ending: "." + ext)
+    }
+
+    /// `base` + `ending` within the 255 bytes (UTF-8) a file name may have: `base` is cut at a whole character.
+    public static func fileName(_ base: String, ending: String) -> String {
+        let room = 255 - ending.utf8.count
+        guard base.utf8.count > room else { return base + ending }
+        var cut = "", bytes = 0
+        for c in base {
+            bytes += c.utf8.count
+            if bytes > room { break }
+            cut.append(c)
+        }
+        return cut + ending
     }
 }

@@ -180,3 +180,11 @@ edited: 2026-11-12
 - **Decision:** `HTMLPage.safeType` drops parameters after `;`, trims and lowercases, and accepts only `token/token` (RFC 6838 name characters `a-z 0-9 ! # $ & ^ _ . + -`). Anything else becomes `application/octet-stream`.
 - **Why:** A whitelist is safer than escaping: an escaped `&quot;` would still produce a nonsense type and a broken picture, while a valid type is all a `data:` URI needs. WebKit should decode `<img>` data by its bytes, so the fallback type likely still shows real pictures (⚠️ from memory, not checked in the app).
 - **Alternatives:** HTML-escape the type (rejected: keeps garbage in the URI; whitelisting covers it).
+
+## 00:22 — Over-long attachment names are shortened to 255 bytes {#d-bug-020}
+
+- **Status:** decided
+- **Context:** BUG-020. `Attachment.fileName` didn't limit length, so names over 255 UTF-8 bytes (easy with umlauts or CJK) couldn't be written: open, Quick Look, save and forward failed.
+- **Decision:** `fileName` keeps the extension (if it is at most 32 bytes) and cuts the rest at a whole character so the whole name is at most 255 UTF-8 bytes. `MailStore.freeURL` shortens the same way when it adds " 2", " 3", … The name shown in the message is unchanged.
+- **Why:** 255 bytes is APFS's limit per name; checked here that the file system counts the name as given (composed): 127 × "ä" (254 bytes) writes, 128 fails. Cutting by `Character` keeps valid UTF-8 and never splits an accent from its letter. Keeping the extension keeps the file's type for Quick Look and the Finder.
+- **Alternatives:** A short hash-based name (rejected: users recognise the start of the name).

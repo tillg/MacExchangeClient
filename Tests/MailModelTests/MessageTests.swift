@@ -41,4 +41,21 @@ struct MessageTests {
         // Links to the web load nothing by themselves.
         #expect(!html(#"<a href="https://x.example">link</a><img srcset="cid:a 1x">"#).hasRemoteContent)
     }
+
+    /// File names may be 255 bytes: longer names are cut, at a whole character, keeping the extension.
+    @Test func longAttachmentNamesAreShortenedToAFileName() throws {
+        let name = String(repeating: "Überweisungsbestätigung ", count: 12) + ".pdf"
+        let file = Attachment(name: name).fileName
+        #expect(file.utf8.count <= 255 && file.utf8.count > 240)
+        #expect(file.hasSuffix(".pdf") && name.hasPrefix(String(file.dropLast(4))))
+        let cjk = Attachment(name: String(repeating: "請求書", count: 40) + ".xlsx").fileName  // 3 bytes each
+        #expect(cjk.utf8.count <= 255 && cjk.hasSuffix(".xlsx"))
+        let noExtension = Attachment(name: String(repeating: "ä", count: 300)).fileName
+        #expect(noExtension == String(repeating: "ä", count: 127))
+        #expect(Attachment(name: "Report.pdf").fileName == "Report.pdf")
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("MessageTests-\(UUID())")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try Data([1]).write(to: dir.appendingPathComponent(file), options: .atomic)
+    }
 }
