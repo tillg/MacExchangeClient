@@ -31,11 +31,15 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 
 ## Message list
 
-- `visibleMessages`: the selected mailbox's messages, newest first. With the unread filter (⌘L) only unread ones.
+- `visibleMessages`: the selected mailbox's messages, newest first. With the unread filter (⌘L) only unread ones
+  (and the opened message, see below).
   While searching, the list shows search results instead and ignores the unread filter ([search.md](search.md)).
 - Row: unread dot, optional avatar, VIP star, sender (for Sent and Drafts "To: " + first recipient), date (time today,
   "Yesterday", weekday within 7 days, else short date), subject, paperclip, flag, two-line preview.
 - Selecting exactly one message marks it read (one main-loop turn later), and the message view loads it.
+- A message that was unread when opened stays in the list with the unread filter and in Unread while it is selected
+  (it is judged as unread there; sidebar counts use the real state). It leaves once the selection moves on, the
+  filter is toggled or another mailbox is selected; deleted or moved, it leaves at once.
 - Swipe right: Read/Unread. Swipe left: Trash, Flag (toggles orange). Right-click: Reply, Reply All, Forward (single
   message), Mark as Read/Unread, Flag colours, Archive, Move to Junk, Delete.
 - Pull down past the top: quick check, with a spinner shown at least 0.8 s (`PullToRefresh.swift`).

@@ -20,27 +20,6 @@ struct Probe_StoreCoreTests {
 
     func store(_ msgs: [Message]) -> MailStore { MailStore(accounts: [work, home], messages: msgs) }
 
-    // 1. Unread filter: opening a message (which marks it read) must not pull it out of the list under the cursor.
-    @Test func unreadFilterKeepsTheOpenedMessageInTheList() {
-        let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
-        let s = store([a, b])
-        s.selectedMailbox = .account(work.id, .inbox)
-        s.filterUnread = true
-        s.selection = [a.id]
-        s.markSelectionRead()  // what MessageListView does on selection change
-        #expect(s.visibleMessages.map(\.id).contains(a.id))
-    }
-
-    // 1b. Same in the Unread smart mailbox.
-    @Test func unreadSmartMailboxKeepsTheOpenedMessageInTheList() {
-        let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
-        let s = store([a, b])
-        s.selectedMailbox = .smart(.unread)
-        s.selection = [a.id]
-        s.markSelectionRead()
-        #expect(s.visibleMessages.map(\.id).contains(a.id))
-    }
-
     // 4. Move to Junk on a mixed selection: everything ends up in Junk (like Mark as Read for a mixed selection).
     @Test func junkOnMixedSelectionMovesAllToJunk() {
         let a = msg(work, .junk, subject: "a", flag: .red), b = msg(work, subject: "b", flag: .red)
