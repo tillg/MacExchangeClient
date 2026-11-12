@@ -54,7 +54,8 @@ One connection, `journal_mode=WAL`, `synchronous=NORMAL`.
   Indexes: `messages_mailbox(account, mailbox)`, `messages_date(date DESC)`.
 - **`sync`**: `(account, mailbox)` PK, `token` (EWS SyncState), `complete` 0/1.
 - **`folders`**: `account`, `box`, `name`, `parent`, `position` (the order to restore).
-- **`outbox`**: `position` PK, `change` BLOB = `PendingChange` as JSON. Rows that don't decode are skipped on read.
+- **`outbox`**: `position` PK, `change` BLOB = `PendingChange` as JSON. Rows that don't decode are skipped on read. Rows
+  whose `previous` messages hold attachments as plain names (older builds) decode.
 
 ### Encodings
 
@@ -106,6 +107,7 @@ Runs when `Mail.sqlite` doesn't exist (`MailDatabase.importCache`); the sidebar 
 1. No `Cache.json`: nothing to import; a new empty database is created by the normal path.
 2. Decode the cache off the main thread. If it can't be decoded, the import throws "The old mail cache couldn't be
    read", the database isn't created, and the same happens on every launch.
+   Caches from builds whose attachments were plain names decode (see `Attachment` in [domain-model.md](domain-model.md)).
 3. `store.restore(cache)`: messages (skipping known `remoteID`s), sync tokens, outbox, complete folders, folder trees.
 4. Write everything into `Mail.sqlite.importing` (old leftovers removed first) and check the row count.
 5. Refuse if `Mail.sqlite` exists meanwhile; else move the temp file into place and reopen it.

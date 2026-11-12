@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [001](BUG-001-legacy-attachment-names-break-cache-import-and-outbox.md) | P1 | Models | Attachment names stored by older versions no longer decode: old Cache.json can never be imported and waiting outbox changes are silently dropped |
 | [002](BUG-002-hidden-selection-erased-by-second-delete.md) | P1 | MailStore | Delete keeps a selection that is no longer in the list; a second Delete erases the message from Trash unseen |
 | [003](BUG-003-trash-hits-crowd-out-search-results.md) | P2 | MailStore | Indexed search: Trash/Junk hits fill the 2,000-result cap, hiding real matches and showing 'Showing the newest 2,000 results' over an empty list |
 | [004](BUG-004-control-chars-break-ews-requests.md) | P2 | EWS | Control characters in subject/body/file name/invite comment make the EWS request malformed XML, so Send/Save/Answer fails |
