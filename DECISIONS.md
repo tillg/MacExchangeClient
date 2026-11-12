@@ -149,3 +149,11 @@ edited: 2026-11-12
 - **Context:** BUG-013. `parseAttachmentContent` took the first `FileAttachment` anywhere in the response, so an attached message carrying files could be opened as one of its files instead of its `.eml`.
 - **Decision:** Read the first element under `m:Attachments`. A `FileAttachment` gives its own `Content`; an `ItemAttachment` gives the `MimeContent` that is a direct child of its item. Nested attachments are never read.
 - **Why:** The request asks for exactly one attachment; anything deeper belongs to that attachment's content.
+
+## 00:12 — Inline pictures with a generic type are fetched; explicit non-image types still aren't {#d-bug-014}
+
+- **Status:** decided; narrower than the lead's "whatever its content type"
+- **Context:** BUG-014. `inlineAttachmentIDs` took only `image/*` attachments, so pictures sent as `application/octet-stream` and referenced by `cid:` never loaded. The lead suggested fetching any referenced attachment whatever its type, but the existing test `inlineImagesAreTheReferencedImageAttachments` pins that a referenced `text/x-sh` attachment is *not* fetched, and existing tests are never changed.
+- **Decision:** A referenced attachment is fetched when its type is `image/*`, `application/octet-stream`, or missing/empty. For the generic ones, `parseInlineImages` takes the type from the file name's extension (`UTType`), falling back to `application/octet-stream`.
+- **Why:** Covers the reported case (and attachments without a type) while keeping explicit non-image parts, which the HTML can't show as a picture anyway, out of the page. The type from the name lets WebKit decode the picture with a correct `data:` type.
+- **Alternatives:** Any type (rejected: contradicts an existing test; a mislabelled `text/html` part has no business inside an `<img>` data URI either).

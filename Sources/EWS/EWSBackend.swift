@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 import MailModel
 
 /// `MailBackend` over Exchange Web Services, for on-prem Exchange.
@@ -94,10 +95,12 @@ public struct EWSBackend: MailBackend {
         return Self.parseInlineImages(try await client.call(Self.attachmentRequest(ids), strict: false))
     }
 
-    /// Image attachments the HTML refers to, whether or not Exchange marks them inline.
+    /// Image attachments the HTML refers to, whether or not Exchange marks them inline. Attachments with a generic
+    /// type (`application/octet-stream`, or none) count too: some mailers send pictures that way.
     static func inlineAttachmentIDs(_ item: XMLNode, wanted: Set<String>) -> [String] {
         (item.child("Attachments")?.children("FileAttachment") ?? []).compactMap { a in
-            guard a.text("ContentType")?.lowercased().hasPrefix("image/") == true,
+            let type = a.text("ContentType")?.lowercased() ?? ""
+            guard type.hasPrefix("image/") || isGeneric(type),
                   let cid = a.text("ContentId").map(contentID), wanted.contains(cid) else { return nil }
             return a.child("AttachmentId")?.attr("Id")
         }
@@ -158,12 +161,20 @@ public struct EWSBackend: MailBackend {
     static func parseInlineImages(_ doc: XMLDocument) -> [String: InlineImage] {
         var images = [String: InlineImage]()
         for a in doc.all("FileAttachment") {
-            guard let cid = a.text("ContentId").map(contentID), let type = a.text("ContentType"),
+            guard let cid = a.text("ContentId").map(contentID),
                   let b64 = a.text("Content"), let data = Data(base64Encoded: b64, options: .ignoreUnknownCharacters) else { continue }
+            var type = a.text("ContentType") ?? ""
+            if isGeneric(type.lowercased()) {
+                type = a.text("Name").flatMap { UTType(filenameExtension: ($0 as NSString).pathExtension)?.preferredMIMEType }
+                    ?? "application/octet-stream"
+            }
             images[cid] = InlineImage(contentType: type, data: data)
         }
         return images
     }
+
+    /// A content type that says nothing about the content.
+    private static func isGeneric(_ type: String) -> Bool { type.isEmpty || type == "application/octet-stream" }
 
     static func contentID(_ s: String) -> String { s.trimmingCharacters(in: CharacterSet(charactersIn: "<> ")) }
 

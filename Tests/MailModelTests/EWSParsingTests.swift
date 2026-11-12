@@ -128,6 +128,35 @@ struct EWSParsingTests {
         #expect(EWSBackend.inlineAttachmentIDs(item, wanted: wanted) == ["A1", "A2"])
     }
 
+    /// Some mailers send pictures in the text as `application/octet-stream` or without a type: referenced by the
+    /// HTML, they are fetched too, and get their type from the file name.
+    @Test func inlineImagesWithAGenericContentTypeAreFetched() throws {
+        let d = try doc("""
+            <t:Message><t:Attachments>
+            <t:FileAttachment><t:AttachmentId Id="A1"/><t:Name>image001.png</t:Name>\
+            <t:ContentType>application/octet-stream</t:ContentType><t:ContentId>image001.png@01D</t:ContentId></t:FileAttachment>
+            <t:FileAttachment><t:AttachmentId Id="A2"/><t:Name>photo.JPG</t:Name><t:ContentId>photo@x</t:ContentId></t:FileAttachment>
+            <t:FileAttachment><t:AttachmentId Id="A3"/><t:Name>notes.txt</t:Name><t:ContentType>text/plain</t:ContentType>\
+            <t:ContentId>notes@x</t:ContentId></t:FileAttachment>
+            </t:Attachments></t:Message>
+            """)
+        let item = try #require(d.first("Message"))
+        #expect(EWSBackend.inlineAttachmentIDs(item, wanted: ["image001.png@01D", "photo@x", "notes@x"]) == ["A1", "A2"])
+
+        let content = try doc("""
+            <m:GetAttachmentResponse><m:ResponseMessages><m:GetAttachmentResponseMessage ResponseClass="Success"><m:Attachments>
+            <t:FileAttachment><t:Name>image001.png</t:Name><t:ContentType>application/octet-stream</t:ContentType>\
+            <t:ContentId>image001.png@01D</t:ContentId><t:Content>AQID</t:Content></t:FileAttachment>
+            <t:FileAttachment><t:Name>photo.JPG</t:Name><t:ContentId>photo@x</t:ContentId><t:Content>BAU=</t:Content></t:FileAttachment>
+            <t:FileAttachment><t:Name>blob</t:Name><t:ContentId>blob@x</t:ContentId><t:Content>Bg==</t:Content></t:FileAttachment>
+            </m:Attachments></m:GetAttachmentResponseMessage></m:ResponseMessages></m:GetAttachmentResponse>
+            """)
+        let images = EWSBackend.parseInlineImages(content)
+        #expect(images["image001.png@01D"] == InlineImage(contentType: "image/png", data: Data([1, 2, 3])))
+        #expect(images["photo@x"] == InlineImage(contentType: "image/jpeg", data: Data([4, 5])))
+        #expect(images["blob@x"] == InlineImage(contentType: "application/octet-stream", data: Data([6])))
+    }
+
     @Test func attachmentRequestAndContent() throws {
         let req = try request(EWSBackend.attachmentRequest(["A&1", "A2"]))
         #expect(req.first("GetAttachment")?.elementChildren.map(\.localName) == ["AttachmentShape", "AttachmentIds"])

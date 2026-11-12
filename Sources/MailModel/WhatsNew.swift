@@ -17,6 +17,7 @@ public enum WhatsNew {
             "A folder no longer fails to load because of one old message with unusual characters in it.",
             "The server field accepts the address however you paste it: with or without http://, with the /EWS/Exchange.asmx part, or with a stray space or line break.",
             "Opening an email that was attached to another email shows that email, not a file attached inside it.",
+            "Pictures in the text of emails from some mail programs now show instead of an empty frame.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",
