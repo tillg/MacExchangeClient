@@ -50,18 +50,6 @@ struct Probe_ModelTests {
         return m
     }
 
-    @Test func remoteContentSrcset() {
-        #expect(html(#"<img srcset="https://t.example/p.png 1x">"#).hasRemoteContent)
-    }
-
-    @Test func remoteContentLinkStylesheet() {
-        #expect(html(#"<link rel="stylesheet" href="https://t.example/s.css">"#).hasRemoteContent)
-    }
-
-    @Test func remoteContentEntityQuotedURL() {
-        #expect(html(#"<td style="background-image:url(&quot;https://t.example/bg.png&quot;)">"#).hasRemoteContent)
-    }
-
 
     // MARK: HTMLPage
 
@@ -231,10 +219,6 @@ struct Probe_ModelTests {
     @Test func renamedMapsAllIDs() {
         let c = ServerChange.move(["a", "b"], to: .trash).renamed(["a": "A"])
         #expect(c.remoteIDs == ["A", "b"])
-    }
-
-    @Test func remoteContentVideoPoster() {
-        #expect(html(#"<video poster="https://t.example/p.jpg"></video>"#).hasRemoteContent)
     }
 
     @Test func remoteContentFalsePositiveImportInText() {

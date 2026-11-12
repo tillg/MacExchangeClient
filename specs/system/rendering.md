@@ -39,9 +39,10 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
 
 ## Remote content
 
-- `Message.hasRemoteContent`: the HTML matches (case-insensitive) `src=` or `background=` followed by `http(s):`,
-  `url(` followed by `http(s):`, or the text `@import` anywhere. Other forms (`srcset`, `<link href>`, `poster`,
-  `&quot;`-quoted URLs) are not detected.
+- `Message.hasRemoteContent`: the HTML matches (case-insensitive) `src=`, `background=` or `poster=` followed by
+  `http(s):`; a `srcset=` value with an `http(s):` candidate anywhere in it; `href=` followed by `http(s):` inside a
+  `<link …>` tag (not `<a href>`); `url(` followed by `http(s):`, optionally quoted with `"`, `'` or an entity
+  (`&quot;`, `&apos;`, `&#34;`, `&#39;`, `&#x22;`, `&#x27;`); or the text `@import` anywhere.
 - Allowed when the user clicked Load Remote Content for this message (kept until the view goes away), or when
   `RemoteImages.loadsAutomatically(from:account:)` says so for the Privacy setting:
   - Always: yes. Ask before downloading: no.
