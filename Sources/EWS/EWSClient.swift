@@ -126,7 +126,15 @@ extension XMLNode {
     var elementChildren: [XMLNode] { (children ?? []).filter { $0.kind == .element } }
 }
 
+/// Text for a request. Characters XML 1.0 forbids (controls other than tab, line feed and carriage return, and
+/// U+FFFE, U+FFFF) are left out: one of them, pasted from Word or a PDF, would make the whole request malformed.
 func xmlEscape(_ s: String) -> String {
-    s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+    let text = s.unicodeScalars.contains(where: forbiddenInXML)
+        ? String(String.UnicodeScalarView(s.unicodeScalars.filter { !forbiddenInXML($0) })) : s
+    return text.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
         .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
+}
+
+private func forbiddenInXML(_ c: Unicode.Scalar) -> Bool {
+    c.value < 0x20 ? c != "\t" && c != "\n" && c != "\r" : c.value == 0xFFFE || c.value == 0xFFFF
 }

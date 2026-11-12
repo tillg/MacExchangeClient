@@ -29,6 +29,7 @@ public enum WhatsNew {
             "Mail kept by an older version of the app is carried over again, even messages with attachments, and changes still waiting to reach the server are no longer lost.",
             "Pressing Delete twice no longer erases a message for good that was hidden by a filter or a search; it stays in the Trash.",
             "Search finds your messages even when many newer matches sit in the Trash or Junk.",
+            "Text pasted from Word or a PDF no longer stops a message, draft or meeting answer from being sent.",
         ]),
         ChangeLogDay(date: "2026-11-11", features: [
             "Nicely formatted emails now look the way the sender designed them, with their pictures.",

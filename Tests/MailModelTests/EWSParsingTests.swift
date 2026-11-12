@@ -255,6 +255,25 @@ struct EWSParsingTests {
         #expect(d.text("s") == "x\u{FFFD}y\u{FFFD}z\u{FFFD}\t\n\r &#8;")
     }
 
+    /// Text pasted from Word or a PDF can carry form feeds or vertical tabs, which XML 1.0 forbids: they are left
+    /// out of requests, so Send, Save and invite answers still work. Tab, line feed and carriage return stay.
+    @Test func charactersXMLForbidsAreLeftOutOfRequests() throws {
+        let forbidden = (0...0x1F).filter { ![0x9, 0xA, 0xD].contains($0) } + [0xFFFE, 0xFFFF]
+        for v in forbidden {
+            let c = String(Character(Unicode.Scalar(v)!))
+            let draft = Draft(accountID: UUID(), to: "a@x.com", subject: "S\(c)ubject", body: "line\(c)break\ttab\nnext")
+            let xml = try #require(try? request(EWSBackend.createRequest(draft, send: true)),
+                                   "U+\(String(v, radix: 16)) breaks the request")
+            #expect(xml.text("Subject") == "Subject")
+            #expect(xml.first("Items")?.text("Body") == "linebreak\ttab\nnext")
+            #expect(xmlEscape("a\(c)\tb\r\nc") == "a\tb\r\nc")
+            let files = [DraftAttachment(name: "scan\(c)1.pdf", contentType: "application/pdf", data: Data([1]))]
+            #expect(try request(EWSBackend.createAttachmentRequest(parentID: "I", files)).text("Name") == "scan1.pdf")
+            let reply = InviteReply(response: .decline, comment: "sorry\(c) next week")
+            #expect(try request(EWSBackend.respondRequest("M", reply)).first("Items")?.text("Body") == "sorry next week")
+        }
+    }
+
     @Test func rejectedPasswordIsASignInFailureNotOffline() {
         #expect(EWSClient.mapError(URLError(.cancelled), credentialsRejected: true) is AuthenticationError)
         #expect(EWSClient.mapError(URLError(.cancelled), credentialsRejected: false) is URLError)
