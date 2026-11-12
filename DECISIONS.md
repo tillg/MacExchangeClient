@@ -293,3 +293,11 @@ edited: 2026-11-13
 - **Context:** BUG-032. A proposed new time with only a start or only an end was queued; EWS writes `ProposedStart`/`ProposedEnd` only as a pair, so the organizer got a plain answer and no proposal.
 - **Decision:** `respond(_:to:)` refuses such a reply with the status "The proposed meeting needs both a start and an end." and queues nothing, like the existing end-before-start check.
 - **Why:** The user would otherwise believe a time was proposed.
+
+## 00:52 — Memory search follows the search rules, but keeps matching inside words {#d-bug-052}
+
+- **Status:** decided; implements [#d-memory-search](#d-memory-search) with one deviation
+- **Context:** BUG-052. The in-memory search (sample data, every launch until stored mail has loaded, and after an index error) matched the whole query as one substring in subject, sender and body only, accent-sensitively.
+- **Decision:** Every typed word must match, in any order, in any of subject, sender, To, Cc (names and addresses), the server's preview or the body; case and accents don't matter. **Deviation:** a word may still match inside a word (`report` finds "Misreported"), not only at the start of one.
+- **Why:** #d-memory-search said "at the start of a word" and assumed the existing tests used only single words. But `searchTypedBeforeTheIndexIsReady` pins memory finding "Misreported" for `report` (and `searchHitsFollowWhatIsInMemory` relies on the same difference), and existing tests are never changed. Matching more on the memory path never hides mail the index would show.
+- **Alternatives:** Word-start matching as decided (rejected: breaks an existing test). Keep "as before" (rejected in #d-memory-search).

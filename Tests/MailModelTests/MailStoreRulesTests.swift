@@ -221,4 +221,29 @@ struct MailStoreRulesTests {
         s.searchText = ""
         #expect(s.status == "Offline")
     }
+
+    /// Without the index, search follows the same rules: every word, in any order and in any field (subject,
+    /// sender, To, Cc, server preview, body); case and accents don't matter. Parts of words still match here.
+    @Test func memorySearchFollowsTheSearchRules() {
+        var unloaded = msg(work, subject: "Hi", body: "")
+        unloaded.bodyLoaded = false
+        unloaded.serverPreview = "the quarterly forecast"
+        unloaded.remoteID = "r1"
+        let s = store([
+            msg(work, subject: "Review of the budget"),
+            msg(work, subject: "To", to: [Contact(name: "Zoe Quill", email: "zoe@q.com")]),
+            msg(work, subject: "Cc", cc: [Contact(name: "Cy", email: "cy@zeta.org")]),
+            msg(work, subject: "Accent", from: "Müller"),
+            unloaded,
+        ])
+        func found(_ q: String) -> [String] { s.searchText = q; return s.visibleMessages.map(\.subject).sorted() }
+        #expect(found("budget review") == ["Review of the budget"])
+        #expect(found("  BUDGET   view ") == ["Review of the budget"])
+        #expect(found("budget lunch") == [])
+        #expect(found("quill") == ["To"])
+        #expect(found("zeta.org") == ["Cc"])
+        #expect(found("forecast quarterly") == ["Hi"])
+        #expect(found("muller") == ["Accent"])
+        #expect(found("MÜLLER accent") == ["Accent"])
+    }
 }

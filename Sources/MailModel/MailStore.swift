@@ -215,10 +215,11 @@ public final class MailStore {
             listCache = (revision, key, list)
             return list
         }
+        let words = Self.searchWords(q)
         let list = messages.filter { m in
             if !q.isEmpty {
                 guard inSearchScope(m), !isDeleted(m), m.mailbox != .junk else { return false }
-                return [m.subject, m.from.name, m.from.email, m.body].contains { $0.lowercased().contains(q) }
+                return Self.matches(m, words)
             }
             if !opened.isEmpty && opened.contains(m.id) {
                 var asOpened = m
@@ -248,6 +249,25 @@ public final class MailStore {
             }
         }
         return parts.flatMap { $0 }.sorted { $0.date > $1.date }
+    }
+
+    /// The typed words, folded as memory search compares them.
+    nonisolated private static func searchWords(_ q: String) -> [String] {
+        q.split(whereSeparator: \.isWhitespace).map { fold(String($0)) }
+    }
+
+    nonisolated private static func fold(_ s: String) -> String {
+        s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+    }
+
+    /// Memory search, by the index's rules (README "Search"): every word, in any of subject, sender, To, Cc, the
+    /// server's preview or the body; case and accents don't matter. Unlike the index, a word also matches inside
+    /// a word. The fields are joined with line breaks, which no word contains, so a word never spans two fields.
+    nonisolated private static func matches(_ m: Message, _ words: [String]) -> Bool {
+        let fields = [m.subject, m.from.name, m.from.email] + (m.to + m.cc).flatMap { [$0.name, $0.email] }
+            + [m.serverPreview ?? "", m.body]
+        let text = fold(fields.joined(separator: "\n"))
+        return words.allSatisfy { text.contains($0) }
     }
 
     private func inSearchScope(_ m: Message) -> Bool {
