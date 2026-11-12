@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [023](BUG-023-refused-change-undoes-unrelated-later-changes.md) | P3 | MailStore | A refused server change restores the whole old message, undoing later queued changes (e.g. a move) or resurrecting an erased message |
 | [024](BUG-024-junk-on-mixed-selection-swaps.md) | P3 | MailStore | Move to Junk on a mixed selection swaps each message (junk ones go to the Inbox) |
 | [025](BUG-025-trash-subfolders-not-treated-as-trash.md) | P3 | MailStore | Subfolders of Trash (deleted folders) are treated as live mail – shown in conversations and in Flagged |
 | [026](BUG-026-reply-all-duplicates-recipients.md) | P3 | MailStore | Reply All lists the same recipient several times |

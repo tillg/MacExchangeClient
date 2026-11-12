@@ -1,7 +1,7 @@
 ---
 title: "Architecture"
 created: 2026-11-12
-edited: 2026-11-12
+edited: 2026-11-13
 ---
 
 # Architecture
@@ -102,8 +102,11 @@ flowchart LR
   - `AuthenticationError`: the account is paused until relaunch; nothing more is sent or fetched for it.
   - `URLError` on `send`, `respond` or `reply`: treated as refused (`failed`), never retried, since it may have gone out.
   - Any other `URLError`: status "Offline – changes will be sent to Exchange later"; the change stays first in line.
-  - Any other error: `failed` — a send or draft is kept as a local message in Drafts; other changes restore each
-    previous message's mailbox, read state, flag and invite (or re-add it if gone). Status shows the reason.
+  - Any other error: `failed` — a send or draft is kept as a local message in Drafts. Other changes restore only
+    the property they set, and only while it still holds the value they set: read state (`setRead`), flag
+    (`setFlagged`), mailbox (`move`), the invite (and the mailbox, if still in Trash) for invite answers. A later
+    change to the same message stays. Only a refused erase (`delete`) re-adds a message that is gone; a message
+    erased after the refused change stays gone. Status shows the reason.
 - A move needs the folder list (read on demand) and renames the moved messages to the new IDs Exchange returns,
   in memory and in the queued changes (`renameRemote`). An answer sent with "Do Not Send a Response" and Remove from
   Calendar also move the item to Trash on the server, ignoring failure.

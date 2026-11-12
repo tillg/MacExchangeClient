@@ -29,18 +29,6 @@ struct Probe_StoreCoreTests {
         #expect(s.message(b.id)?.mailbox == .junk)
     }
 
-    // 5. A refused read change undoes only the read state, not a later move that is still queued.
-    @Test func refusedReadChangeDoesNotUndoALaterMove() {
-        let m = msg(work, rid: "R")
-        let s = store([m])
-        s.toggleRead([m.id])
-        s.move([m.id], to: .archive)
-        #expect(s.outbox.count == 2)
-        s.failed(s.outbox[0], "refused")
-        #expect(s.message(m.id)?.isRead == false)
-        #expect(s.message(m.id)?.mailbox == .archive, "the move is still queued for the server")
-    }
-
     // 6. Next selection: deleting the last row selects the one above.
     @Test func deletingTheLastRowSelectsThePrevious() {
         let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
@@ -198,17 +186,5 @@ struct Probe_StoreCoreTests {
         let s = store([a])
         s.setFolders([Folder(box: deleted, name: "Old", parent: .trash)], account: work.id)
         #expect(s.count(.smart(.flagged)) == 0)
-    }
-
-    // 3b. Same root cause as 5: a refused move brings back a message the user erased meanwhile.
-    @Test func refusedMoveDoesNotResurrectAnErasedMessage() {
-        let m = msg(work, rid: "R")
-        let s = store([m])
-        s.archive([m.id])            // move → archive (queued)
-        s.delete([m.id])             // move → trash (queued)
-        s.delete([m.id])             // erase (queued delete)
-        #expect(s.message(m.id) == nil)
-        s.failed(s.outbox[0], "refused")
-        #expect(s.message(m.id) == nil, "erased message is back in the Inbox while its delete is still queued")
     }
 }
