@@ -32,6 +32,8 @@ stored: [storage.md](storage.md). How EWS fills them: [ews.md](ews.md).
 - `initials`: the first letters of the first two parts of `name` split on ASCII space, uppercased.
 - `parseList(_:)` parses what the user types in To/Cc:
   1. Split on `,` and `;`, except inside double quotes (where `\"` and `\\` are escapes) or inside `<>`.
+     If a quote or `<` is never closed (or a `<` opens inside `<>`), the split ignores quotes and `<>` instead,
+     so no recipient after it is swallowed.
   2. Trim blanks and line breaks from each part; skip empty parts.
   3. A part with no `@`, `<` or `"`, followed by a part with `<`, is joined to it with ", ": Outlook's unquoted
      `Doe, John <john@x.com>` is one recipient named "Doe, John".
