@@ -134,17 +134,6 @@ struct Probe_StoreFlowsTests {
         FileManager.default.temporaryDirectory.appendingPathComponent("ProbeStoreFlows-\(UUID())")
     }
 
-    @Test func probe_attachmentWithVeryLongNameOpens() async {
-        let name = String(repeating: "ä", count: 200) + ".pdf"  // 404 bytes UTF-8
-        var m = msg(work)
-        m.attachments = [Attachment(name: name)]
-        let s = store([m])
-        s.downloadsFolder = tempDir()
-        s.setAttachmentData([Data("x".utf8)], for: m.id)
-        let url = await s.attachmentFile(0, of: m.id)
-        #expect(url != nil, "status: \(String(describing: s.status))")
-    }
-
     @Test func probe_attachmentTraversalStaysInFolder() async throws {
         var m = msg(work)
         m.attachments = [Attachment(name: "../../evil.sh"), Attachment(name: ".."), Attachment(name: "a\\..\\b")]

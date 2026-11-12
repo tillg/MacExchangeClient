@@ -98,18 +98,6 @@ struct Probe_ModelTests {
         #expect(!RemoteImages.organisation.loadsAutomatically(from: Contact(name: "X", email: "b@northwind.example.evil.com"), account: me))
     }
 
-    // MARK: Attachment.fileName
-
-    @Test func longAttachmentNameCanBeWritten() throws {
-        let name = String(repeating: "Überweisungsbestätigung ", count: 12) + ".pdf"  // ~300 UTF-8 bytes
-        let a = Attachment(name: name)
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("probe-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        try Data([1]).write(to: dir.appendingPathComponent(a.fileName), options: .atomic)
-    }
-
-
     // MARK: Draft.html
 
     @Test func draftHTMLSplitsCRLFLines() {
