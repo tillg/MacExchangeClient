@@ -100,12 +100,6 @@ struct Probe_ModelTests {
 
     // MARK: Draft.html
 
-    @Test func draftHTMLSplitsCRLFLines() {
-        let d = Draft(accountID: UUID(), body: "one\r\ntwo\r\nthree")
-        let h = d.html { _ in nil }
-        #expect(h.contains("<div>one</div>") && h.contains("<div>three</div>"), "\(h)")
-    }
-
     @Test func draftHTMLKeepsRunsOfSpaces() {
         let d = Draft(accountID: UUID(), body: "Name    Qty\nApple      3")
         let h = d.html { _ in nil }

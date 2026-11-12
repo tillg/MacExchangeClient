@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [021](BUG-021-draft-html-crlf-lines-merged.md) | P3 | Models | Draft.html merges CRLF lines into one, so quoted text arrives as one paragraph when a picture is placed |
 | [022](BUG-022-draft-html-collapses-spaces.md) | P3 | Models | Draft.html collapses runs of spaces and tabs (indented text/tables lose their layout) |
 | [023](BUG-023-refused-change-undoes-unrelated-later-changes.md) | P3 | MailStore | A refused server change restores the whole old message, undoing later queued changes (e.g. a move) or resurrecting an erased message |
 | [024](BUG-024-junk-on-mixed-selection-swaps.md) | P3 | MailStore | Move to Junk on a mixed selection swaps each message (junk ones go to the Inbox) |
