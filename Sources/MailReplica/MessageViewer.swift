@@ -131,7 +131,6 @@ struct ViewOptionsMenu: View {
 
     var body: some View {
         Menu {
-            Toggle("Show Mail Categories", isOn: Bindable(store).showCategories)
             Toggle("Show Contact Photo", isOn: $showPhoto)
         } label: {
             Label("View Options", systemImage: "line.3.horizontal")

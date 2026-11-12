@@ -1,4 +1,6 @@
+import CoreServices
 import Foundation
+import UniformTypeIdentifiers
 import Observation
 
 @MainActor
@@ -16,8 +18,6 @@ public final class MailStore {
     public var selectedMailbox: MailboxRef = .smart(.allInboxes)
     public var selection: Set<Message.ID> = []
     public var filterUnread = false
-    public var category: MailCategory = .primary
-    public var showCategories = true
     public var searchText = ""
     /// Last sync problem or notice, shown under the window title.
     public var status: String?
@@ -138,15 +138,14 @@ public final class MailStore {
     }
 
     private struct ListKey: Equatable {
-        var mailbox: MailboxRef, query: String, filterUnread: Bool, category: MailCategory, showCategories: Bool
+        var mailbox: MailboxRef, query: String, filterUnread: Bool
     }
 
     /// Messages for the list pane: mailbox (or whole account/all mail while searching),
-    /// category, unread filter, newest first.
+    /// unread filter, newest first.
     public var visibleMessages: [Message] {
         let q = searchText.trimmingCharacters(in: .whitespaces).lowercased()
-        let key = ListKey(mailbox: selectedMailbox, query: q, filterUnread: filterUnread, category: category,
-                          showCategories: showCategories)
+        let key = ListKey(mailbox: selectedMailbox, query: q, filterUnread: filterUnread)
         _ = messages.count  // registers the dependency for SwiftUI even when the cache answers
         if let c = listCache, c.revision == revision, c.key == key { return c.list }
         let list = messages.filter { m in
@@ -156,7 +155,6 @@ public final class MailStore {
             }
             guard contains(selectedMailbox, m) else { return false }
             if filterUnread && m.isRead { return false }
-            if showCategories && selectedMailbox.isInbox && m.category != category { return false }
             return true
         }
         .sorted { $0.date > $1.date }
@@ -595,11 +593,13 @@ public final class MailStore {
         switch p.change {
         case let .send(d), let .saveDraft(d):
             let acct = account(d.accountID)
-            add(Message(accountID: d.accountID, mailbox: .drafts,
-                        from: Contact(name: acct?.name ?? "", email: acct?.address ?? ""),
-                        to: Contact.parseList(d.to), cc: Contact.parseList(d.cc),
-                        subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
-                        body: d.body, date: .now, isRead: true))
+            let m = Message(accountID: d.accountID, mailbox: .drafts,
+                            from: Contact(name: acct?.name ?? "", email: acct?.address ?? ""),
+                            to: Contact.parseList(d.to), cc: Contact.parseList(d.cc),
+                            subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
+                            body: d.text, date: .now, isRead: true, attachments: d.attachments.map(\.attachment))
+            add(m)
+            if !d.attachments.isEmpty { setAttachmentData(d.attachments.map(\.data), for: m.id) }
             status = "Couldn't send “\(d.subject)”: \(error). It's in Drafts on this Mac."
         default:
             for old in p.previous {
@@ -767,6 +767,98 @@ public final class MailStore {
         do { setInlineImages(try await backend.inlineImages(remoteID: rid, contentIDs: ids), for: id) } catch {
             if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load images: \(error.localizedDescription)" }
         }
+    }
+
+    // MARK: Attachments
+
+    /// Where opened attachments are written, a folder per message, like Mail's "Mail Downloads".
+    @ObservationIgnored public var downloadsFolder = FileManager.default.temporaryDirectory
+        .appendingPathComponent("Mail Downloads")
+    /// The content of attachments of messages without a server (sample data), by position.
+    @ObservationIgnored private var localAttachments: [Message.ID: [Data]] = [:]
+    /// What Quick Look shows: every attachment of a message, and the one in front.
+    public var previewItems: [URL] = []
+    public var previewItem: URL?
+
+    /// For sample data and tests: the content of a local message's attachments, in order.
+    public func setAttachmentData(_ data: [Data], for id: Message.ID) { localAttachments[id] = data }
+
+    /// The attachment as a file, fetched from the server the first time. nil (and a status) if that fails.
+    public func attachmentFile(_ index: Int, of id: Message.ID) async -> URL? {
+        guard let m = message(id), m.attachments.indices.contains(index) else { return nil }
+        let a = m.attachments[index]
+        // A folder per position: two attachments may have the same name.
+        let url = downloadsFolder.appendingPathComponent(id.uuidString).appendingPathComponent("\(index)")
+            .appendingPathComponent(a.fileName)
+        if FileManager.default.fileExists(atPath: url.path) { return url }
+        do {
+            let data: Data
+            if let local = localAttachments[id], local.indices.contains(index) {
+                data = local[index]
+            } else if let rid = m.remoteID, let backend = backends[m.accountID], !paused.contains(m.accountID) {
+                data = try await backend.attachment(remoteID: rid, index: index)
+            } else {
+                status = "Couldn't open “\(a.name)”: its content isn't available."
+                return nil
+            }
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: url, options: .atomic)
+            // As Mail does: Gatekeeper then asks before an attached app or script runs.
+            try (url as NSURL).setResourceValue([kLSQuarantineTypeKey as String: kLSQuarantineTypeEmailAttachment as String,
+                                                 kLSQuarantineAgentNameKey as String: "Mail Replica"],
+                                                forKey: .quarantinePropertiesKey)
+            return url
+        } catch {
+            if !pauseIfSignInFailed(error, account: m.accountID) {
+                status = "Couldn't open “\(a.name)”: \(error.localizedDescription)"
+            }
+            return nil
+        }
+    }
+
+    /// Copies the attachment into `folder` without replacing anything there ("name 2.pdf", as in the Finder).
+    public func saveAttachment(_ index: Int, of id: Message.ID, to folder: URL) async -> URL? {
+        guard let file = await attachmentFile(index, of: id) else { return nil }
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let target = Self.freeURL(for: file.lastPathComponent, in: folder)
+            try FileManager.default.copyItem(at: file, to: target)
+            return target
+        } catch {
+            status = "Couldn't save “\(file.lastPathComponent)”: \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    /// File ▸ Save Attachments…: every attachment of the message into one folder.
+    public func saveAllAttachments(of id: Message.ID, to folder: URL) async -> [URL] {
+        var saved: [URL] = []
+        for i in message(id)?.attachments.indices ?? 0..<0 {
+            if let url = await saveAttachment(i, of: id, to: folder) { saved.append(url) }
+        }
+        return saved
+    }
+
+    /// Quick Look over all of the message's attachments, starting at `index`.
+    public func quickLookAttachments(of id: Message.ID, at index: Int = 0) async {
+        var files: [URL] = [], front: URL?
+        for i in message(id)?.attachments.indices ?? 0..<0 {
+            guard let url = await attachmentFile(i, of: id) else { continue }
+            files.append(url)
+            if i == index { front = url }
+        }
+        previewItems = files
+        previewItem = front ?? files.first
+    }
+
+    static func freeURL(for name: String, in folder: URL) -> URL {
+        let ext = (name as NSString).pathExtension, base = (name as NSString).deletingPathExtension
+        var url = folder.appendingPathComponent(name), n = 2
+        while FileManager.default.fileExists(atPath: url.path) {
+            url = folder.appendingPathComponent(ext.isEmpty ? "\(base) \(n)" : "\(base) \(n).\(ext)")
+            n += 1
+        }
+        return url
     }
 
     /// For sample data and tests: a day of made-up calendar entries next to an invite.
@@ -957,7 +1049,7 @@ public final class MailStore {
 
     // MARK: Compose
 
-    public func draft(_ kind: ReplyKind, to id: Message.ID) -> Draft {
+    public func draft(_ kind: ReplyKind, to id: Message.ID, includeAttachments: IncludeAttachments = .never) -> Draft {
         guard let m = message(id) else { return Draft(accountID: accounts[0].id) }
         let me = account(m.accountID)?.address
         let prefix = kind == .forward ? "Fwd: " : "Re: "
@@ -975,7 +1067,68 @@ public final class MailStore {
             to = ([m.from] + m.to + m.cc).map(\.email).filter { $0 != me }.joined(separator: ", ")
         case .forward: break
         }
-        return Draft(accountID: m.accountID, to: to, subject: subject, body: header + quoted)
+        var d = Draft(accountID: m.accountID, to: to, subject: subject, body: header + quoted)
+        if m.hasAttachments || !m.attachments.isEmpty {
+            d.original = id
+            // Forward always takes them along; a reply only with Include Attachments With Replies ▸ Always.
+            if kind == .forward || includeAttachments == .always { d.loadingOriginal = id }
+        }
+        return d
+    }
+
+    /// Include Attachments With Replies ▸ When Adding Recipients: the reply now goes to someone who
+    /// wasn't on the original message.
+    public func addsNewRecipient(_ d: Draft) -> Bool {
+        guard let id = d.original, let m = message(id) else { return false }
+        var known = Set(([m.from] + m.to + m.cc).map { $0.email.lowercased() })
+        if let me = account(m.accountID)?.address { known.insert(me.lowercased()) }
+        return (Contact.parseList(d.to) + Contact.parseList(d.cc))
+            .contains { $0.email.contains("@") && !known.contains($0.email.lowercased()) }
+    }
+
+    /// Adds files to a draft. A folder (or package) goes as a zip archive of it, made the way the Finder
+    /// compresses. Unreadable items are left out, with a note in `status`.
+    public func attach(_ urls: [URL], to draft: inout Draft) { draft.attachments += files(urls) }
+
+    /// The files to attach: a folder as a zip of it. Reports the ones that can't be read.
+    public func files(_ urls: [URL]) -> [DraftAttachment] {
+        var files: [DraftAttachment] = [], skipped: [String] = []
+        for url in urls {
+            let isFolder = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            if isFolder {
+                guard let zip = Self.zipped(url) else { skipped.append(url.lastPathComponent); continue }
+                files.append(DraftAttachment(name: url.lastPathComponent + ".zip", contentType: "application/zip", data: zip))
+                continue
+            }
+            guard let data = try? Data(contentsOf: url) else { skipped.append(url.lastPathComponent); continue }
+            files.append(DraftAttachment(name: url.lastPathComponent,
+                                         contentType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType, data: data))
+        }
+        if !skipped.isEmpty { status = "Couldn't attach \(skipped.map { "“\($0)”" }.joined(separator: ", "))." }
+        return files
+    }
+
+    /// A zip of the folder, from the system's "for uploading" read (it zips folders on the fly).
+    static func zipped(_ folder: URL) -> Data? {
+        var data: Data?, error: NSError?
+        NSFileCoordinator().coordinate(readingItemAt: folder, options: .forUploading, error: &error) { zipURL in
+            data = try? Data(contentsOf: zipURL)
+        }
+        return data
+    }
+
+    /// Adds the original message's attachments (a forward, or a reply that includes them), fetched from the
+    /// server if needed, as in Mail.
+    public func includeOriginalAttachments(in draft: inout Draft) async {
+        guard let id = draft.loadingOriginal, let m = message(id) else { draft.loadingOriginal = nil; return }
+        if m.needsBody { await loadBody(id) }
+        for (i, a) in (message(id)?.attachments ?? []).enumerated() {
+            guard let url = await attachmentFile(i, of: id), let data = try? Data(contentsOf: url) else { continue }
+            draft.attachments.append(DraftAttachment(
+                name: a.name, contentType: a.contentType ?? UTType(filenameExtension: url.pathExtension)?.preferredMIMEType,
+                data: data, fromOriginal: true))
+        }
+        draft.loadingOriginal = nil
     }
 
     /// An invite answer "with comments" as a message, like Outlook's: to the organizer, with the subject
@@ -994,9 +1147,37 @@ public final class MailStore {
                                                 proposedEnd: proposing ? invite.end : nil))
     }
 
+    // MARK: Message size
+
+    /// The largest message each account may send, as its server reports it.
+    public private(set) var maxMessageSizes: [UUID: Int] = [:]
+
+    public func setMaxMessageSize(_ size: Int, for account: UUID) { maxMessageSizes[account] = size }
+
+    /// Asks the server once per session; without an answer there is no limit to show.
+    public func loadMaxMessageSize(for account: UUID) async {
+        guard maxMessageSizes[account] == nil, let backend = backends[account], !paused.contains(account),
+              let address = self.account(account)?.address,
+              let size = try? await backend.maxMessageSize(from: address) else { return }
+        maxMessageSizes[account] = size
+    }
+
+    public func maximumSize(for d: Draft) -> Int? { maxMessageSizes[d.accountID] }
+
+    /// Over the account's limit: Send asks first, as Mail does before Mail Drop.
+    public func isOverSizeLimit(_ d: Draft) -> Bool { maximumSize(for: d).map { d.estimatedSize > $0 } ?? false }
+
+    /// Mail's AttachmentsPendingMessage: a forward isn't sent or saved before its original files are in.
+    private func attachmentsPending(_ d: Draft) -> Bool {
+        guard d.loadingOriginal != nil else { return false }
+        status = "This message contains attachments that are still being loaded."
+        return true
+    }
+
     public func send(_ d: Draft) {
+        if attachmentsPending(d) { return }
         if let a = d.inviteAnswer {
-            let text = d.body.trimmingCharacters(in: .whitespacesAndNewlines)
+            let text = d.text.trimmingCharacters(in: .whitespacesAndNewlines)
             return respond(InviteReply(response: a.response, comment: text.isEmpty ? nil : text,
                                        proposedStart: a.proposedStart, proposedEnd: a.proposedEnd), to: a.messageID)
         }
@@ -1005,20 +1186,25 @@ public final class MailStore {
             outbox.append(PendingChange(account: acct.id, change: .send(d), previous: []))
             return scheduleFlush()
         }
-        add(Message(accountID: acct.id, mailbox: .sent, from: Contact(name: acct.name, email: acct.address),
-                                to: Contact.parseList(d.to), cc: Contact.parseList(d.cc), subject: d.subject,
-                                body: d.body, date: .now, isRead: true))
+        let m = Message(accountID: acct.id, mailbox: .sent, from: Contact(name: acct.name, email: acct.address),
+                        to: Contact.parseList(d.to), cc: Contact.parseList(d.cc), subject: d.subject,
+                        body: d.text, date: .now, isRead: true, attachments: d.attachments.map(\.attachment))
+        add(m)
+        if !d.attachments.isEmpty { setAttachmentData(d.attachments.map(\.data), for: m.id) }
     }
 
     public func saveDraft(_ d: Draft) {
+        if attachmentsPending(d) { return }
         let acct = account(d.accountID) ?? accounts[0]
         if serverAccounts.contains(acct.id) {
             outbox.append(PendingChange(account: acct.id, change: .saveDraft(d), previous: []))
             return scheduleFlush()
         }
-        add(Message(accountID: acct.id, mailbox: .drafts, from: Contact(name: acct.name, email: acct.address),
-                                to: Contact.parseList(d.to), subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
-                                body: d.body, date: .now, isRead: true))
+        let m = Message(accountID: acct.id, mailbox: .drafts, from: Contact(name: acct.name, email: acct.address),
+                        to: Contact.parseList(d.to), subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
+                        body: d.text, date: .now, isRead: true, attachments: d.attachments.map(\.attachment))
+        add(m)
+        if !d.attachments.isEmpty { setAttachmentData(d.attachments.map(\.data), for: m.id) }
     }
 }
 

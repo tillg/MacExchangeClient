@@ -13,10 +13,6 @@ struct MessageListView: View {
         let lookup = Lookup(msgs)
         let isEmpty = msgs.isEmpty
         VStack(spacing: 0) {
-            if store.showCategories && store.selectedMailbox.isInbox && store.searchText.isEmpty {
-                CategoryBar()
-                Divider()
-            }
             List(selection: Bindable(store).selection) {
                 ForEach(msgs.map(\.id), id: \.self) { id in
                     let m = lookup.byID[id]!
@@ -133,46 +129,6 @@ struct MessageRow: View {
             return d.formatted(.dateTime.weekday(.wide))
         }
         return d.formatted(date: .numeric, time: .omitted)
-    }
-}
-
-/// Inbox category strip: the selected category expands to show its title.
-struct CategoryBar: View {
-    @Environment(MailStore.self) private var store
-
-    var body: some View {
-        HStack(spacing: 6) {
-            ForEach(MailCategory.allCases, id: \.self) { cat in
-                let on = store.category == cat
-                Button { withAnimation(.snappy) { store.category = cat } } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: cat.symbol + (on ? ".fill" : ""))
-                        if on { Text(cat.title).fixedSize() }
-                    }
-                    .font(.system(size: 12, weight: on ? .semibold : .regular))
-                    .foregroundStyle(on ? Color.white : Color.secondary)
-                    .padding(.horizontal, on ? 12 : 0)
-                    .frame(maxWidth: on ? nil : .infinity, minHeight: 26)
-                    .background(Capsule().fill(on ? cat.color : Color.secondary.opacity(0.12)))
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .help(cat.title)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-    }
-}
-
-extension MailCategory {
-    var color: Color {
-        switch self {
-        case .primary: .blue
-        case .transactions: .green
-        case .updates: .purple
-        case .promotions: .pink
-        }
     }
 }
 

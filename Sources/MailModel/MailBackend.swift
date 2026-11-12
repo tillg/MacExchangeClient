@@ -15,6 +15,10 @@ public protocol MailBackend: Sendable {
     func body(remoteID: String) async throws -> MessageBody
     /// The message's attached images with these content IDs, keyed by content ID (without `<>`).
     func inlineImages(remoteID: String, contentIDs: Set<String>) async throws -> [String: InlineImage]
+    /// The content of one attachment, by its position in `MessageBody.attachments`. Fetched when it is opened.
+    func attachment(remoteID: String, index: Int) async throws -> Data
+    /// The largest message the account may send, in bytes, if the server says.
+    func maxMessageSize(from address: String) async throws -> Int?
     /// Calendar entries between two times, for the day next to an invite.
     func events(from: Date, to: Date) async throws -> [CalendarEvent]
 
@@ -106,14 +110,14 @@ public struct SyncResult: Sendable {
 /// The full message. Sender and recipients are included because list summaries may lack email addresses.
 public struct MessageBody: Sendable {
     public var text: String
-    public var attachments: [String]
+    public var attachments: [Attachment]
     public var from: Contact?
     public var to: [Contact]?
     public var cc: [Contact]?
     public var invite: Invite?
     /// The HTML body, if the message has one; `text` is then its plain-text version.
     public var html: String?
-    public init(text: String, attachments: [String], from: Contact? = nil, to: [Contact]? = nil, cc: [Contact]? = nil,
+    public init(text: String, attachments: [Attachment], from: Contact? = nil, to: [Contact]? = nil, cc: [Contact]? = nil,
                 invite: Invite? = nil, html: String? = nil) {
         self.text = text; self.attachments = attachments; self.from = from; self.to = to; self.cc = cc; self.invite = invite
         self.html = html

@@ -6,7 +6,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark.png">
-  <img alt="Three-column mail window: mailboxes sidebar, message list with category bar, message view" src="docs/screenshots/light.png">
+  <img alt="Three-column mail window: mailboxes sidebar, message list, message view" src="docs/screenshots/light.png">
 </picture>
 
 > **Status:** reads and changes mail on on-prem Exchange over EWS. Without an account it shows built-in sample messages. See [Roadmap](#roadmap).
@@ -25,14 +25,15 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 
   Attendee answer icons are missing: your copy of an invite reports every attendee's answer as unknown.
 - **HTML mail:** shown as the sender laid it out, on a white page also in dark mode. Mail without its own fonts uses Mail's default, Helvetica 14, with Mail's margins. Images, styles and fonts from the web follow Outlook's "Download external images" (Settings ▸ Privacy): by default they load for senders in your organisation (your account's mail domain and its subdomains). Other mail shows Load Remote Content first, so opening it doesn't tell the sender. Images load straight from the sender's server, with no privacy relay like Mail's. The app runs no JavaScript in mail, and links open in your browser. Images attached to the message and shown in its text (`cid:`, such as signature logos) load from Exchange when you open the message; they are kept in memory only, not in the cache. The list, search and replies use the plain-text version, which Exchange sends along
+- **Attachments, as in Mail:** shown below the text. Pictures appear in place, other files as their Finder icon with name and size. Double-click opens a file. Space shows Quick Look, and dragging to the Finder saves a copy. Control-click gives Mail's menu: Open Attachment, Open With, Quick Look Attachment, Save Attachment…, Save to Downloads Folder, and View as Icon / View in Place for pictures. The paperclip in the header shows the count; its menu saves one file or all of them, or opens Quick Look. File ▸ Save Attachments… asks for a folder, and File ▸ Quick Look Attachments… (⌘Y) shows them all. Content loads from Exchange only when you open a file. It goes to a temporary "Mail Downloads" folder, not the cache. An attached message opens as a `.eml` file. Saving never replaces a file: a second copy becomes "name 2.pdf".
 - **Three-column window** with a mailboxes sidebar, a message list and a message view, using Mail's toolbar layout and SF Symbols
 - **Favorites and smart mailboxes:** All Inboxes, VIPs, Flagged, Unread, then each account's Inbox, Drafts, Sent, Junk, Trash and Archive, with unread badges
 - **Folder trees, as in Mail:** each account's own folders follow its standard mailboxes, sorted by name. Subfolders sit under their parent (for example Inbox ▸ Projects ▸ Launch), behind a disclosure triangle. With more than one account, Favorites ▸ All Inboxes opens into each account's Inbox. Folders are move and drop targets, and the Move menu lists them indented under their parent. From Exchange you get every mail folder below the mailbox root, without calendar, contacts, tasks, Outbox and hidden folders. The folder list is read once per launch, so a folder created elsewhere shows up after a relaunch. Mail in a subfolder of Inbox doesn't count towards All Inboxes, as in Mail
-- **Categories:** Primary, Transactions, Updates and Promotions in the Inbox (⌥⌘1–4)
 - **Message actions:** reply, reply all, forward, archive, delete, junk, flag in seven colours, mark read or unread. After an action the next message is selected, as in Mail
 - **Drag & drop:** drag messages onto a mailbox to move them, also to another account. Drop them on Flagged to flag them, or on All Inboxes to put each back in its own Inbox
 - **Search** across the whole account (not Trash or Junk), plus an unread filter
 - **Compose window** with reply quoting, Send and Save Draft
+- **Attaching files:** Attach (paperclip) in the compose toolbar, File ▸ Attach Files… (⇧⌘A), or drop files on the window, the text included (Finder files, and pictures from Photos as file promises). A folder goes as a zip of it (Folder.zip). Files sit in the text, as in Mail: pictures shown in place (scaled to the window width), other files as their icon with name and size. Drop them where you want them, drag them to another place, cut and paste them, or delete them like a character. Attach and ⇧⌘A put files at the insertion point, the original's files go at the end. Pictures placed in the text go out in their place: the message is then sent as HTML (a `<div>` per line, as Mail writes it) with the pictures as inline attachments it references by `cid:`. Other files are ordinary attachments, so recipients see them in the attachment list, not at their place in the text (Exchange's HTML body can only place pictures). Only JPEG, PNG and GIF go inline; other picture types (HEIC from an iPhone, TIFF) show in place while composing but go as ordinary attachments, since many clients can't draw them. Without pictures in the text the message stays plain text. Forward takes the original's attachments along. Replies follow Edit ▸ Include Attachments With Replies: Never (the default here), Ask, When Adding Recipients (once you leave To/Cc, or press Return, with someone added who wasn't on the original) or Always. The Include/Exclude Attachments button in the compose toolbar adds or removes the original's files by hand. The header shows the Message Size once files are attached, in red with "(maximum …)" when it is over the limit Exchange reports for the account (MailTips). Sending over the limit asks first (Try Sending in Email / Cancel). Mail Drop isn't possible: it uploads to iCloud and needs an Apple Account sign-in, and there is no public API for other apps. On Exchange a message with files is saved in Drafts, the files are added, and then it is sent (the order Microsoft documents for EWS). A forward can't be sent until the original's files have loaded.
 - **Swipe actions:** swipe right for Unread, left for Trash or Flag
 - **Menu bar and shortcuts** taken from Mail's own `MainMenu.nib`
 - **Light and dark mode**
@@ -102,7 +103,9 @@ A change you made that hasn't reached the server yet is kept when a sync reports
 | Reply All | ⇧⌘R | | Read / Unread | ⇧⌘U |
 | Forward | ⇧⌘F | | Toggle flag | ⇧⌘L |
 | Send | ⇧⌘D | | Unread filter | ⌘L |
-| Go to mailbox | ⌘1–9 | | Category | ⌥⌘1–4 |
+| Attach files | ⇧⌘A | | Quick Look attachments | ⌘Y |
+| Quick Look one attachment | Space | | | |
+| Go to mailbox | ⌘1–9 | | | |
 
 ## Project layout
 
@@ -132,7 +135,7 @@ MAIL_SNAPSHOT=$PWD/tmp/snap.png .build/debug/MailReplica
 MAIL_SNAPSHOT=$PWD/tmp/snap-dark.png MAIL_SNAPSHOT_DARK=1 .build/debug/MailReplica
 ```
 
-`MAIL_SNAPSHOT_SUBJECT="Q4 numbers review"` selects a message by subject (here the sample invite), switching to its category; `"30% off everything this weekend 🌊"` is the sample HTML newsletter. HTML bodies are drawn into the PNG once they have loaded. `MAIL_SNAPSHOT_HTML=mail.html` shows that file as the selected message's HTML body, to check how a particular mail renders. `MAIL_SNAPSHOT_ANSWER=decline` (or `accept`, `tentative`, `propose`) opens the answer window for the selected invite and captures that window. `MAIL_SNAPSHOT_PROGRESS=0.3` shows the progress bar. Use `MAIL_SAMPLE_DATA=1` so no real mail ends up in a screenshot.
+`MAIL_SNAPSHOT_SUBJECT="Q4 numbers review"` selects a message by subject (here the sample invite); `"30% off everything this weekend 🌊"` is the sample HTML newsletter. HTML bodies are drawn into the PNG once they have loaded. `MAIL_SNAPSHOT_HTML=mail.html` shows that file as the selected message's HTML body, to check how a particular mail renders. `MAIL_SNAPSHOT_ANSWER=decline` (or `accept`, `tentative`, `propose`) opens the answer window for the selected invite and captures that window. `MAIL_SNAPSHOT_PROGRESS=0.3` shows the progress bar. `MAIL_SNAPSHOT_SIZE=1280x800` sets the window size first; the README screenshots use it, scaled to 1× with `sips -Z 1280`. `MAIL_SNAPSHOT_DROP=a.jpg:b.txt` (with `MAIL_SNAPSHOT_ANSWER=forward`) drops those files onto the message text through a real pasteboard, at character `MAIL_SNAPSHOT_DROP_AT` (default 0). `MAIL_SNAPSHOT_EDIT=move` then cuts the first file and pastes it at the end (through RTFD), `delete` deletes it; both print the files the text holds afterwards. Use `MAIL_SAMPLE_DATA=1` so no real mail ends up in a screenshot.
 
 ## How faithful is it?
 
@@ -146,9 +149,13 @@ The details come from Mail.app's own resources in `/System/Applications/Mail.app
 | Toolbar | toggle sidebar · back/forward · filter · view options · compose ‖ reply/reply all/forward · archive/delete/junk · move · flag ‖ search | ✅ `MainWindow.toolbar` default set and SF Symbol names |
 | Sidebar | Favorites, Smart Mailboxes, per-account mailboxes, badges | ✅ `Sidebar*.icns` names · ⚠️ badge rules |
 | Folder tree | Own folders after the standard ones, by name; subfolders behind disclosure triangles, closed at launch; a closed folder shows only its own count; All Inboxes opens into one Inbox per account | ⚠️ from memory of Mail, not read from the bundle |
-| Categories | Primary, Transactions, Updates, Promotions | ✅ `MainMenu.nib` · ⚠️ colours |
 | Flags | Red, Orange, Yellow, Green, Blue, Purple, Gray | ✅ `MainMenu.nib` |
 | Shortcuts | See table above | ✅ `MainMenu.nib` key equivalents |
+| Attachments | Context menu items and order; File ▸ Save Attachments…, Quick Look Attachments… ⌘Y; "name (size)" | ✅ `ViewAttachmentContextMenu.nib`, `MainMenu.nib`, `Localizable.loctable` |
+| Compose attachments | Attach button, paperclip and tooltip; Attach Files… ⇧⌘A | ✅ `ComposeWindow.toolbar`, `Localizable.loctable`, `MainMenu.nib` |
+| Compose attachment layout | Files in the text where dropped (Mail's Edit ▸ Attachments ▸ Insert Attachments at End is in `MainMenu.nib`; off by default, from memory); forward includes attachments | ✅ menu item; ⚠️ Attach inserting at the insertion point and the original's files at the end, icon look; the sent HTML (`<div>` per line, body style) from memory of Mail's output; non-picture files not placed in the sent mail |
+| Replies and size | Include Attachments With Replies (Never/Ask/When Adding Recipients/Always), Include/Exclude Attachments button, "Message Size:", "%@ (maximum %@)", the Try Sending in Email button | ✅ `MainMenu.nib`, `ComposeWindow.toolbar`, `ComposeViewControllerWK2.loctable`, `Compose.loctable` · ⚠️ default Never, the Ask dialog's wording, the over-limit alert's title and text, folders as zip, the size estimate |
+| Attachment layout | Pictures in place, other files as icons below the text; the header paperclip with count and its menu; Space, drag-out and double-click; the "name 2" rule for duplicates | ⚠️ Apple's Mail User Guide and memory of Mail, not read from the bundle |
 | List row | Unread dot, bold sender, relative date, subject, 2-line preview, flag, paperclip, optional contact photo | ⚠️ drawn in code · ✅ fonts 13pt / 11pt |
 | Behaviour | Marked read when shown; Delete goes to the account's Trash and deleting from Trash erases; Junk toggles; next message selected after an action; drag & drop as described above | ⚠️ tested in `MailStoreTests` |
 
@@ -163,8 +170,10 @@ The details come from Mail.app's own resources in `/System/Applications/Mail.app
 - [x] Local cache on disk, so a launch doesn't sync everything again
 - [x] HTML message view
 - [x] Inline images in HTML mail
-- [ ] Opening attachments
+- [x] Opening attachments
+- [x] Adding attachments to new mail
+- [x] Pictures keep their place in the sent mail (HTML body with inline pictures)
 - [x] Custom folders and subfolders, as a tree
 - [ ] Microsoft Graph backend, once the mailbox is reachable there
 
-**Not planned for now:** rules, conversation threading, rich-text compose, Remind Me, Follow Up, Mute, and the separate message window on double-click.
+**Not planned for now:** mail categories (removed: not used here), rules, conversation threading, rich-text compose, Remind Me, Follow Up, Mute, and the separate message window on double-click.

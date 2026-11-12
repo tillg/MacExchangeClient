@@ -307,26 +307,40 @@ public final class MailDatabase: @unchecked Sendable {
         }
     }
 
+    /// Attachments as "name␟size␟type␞…". Older rows hold names only.
+    static func attachments(_ list: [Attachment]) -> String {
+        list.map { [$0.name, $0.size.map(String.init) ?? "", $0.contentType ?? ""].joined(separator: "\u{1F}") }
+            .joined(separator: "\u{1E}")
+    }
+
+    static func attachments(_ s: String) -> [Attachment] {
+        s.isEmpty ? [] : s.components(separatedBy: "\u{1E}").map { a in
+            let f = a.components(separatedBy: "\u{1F}")
+            return Attachment(name: f[0], size: f.count > 1 ? Int(f[1]) : nil,
+                              contentType: f.count > 2 && !f[2].isEmpty ? f[2] : nil)
+        }
+    }
+
     private static func bind(_ m: Message, _ st: Statement) throws {
         st.bind(1, m.id.uuidString); st.bind(2, m.accountID.uuidString); st.bind(3, m.mailbox.rawValue)
         st.bind(4, m.remoteID); st.bind(5, m.date.timeIntervalSinceReferenceDate); st.bind(6, m.isRead ? 1 : 0)
         st.bind(7, m.flag?.rawValue); st.bind(8, m.from.name); st.bind(9, m.from.email); st.bind(10, contacts(m.to))
         st.bind(11, contacts(m.cc)); st.bind(12, m.subject); st.bind(13, m.body); st.bind(14, m.category.rawValue)
         st.bind(15, (m.isVIP ? vip : 0) | (m.hasAttachments ? attach : 0) | (m.bodyLoaded ? loaded : 0))
-        st.bind(16, m.attachments.joined(separator: "\u{1E}")); st.bind(17, m.serverPreview)
+        st.bind(16, attachments(m.attachments)); st.bind(17, m.serverPreview)
         st.bind(18, try m.invite.map { try JSONEncoder().encode($0) }); st.bind(19, m.html)
         st.bind(20, m.isInvite.map { $0 ? 1 : 0 }); st.bind(21, m.htmlChecked.map { $0 ? 1 : 0 })
     }
 
     private static func message(_ r: Statement) -> Message? {
         guard let id = UUID(uuidString: r.text(0)), let account = UUID(uuidString: r.text(1)) else { return nil }
-        let bits = r.int(14), attachments = r.text(15)
+        let bits = r.int(14), files = r.text(15)
         var m = Message(id: id, accountID: account, mailbox: MailboxKind(rawValue: r.text(2)),
                         from: Contact(name: r.text(7), email: r.text(8)), to: contacts(r.text(9)), cc: contacts(r.text(10)),
                         subject: r.text(11), body: r.text(12), date: Date(timeIntervalSinceReferenceDate: r.double(4)),
                         isRead: r.int(5) == 1, flag: r.optionalText(6).flatMap(FlagColor.init(rawValue:)),
                         category: MailCategory(rawValue: r.text(13)) ?? .primary, isVIP: bits & vip != 0,
-                        attachments: attachments.isEmpty ? [] : attachments.components(separatedBy: "\u{1E}"),
+                        attachments: attachments(files),
                         remoteID: r.optionalText(3), hasAttachments: bits & attach != 0, serverPreview: r.optionalText(16),
                         bodyLoaded: bits & loaded != 0)
         m.invite = r.isNull(17) ? nil : try? JSONDecoder().decode(Invite.self, from: r.data(17))

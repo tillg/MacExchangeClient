@@ -69,4 +69,45 @@ struct EWSLiveTests {
         #expect(Set(own.map(\.id)).isDisjoint(with: standard.map(\.id)))
         #expect(own.allSatisfy { !$0.name.isEmpty })
     }
+
+    /// The account's sending limit from MailTips. Prints the limit only.
+    @Test(.enabled(if: EWSLiveTests.backend != nil)) func maxMessageSizeFromMailTips() async throws {
+        let b = try #require(Self.backend)
+        let me = try #require(Self.env["EWS_EMAIL"] ?? ExchangeAccount.saved().first?.email)
+        let size = try await b.maxMessageSize(from: me)
+        print("MAXSIZE \(size.map(String.init) ?? "none")")
+        #expect((size ?? 0) > 1_000_000)
+    }
+
+    /// Lists the inbox's newest messages with attachments and fetches each listed attachment's content.
+    /// Also counts listed pictures whose content ID the HTML uses (they would show twice). Prints counts only.
+    @Test(.enabled(if: EWSLiveTests.backend != nil)) func attachmentsOfRecentMailOpen() async throws {
+        let b = try #require(Self.backend)
+        let inbox = try #require(try await b.folders().first { $0.role == .inbox })
+        let withFiles = try await b.newest(in: inbox, limit: 200).filter(\.hasAttachments).prefix(8)
+        var listed = 0, sized = 0, fetched = 0, messages = 0, alsoInHTML = 0
+        for m in withFiles {
+            let rid = try #require(m.remoteID)
+            let doc = try await b.client.call(EWSBackend.bodyRequest(rid))
+            let item = try #require(doc.first("Items")?.elementChildren.first)
+            let body = EWSBackend.parseBody(item)
+            let cids = body.html.map(HTMLPage.contentIDs) ?? []
+            for (i, a) in body.attachments.enumerated() {
+                listed += 1
+                if a.size != nil { sized += 1 }
+                if a.contentType == "message/rfc822" { messages += 1 }
+                let entry = EWSBackend.listedAttachments(item)[i]
+                if a.contentType?.hasPrefix("image/") == true, entry.id != nil,
+                   item.child("Attachments")?.elementChildren.contains(where: {
+                       $0.child("AttachmentId")?.attr("Id") == entry.id && $0.text("ContentId").map(EWSBackend.contentID).map(cids.contains) == true
+                   }) == true { alsoInHTML += 1 }
+                if (a.size ?? 0) > 5_000_000 { continue }
+                let data = try await b.attachment(remoteID: rid, index: i)
+                #expect(!data.isEmpty)
+                fetched += 1
+            }
+        }
+        print("ATTACHMENTS messages \(withFiles.count), listed \(listed), sized \(sized), fetched \(fetched), eml \(messages), alsoInHTML \(alsoInHTML)")
+        #expect(listed == sized)
+    }
 }

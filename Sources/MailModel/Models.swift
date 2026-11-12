@@ -98,15 +98,6 @@ public enum FlagColor: String, CaseIterable, Hashable, Codable, Sendable {
 /// Mail Categories (Inbox top bar).
 public enum MailCategory: String, CaseIterable, Hashable, Codable, Sendable {
     case primary, transactions, updates, promotions
-    public var title: String { rawValue.capitalized }
-    public var symbol: String {
-        switch self {
-        case .primary: "person"
-        case .transactions: "cart"
-        case .updates: "message"
-        case .promotions: "megaphone"
-        }
-    }
 }
 
 public struct Contact: Hashable, Codable, Sendable {
@@ -148,7 +139,7 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
     public var flag: FlagColor?
     public var category: MailCategory
     public var isVIP: Bool
-    public var attachments: [String]
+    public var attachments: [Attachment]
     /// Set for messages that live on a server; nil for local sample data.
     public var remoteID: String?
     /// Servers report this before the attachment names are fetched with the body.
@@ -170,7 +161,7 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
     public init(id: UUID = UUID(), accountID: UUID, mailbox: MailboxKind = .inbox, from: Contact, to: [Contact],
                 cc: [Contact] = [], subject: String, body: String, date: Date, isRead: Bool = false,
                 flag: FlagColor? = nil, category: MailCategory = .primary, isVIP: Bool = false,
-                attachments: [String] = [], remoteID: String? = nil, hasAttachments: Bool? = nil,
+                attachments: [Attachment] = [], remoteID: String? = nil, hasAttachments: Bool? = nil,
                 serverPreview: String? = nil, bodyLoaded: Bool = true, isInvite: Bool? = nil, invite: Invite? = nil) {
         self.id = id; self.accountID = accountID; self.mailbox = mailbox; self.from = from; self.to = to
         self.cc = cc; self.subject = subject; self.body = body; self.date = date; self.isRead = isRead
@@ -180,8 +171,11 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
         self.isInvite = isInvite ?? (invite != nil ? true : nil); self.invite = invite
     }
 
-    /// The body must be fetched: never loaded, or loaded from a server before HTML was asked for.
-    public var needsBody: Bool { !bodyLoaded || (remoteID != nil && htmlChecked != true) }
+    /// The body must be fetched: never loaded, or loaded from a server before HTML was asked for or
+    /// before attachments had a size (needed to open them as Mail does).
+    public var needsBody: Bool {
+        !bodyLoaded || (remoteID != nil && (htmlChecked != true || attachments.contains { $0.size == nil }))
+    }
 
     /// The HTML loads images, styles or fonts from the web. They are blocked until the user allows them, so
     /// opening a message doesn't tell the sender it was read.
@@ -208,6 +202,16 @@ public struct Draft: Hashable, Codable, Sendable {
     /// Set when this is an answer to an invite: Send answers it, with the body as the comment.
     /// Optional, so drafts cached before it existed still load.
     public var inviteAnswer: InviteAnswer?
+    /// Files sent with the message. Stored optional, so drafts cached before it existed still load.
+    private var files: [DraftAttachment]?
+    public var attachments: [DraftAttachment] {
+        get { files ?? [] }
+        set { files = newValue.isEmpty ? nil : newValue }
+    }
+    /// The message whose attachments the compose window still has to add (a forward, or a reply that includes them).
+    public var loadingOriginal: UUID?
+    /// The message replied to or forwarded, when it has attachments (for Include/Exclude Attachments).
+    public var original: UUID?
     public init(accountID: UUID, to: String = "", cc: String = "", subject: String = "", body: String = "",
                 inviteAnswer: InviteAnswer? = nil) {
         self.accountID = accountID; self.to = to; self.cc = cc; self.subject = subject; self.body = body
@@ -215,4 +219,118 @@ public struct Draft: Hashable, Codable, Sendable {
     }
 }
 
+extension Draft {
+    /// Some of the files came from the message replied to or forwarded.
+    public var hasOriginalAttachments: Bool { attachments.contains(where: \.fromOriginal) }
+
+    /// Exclude Attachments: takes out the original's files, keeps the ones added here.
+    public mutating func excludeOriginalAttachments() {
+        var k = 0
+        body = String(body.filter { c in
+            guard c == Self.fileMark else { return true }
+            defer { k += 1 }
+            return !(attachments.indices.contains(k) && attachments[k].fromOriginal)
+        })
+        attachments.removeAll(where: \.fromOriginal)
+    }
+
+    /// About the size Exchange counts against the account's limit: the text, and files in base64
+    /// (4 bytes per 3, plus a line break every 76 characters).
+    public var estimatedSize: Int {
+        text.utf8.count + subject.utf8.count + attachments.reduce(0) { $0 + Self.encodedSize($1) }
+    }
+
+    static func encodedSize(_ a: DraftAttachment) -> Int {
+        let b64 = (a.data.count + 2) / 3 * 4
+        return b64 + b64 / 76 * 2 + 300
+    }
+
+    /// A file placed in the text sits at this character of `body`: the k-th one is `attachments[k]`, as in
+    /// an attributed string. Files beyond the marks were added without a place (they show at the end).
+    public static let fileMark: Character = "\u{FFFC}"
+
+    /// The text that is sent: the body without the marks of the files placed in it.
+    public var text: String { body.filter { $0 != Self.fileMark } }
+
+    /// Pictures placed in the text, by their index in `attachments`: they are sent in their place. Only types every
+    /// mail client draws in HTML; others (HEIC, TIFF…) go as ordinary files, so the recipient still gets them.
+    public var placedPictures: [Int] {
+        let marks = body.filter { $0 == Self.fileMark }.count
+        return attachments.indices.filter { $0 < marks && Self.inlineTypes.contains(attachments[$0].contentType?.lowercased() ?? "") }
+    }
+
+    static let inlineTypes: Set<String> = ["image/jpeg", "image/jpg", "image/png", "image/gif"]
+
+    /// The body as HTML with the placed pictures at their marks, as `cid:` references. A line per `<div>` and
+    /// `<div><br></div>` for an empty one, the way Mail writes its HTML; other files' marks are left out.
+    public func html(contentID: (Int) -> String?) -> String {
+        func escape(_ s: Substring) -> String {
+            s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
+        }
+        var k = 0
+        let lines = body.split(separator: "\n", omittingEmptySubsequences: false).map { line -> String in
+            var out = "", run = Substring()
+            for c in line {
+                guard c == Self.fileMark else { run.append(c); continue }
+                out += escape(run); run = ""
+                if let id = contentID(k) { out += "<img src=\"cid:\(id)\" alt=\"\(escape(Substring(attachments[k].name)))\">" }
+                k += 1
+            }
+            out += escape(run)
+            return "<div>\(out.isEmpty ? "<br>" : out)</div>"
+        }
+        return "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\"></head>"
+            + "<body style=\"overflow-wrap: break-word; -webkit-nbsp-mode: space; line-break: after-white-space;\">"
+            + lines.joined(separator: "\n") + "</body></html>"
+    }
+}
+
+/// Edit ▸ Include Attachments With Replies, as in Mail.
+public enum IncludeAttachments: String, CaseIterable, Sendable {
+    case never, ask, whenAddingRecipients, always
+    public var title: String {
+        switch self {
+        case .never: "Never"
+        case .ask: "Ask"
+        case .whenAddingRecipients: "When Adding Recipients"
+        case .always: "Always"
+        }
+    }
+}
+
+/// A file added to a message being written, with its content (kept until the message is sent).
+public struct DraftAttachment: Hashable, Codable, Sendable {
+    public var name: String
+    public var contentType: String?
+    public var data: Data
+    /// Taken from the message replied to or forwarded.
+    public var fromOriginal: Bool
+    public init(name: String, contentType: String?, data: Data, fromOriginal: Bool = false) {
+        self.name = name; self.contentType = contentType; self.data = data; self.fromOriginal = fromOriginal
+    }
+    public var attachment: Attachment { Attachment(name: name, size: data.count, contentType: contentType) }
+}
+
 public enum ReplyKind: Sendable { case reply, replyAll, forward }
+
+/// A file sent with a message. Only its name, size and type are kept; the content is fetched when it is opened.
+public struct Attachment: Hashable, Codable, Sendable, ExpressibleByStringLiteral {
+    public var name: String
+    /// Bytes, when the server reports it.
+    public var size: Int?
+    public var contentType: String?
+
+    public init(name: String, size: Int? = nil, contentType: String? = nil) {
+        self.name = name; self.size = size; self.contentType = contentType
+    }
+
+    public init(stringLiteral name: String) { self.init(name: name) }
+
+    /// The name as a file name: the sender's name can't point into another folder.
+    /// A "/" becomes ":", which the Finder shows as "/" again.
+    public var fileName: String {
+        let n = name.replacingOccurrences(of: "/", with: ":").replacingOccurrences(of: "\0", with: "")
+        return n.isEmpty || n == "." || n == ".." ? "Attachment" : n
+    }
+}

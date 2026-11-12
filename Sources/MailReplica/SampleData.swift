@@ -52,7 +52,7 @@ enum SampleData {
             Message(accountID: work.id, from: c("Elena Petrova", "elena@client.example"), to: meWork,
                     subject: "Contract draft v3",
                     body: "Alex, attached is v3 with legal's edits on sections 4 and 7. Can we sign off this week?\n\nBest,\nElena",
-                    date: ago(120), isRead: true, attachments: ["Contract_v3.docx"]).withHTML(elenaHTML),
+                    date: ago(120), isRead: true, attachments: ["Contract_v3.pdf"]).withHTML(elenaHTML),
             Message(accountID: icloud.id, from: me[0], to: [c("Sam Lee", "sam.lee@me.com")], subject: "Re: Concert tickets",
                     body: "Got them! Row 12.", date: ago(80), isRead: true).with(.sent),
             Message(accountID: work.id, from: meWork[0], to: [c("Priya Raman", "priya@northwind.example")],
@@ -91,7 +91,16 @@ enum SampleData {
                            required: [c("Alex Morgan", work.address), c("Jonas Weber", "jonas@northwind.example"),
                                       c("Elena Petrova", "elena@northwind.example"), c("Sam Okafor", "sam@northwind.example")],
                            optional: [c("Mia Chen", "mia@northwind.example")]))
-        let store = MailStore(accounts: [icloud, work], messages: msgs + [invite])
+        // Attachments get made-up content, so they open, and its size.
+        var files: [Message.ID: [Data]] = [:]
+        let all = (msgs + [invite]).map { m in
+            var m = m
+            files[m.id] = m.attachments.map { sampleFile($0.name, message: m.subject) }
+            m.attachments = zip(m.attachments, files[m.id]!).map { Attachment(name: $0.name, size: $1.count) }
+            return m
+        }
+        let store = MailStore(accounts: [icloud, work], messages: all)
+        for (id, data) in files where !data.isEmpty { store.setAttachmentData(data, for: id) }
         store.setFolders([Folder(box: projects, name: "Projects", parent: .inbox),
                           Folder(box: launch, name: "Northwind Launch", parent: projects),
                           Folder(box: receipts, name: "Receipts", parent: .inbox),
@@ -111,6 +120,38 @@ enum SampleData {
             store.setInlineImages(["logo@client.example": InlineImage(contentType: "image/png", data: logo())], for: elena.id)
         }
         return store
+    }
+
+    /// A one-page PDF or a photo-like JPEG, drawn in code.
+    private static func sampleFile(_ name: String, message: String) -> Data {
+        let size = NSSize(width: 1200, height: 800)
+        if name.lowercased().hasSuffix(".jpeg") {
+            let image = NSImage(size: size, flipped: false) { r in
+                let hue = CGFloat(name.unicodeScalars.reduce(0) { $0 + Int($1.value) } % 360) / 360
+                NSGradient(starting: NSColor(hue: hue, saturation: 0.5, brightness: 0.95, alpha: 1),
+                           ending: NSColor(hue: hue + 0.1, saturation: 0.7, brightness: 0.55, alpha: 1))?.draw(in: r, angle: -60)
+                NSColor(white: 1, alpha: 0.85).setFill()
+                NSBezierPath(ovalIn: NSRect(x: 820, y: 520, width: 180, height: 180)).fill()
+                return true
+            }
+            guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return Data() }
+            return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) ?? Data()
+        }
+        let pdf = NSMutableData()
+        var box = CGRect(x: 0, y: 0, width: 595, height: 842)
+        guard let consumer = CGDataConsumer(data: pdf), let ctx = CGContext(consumer: consumer, mediaBox: &box, nil)
+        else { return Data() }
+        ctx.beginPDFPage(nil)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+        NSAttributedString(string: (name as NSString).deletingPathExtension,
+                           attributes: [.font: NSFont.boldSystemFont(ofSize: 24)]).draw(at: NSPoint(x: 60, y: 760))
+        NSAttributedString(string: "Sample attachment of “\(message)”.",
+                           attributes: [.font: NSFont.systemFont(ofSize: 13)]).draw(at: NSPoint(x: 60, y: 720))
+        NSGraphicsContext.restoreGraphicsState()
+        ctx.endPDFPage()
+        ctx.closePDF()
+        return pdf as Data
     }
 
     /// A made-up company logo, drawn in code.

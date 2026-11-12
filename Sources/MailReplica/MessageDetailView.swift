@@ -1,4 +1,5 @@
 import MailModel
+import QuickLook
 import SwiftUI
 
 struct MessageDetailView: View {
@@ -26,6 +27,7 @@ struct MessageContent: View {
     /// Messages whose remote content the user loaded, until the window closes (Mail asks again later too).
     @State private var remoteAllowed: Set<Message.ID> = []
     @AppStorage("remoteImages") private var remoteImages = RemoteImages.defaultValue
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ScrollView {
@@ -48,6 +50,7 @@ struct MessageContent: View {
             }
         }
         .background(Color(nsColor: .textBackgroundColor))
+        .quickLookPreview(Bindable(store).previewItem, in: store.previewItems)
     }
 }
 
@@ -74,7 +77,12 @@ extension MessageContent {
                     .padding(20)
             }
             if !message.attachments.isEmpty {
-                AttachmentStrip(names: message.attachments).padding(.horizontal, 20).padding(.bottom, 20)
+                // On the HTML's white page, as in Mail, also in dark mode.
+                let onPage = message.bodyLoaded && message.html != nil
+                AttachmentsView(message: message).padding(.horizontal, 20).padding(.bottom, 20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(onPage ? Color.white : .clear)
+                    .environment(\.colorScheme, onPage ? .light : colorScheme)
             }
         }
     }
@@ -107,6 +115,7 @@ struct MessageHeader: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text(message.from.name).font(.system(size: 14, weight: .bold))
                     Spacer()
+                    if !message.attachments.isEmpty { AttachmentButton(message: message) }
                     if let f = message.flag {
                         Image(systemName: "flag.fill").foregroundStyle(f.color).font(.system(size: 11))
                     }
@@ -124,35 +133,5 @@ struct MessageHeader: View {
     private func recipients(_ label: String, _ list: [Contact]) -> some View {
         (Text(label + " ").foregroundStyle(.secondary) + Text(list.map(\.name).joined(separator: ", ")))
             .font(.system(size: 12))
-    }
-}
-
-struct AttachmentStrip: View {
-    let names: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Divider()
-            Label("\(names.count) Attachment\(names.count == 1 ? "" : "s")", systemImage: "paperclip")
-                .font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
-            HStack(spacing: 10) {
-                ForEach(names, id: \.self) { n in
-                    VStack(spacing: 4) {
-                        Image(systemName: icon(n)).font(.system(size: 28)).foregroundStyle(.secondary)
-                            .frame(width: 64, height: 56)
-                            .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.1)))
-                        Text(n).font(.system(size: 11)).lineLimit(1).frame(width: 90)
-                    }
-                }
-            }
-        }
-    }
-
-    private func icon(_ n: String) -> String {
-        switch (n as NSString).pathExtension.lowercased() {
-        case "pdf": "doc.richtext"
-        case "jpeg", "jpg", "png", "heic": "photo"
-        default: "doc"
-        }
     }
 }

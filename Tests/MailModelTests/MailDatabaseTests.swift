@@ -26,7 +26,7 @@ struct MailDatabaseTests {
                         to: [Contact(name: "Me", email: "me@work.com"), Contact(name: "Bob", email: "bob@x.com")],
                         cc: [Contact(name: "Cy", email: "")], subject: "Ünïcode ✓", body: "Line 1\nLine 2",
                         date: Date(timeIntervalSinceReferenceDate: 812_345_678.123), isRead: true, flag: .purple,
-                        category: .updates, isVIP: true, attachments: ["a.pdf", "b, c.png"], remoteID: "R-full",
+                        category: .updates, isVIP: true, attachments: [MailModel.Attachment(name: "a.pdf", size: 1234, contentType: "application/pdf"), "b, c.png"], remoteID: "R-full",
                         hasAttachments: true, serverPreview: "Preview", bodyLoaded: true,
                         invite: Invite(start: Date(timeIntervalSinceReferenceDate: 812_400_000),
                                        end: Date(timeIntervalSinceReferenceDate: 812_403_600), location: "Room 1",
@@ -38,6 +38,14 @@ struct MailDatabaseTests {
     }
 
     func reopen(_ url: URL) throws -> MailDatabase { try MailDatabase(url: url) }
+
+    /// Rows written before attachments had a size and type still read, as names.
+    @Test func attachmentNamesFromOlderRowsStillRead() {
+        #expect(MailDatabase.attachments("a.pdf\u{1E}b.png") == ["a.pdf", "b.png"])
+        #expect(MailDatabase.attachments("") == [])
+        let list: [MailModel.Attachment] = [MailModel.Attachment(name: "x", size: 5, contentType: "text/plain"), "y"]
+        #expect(MailDatabase.attachments(MailDatabase.attachments(list)) == list)
+    }
 
     @Test func everyFieldOfAMessageSurvives() throws {
         let url = tempURL()

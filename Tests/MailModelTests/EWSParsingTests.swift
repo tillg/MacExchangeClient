@@ -142,6 +142,44 @@ struct EWSParsingTests {
         #expect(EWSBackend.parseInlineImages(d) == ["image001.png@01DA": InlineImage(contentType: "image/png", data: Data([1, 2, 3]))])
     }
 
+    /// Attached files with their size and type; an attached message becomes a .eml file, as in Mail.
+    @Test func bodyListsAttachmentsWithSizeTypeAndAttachedMessagesAsEml() throws {
+        let d = try doc("""
+            <t:Message><t:ItemId Id="ID1"/><t:Body BodyType="Text">Hi</t:Body><t:Attachments>
+            <t:FileAttachment><t:AttachmentId Id="A1"/><t:Name>report.pdf</t:Name><t:ContentType>application/pdf</t:ContentType>\
+            <t:Size>2048</t:Size><t:IsInline>false</t:IsInline></t:FileAttachment>
+            <t:FileAttachment><t:AttachmentId Id="A2"/><t:Name>image001.png</t:Name><t:IsInline>true</t:IsInline></t:FileAttachment>
+            <t:ItemAttachment><t:AttachmentId Id="A3"/><t:Name>Re: Budget</t:Name><t:Size>900</t:Size></t:ItemAttachment>
+            </t:Attachments></t:Message>
+            """)
+        let item = try #require(d.first("Message"))
+        #expect(EWSBackend.parseBody(item).attachments == [
+            MailModel.Attachment(name: "report.pdf", size: 2048, contentType: "application/pdf"),
+            MailModel.Attachment(name: "Re: Budget.eml", size: 900, contentType: "message/rfc822"),
+        ])
+        // The same list, in the same order, gives the IDs to fetch them by position.
+        #expect(EWSBackend.listedAttachments(item).map(\.id) == ["A1", "A3"])
+    }
+
+    @Test func attachmentContentAsksForMimeAndReadsFilesAndMessages() throws {
+        let req = try request(EWSBackend.attachmentContentRequest("A&1"))
+        #expect(req.first("IncludeMimeContent")?.stringValue == "true")
+        #expect(req.first("AttachmentId")?.attr("Id") == "A&1")
+        let file = try doc("""
+            <m:GetAttachmentResponse><m:ResponseMessages><m:GetAttachmentResponseMessage ResponseClass="Success">\
+            <m:Attachments><t:FileAttachment><t:Name>a.pdf</t:Name><t:Content>AQID</t:Content></t:FileAttachment>\
+            </m:Attachments></m:GetAttachmentResponseMessage></m:ResponseMessages></m:GetAttachmentResponse>
+            """)
+        #expect(EWSBackend.parseAttachmentContent(file) == Data([1, 2, 3]))
+        let message = try doc("""
+            <m:GetAttachmentResponse><m:ResponseMessages><m:GetAttachmentResponseMessage ResponseClass="Success">\
+            <m:Attachments><t:ItemAttachment><t:Message><t:MimeContent CharacterSet="UTF-8">BAU=</t:MimeContent>\
+            </t:Message></t:ItemAttachment></m:Attachments></m:GetAttachmentResponseMessage></m:ResponseMessages>\
+            </m:GetAttachmentResponse>
+            """)
+        #expect(EWSBackend.parseAttachmentContent(message) == Data([4, 5]))
+    }
+
     @Test func archiveFolderFoundByLocalizedName() throws {
         let d = try doc("""
             <m:Folders><t:Folder><t:FolderId Id="F1"/><t:DisplayName>Posteingang</t:DisplayName></t:Folder>
@@ -339,5 +377,90 @@ struct EWSParsingTests {
         let saved = try request(EWSBackend.createRequest(draft, send: false))
         #expect(saved.first("CreateItem")?.attr("MessageDisposition") == "SaveOnly")
         #expect(saved.first("DistinguishedFolderId")?.attr("Id") == "drafts")
+    }
+
+    /// The marks for files placed in the text aren't sent.
+    @Test func createRequestLeavesOutTheFileMarks() throws {
+        let draft = Draft(accountID: UUID(), to: "a@x.com", body: "Hi\u{FFFC} there")
+        #expect(try request(EWSBackend.createRequest(draft, send: true)).first("Message")?.text("Body") == "Hi there")
+    }
+
+    /// Pictures placed in the text go out in their place: an HTML body pointing at inline attachments by content ID.
+    /// Other files stay ordinary attachments.
+    @Test func picturesInTheTextGoOutInline() throws {
+        var draft = Draft(accountID: UUID(), to: "a@x.com", body: "Look <here>:\n\u{FFFC}\n\nand \u{FFFC} bye")
+        draft.attachments = [DraftAttachment(name: "p.jpg", contentType: "image/jpeg", data: Data([1])),
+                             DraftAttachment(name: "d.pdf", contentType: "application/pdf", data: Data([2]))]
+        let ids = EWSBackend.contentIDs(draft)
+        #expect(Array(ids.keys) == [0])
+        let cid = try #require(ids[0])
+        let msg = try #require(try request(EWSBackend.createRequest(draft, send: false, contentIDs: ids)).first("Message"))
+        #expect(msg.child("Body")?.attr("BodyType") == "HTML")
+        let html = try #require(msg.text("Body"))
+        #expect(html.contains("<div>Look &lt;here&gt;:</div>"))
+        #expect(html.contains("<img src=\"cid:\(cid)\""))
+        #expect(html.contains("<div><br></div>"))
+        #expect(html.contains("<div>and  bye</div>"))
+        #expect(!html.contains("\u{FFFC}"))
+
+        let add = try request(EWSBackend.createAttachmentRequest(parentID: "I1", draft.attachments, contentIDs: ids))
+        let files = add.all("FileAttachment")
+        #expect(files[0].elementChildren.map(\.localName) == ["Name", "ContentType", "ContentId", "IsInline", "Content"])
+        #expect(files[0].text("ContentId") == cid)
+        #expect(files[0].text("IsInline") == "true")
+        #expect(files[1].elementChildren.map(\.localName) == ["Name", "ContentType", "Content"])
+
+        // A HEIC photo few clients can draw goes as a file.
+        draft.attachments[0].contentType = "image/heic"
+        #expect(EWSBackend.contentIDs(draft).isEmpty)
+        draft.attachments[0].contentType = "image/jpeg"
+
+        // Without a picture in the text the body stays plain text.
+        draft.attachments.swapAt(0, 1)
+        draft.attachments[1].contentType = "application/zip"
+        #expect(EWSBackend.contentIDs(draft).isEmpty)
+        #expect(try request(EWSBackend.createRequest(draft, send: false)).first("Message")?.child("Body")?.attr("BodyType") == "Text")
+    }
+
+    /// With files, a message is created in Drafts, the files are added, and then it is sent.
+    @Test func attachmentsAreAddedToTheSavedItemThenItIsSent() throws {
+        let files = [DraftAttachment(name: "a & b.pdf", contentType: "application/pdf", data: Data([1, 2, 3]))]
+        let add = try request(EWSBackend.createAttachmentRequest(parentID: "I&1", files))
+        #expect(add.first("ParentItemId")?.attr("Id") == "I&1")
+        let file = try #require(add.first("FileAttachment"))
+        #expect(file.elementChildren.map(\.localName) == ["Name", "ContentType", "Content"])
+        #expect(file.text("Name") == "a & b.pdf")
+        #expect(file.text("Content") == "AQID")
+        let created = try doc("""
+            <m:CreateAttachmentResponse><m:ResponseMessages><m:CreateAttachmentResponseMessage ResponseClass="Success">\
+            <m:Attachments><t:FileAttachment><t:AttachmentId Id="A1" RootItemId="I1" RootItemChangeKey="CK2"/>\
+            </t:FileAttachment></m:Attachments></m:CreateAttachmentResponseMessage></m:ResponseMessages></m:CreateAttachmentResponse>
+            """)
+        #expect(EWSBackend.parseRootItem(created) == EWSBackend.ItemRef(id: "I1", changeKey: "CK2"))
+        let saved = try doc("""
+            <m:CreateItemResponse><m:ResponseMessages><m:CreateItemResponseMessage ResponseClass="Success">\
+            <m:Items><t:Message><t:ItemId Id="I1" ChangeKey="CK1"/></t:Message></m:Items>\
+            </m:CreateItemResponseMessage></m:ResponseMessages></m:CreateItemResponse>
+            """)
+        #expect(EWSBackend.parseCreatedItem(saved) == EWSBackend.ItemRef(id: "I1", changeKey: "CK1"))
+        let send = try request(EWSBackend.sendItemRequest(EWSBackend.ItemRef(id: "I1", changeKey: "CK2")))
+        #expect(send.first("SendItem")?.attr("SaveItemToFolder") == "true")
+        #expect(send.first("ItemId")?.attr("ChangeKey") == "CK2")
+        #expect(send.first("SavedItemFolderId")?.first("DistinguishedFolderId")?.attr("Id") == "sentitems")
+    }
+
+    /// Outlook's limit for the sender: MailTips' MaxMessageSize.
+    @Test func maxMessageSizeFromMailTips() throws {
+        let req = try request(EWSBackend.mailTipsRequest(from: "me@x.com"))
+        #expect(req.first("SendingAs")?.text("EmailAddress") == "me@x.com")
+        #expect(req.first("Recipients")?.first("EmailAddress")?.stringValue == "me@x.com")
+        #expect(req.first("MailTipsRequested")?.stringValue == "MaxMessageSize")
+        let d = try doc("""
+            <m:GetMailTipsResponse ResponseClass="Success"><m:ResponseMessages><m:MailTipsResponseMessageType ResponseClass="Success">\
+            <m:MailTips><t:RecipientAddress><t:EmailAddress>me@x.com</t:EmailAddress></t:RecipientAddress>\
+            <t:MaxMessageSize>36700160</t:MaxMessageSize></m:MailTips></m:MailTipsResponseMessageType></m:ResponseMessages>\
+            </m:GetMailTipsResponse>
+            """)
+        #expect(EWSBackend.parseMaxMessageSize(d) == 36_700_160)
     }
 }

@@ -104,6 +104,48 @@ public struct EWSBackend: MailBackend {
         }
     }
 
+    public func attachment(remoteID: String, index: Int) async throws -> Data {
+        // The IDs are looked up when opening, not stored: a moved message's attachments get new IDs.
+        let doc = try await client.call("""
+            <m:GetItem><m:ItemShape><t:BaseShape>IdOnly</t:BaseShape>\
+            <t:AdditionalProperties><t:FieldURI FieldURI="item:Attachments"/></t:AdditionalProperties></m:ItemShape>\
+            <m:ItemIds><t:ItemId Id="\(xmlEscape(remoteID))"/></m:ItemIds></m:GetItem>
+            """)
+        let listed = doc.first("Items")?.elementChildren.first.map(Self.listedAttachments) ?? []
+        guard listed.indices.contains(index), let id = listed[index].id else {
+            throw EWSError(code: "ErrorAttachmentNotFound", message: "The attachment is no longer on the server")
+        }
+        guard let data = Self.parseAttachmentContent(try await client.call(Self.attachmentContentRequest(id))) else {
+            throw EWSError(code: "ErrorAttachmentEmpty", message: "The server sent no content for the attachment")
+        }
+        return data
+    }
+
+    /// The attachments shown below a message, in order, with the IDs to fetch them. Inline ones (signature
+    /// logos and the like) are left out; an attached message is listed as a .eml file.
+    static func listedAttachments(_ item: XMLNode) -> [(id: String?, attachment: Attachment)] {
+        (item.child("Attachments")?.elementChildren ?? []).compactMap { a in
+            guard a.text("IsInline") != "true", let name = a.child("Name")?.stringValue else { return nil }
+            let isMessage = a.localName == "ItemAttachment"
+            let file = isMessage && !name.lowercased().hasSuffix(".eml") ? name + ".eml" : name
+            return (a.child("AttachmentId")?.attr("Id"),
+                    Attachment(name: file, size: a.text("Size").flatMap { Int($0) },
+                               contentType: isMessage ? "message/rfc822" : a.text("ContentType")))
+        }
+    }
+
+    /// MIME content too, so an attached message arrives as a whole .eml.
+    static func attachmentContentRequest(_ id: String) -> String {
+        "<m:GetAttachment><m:AttachmentShape><t:IncludeMimeContent>true</t:IncludeMimeContent></m:AttachmentShape>"
+            + "<m:AttachmentIds><t:AttachmentId Id=\"\(xmlEscape(id))\"/></m:AttachmentIds></m:GetAttachment>"
+    }
+
+    /// A file's content, or an attached message's MIME source.
+    static func parseAttachmentContent(_ doc: XMLDocument) -> Data? {
+        let b64 = doc.first("FileAttachment")?.text("Content") ?? doc.first("ItemAttachment")?.text("MimeContent")
+        return b64.flatMap { Data(base64Encoded: $0, options: .ignoreUnknownCharacters) }
+    }
+
     static func attachmentRequest(_ ids: [String]) -> String {
         "<m:GetAttachment><m:AttachmentShape/><m:AttachmentIds>"
             + ids.map { "<t:AttachmentId Id=\"\(xmlEscape($0))\"/>" }.joined()
@@ -204,9 +246,89 @@ public struct EWSBackend: MailBackend {
 
     public func delete(_ ids: [String]) async throws { _ = try await client.call(Self.deleteRequest(ids)) }
 
-    public func send(_ draft: Draft) async throws { _ = try await client.call(Self.createRequest(draft, send: true)) }
+    public func send(_ draft: Draft) async throws {
+        guard !draft.attachments.isEmpty else { return _ = try await client.call(Self.createRequest(draft, send: true)) }
+        let item = try await saveWithAttachments(draft)
+        do { try await client.call(Self.sendItemRequest(item)) } catch {
+            // The app keeps the message in Drafts on this Mac; don't leave a second copy in Exchange's Drafts.
+            // If it did go out, the item is in Sent Items under a new ID and this delete misses it.
+            try? await delete([item.id])
+            throw error
+        }
+    }
 
-    public func saveDraft(_ draft: Draft) async throws { _ = try await client.call(Self.createRequest(draft, send: false)) }
+    public func saveDraft(_ draft: Draft) async throws {
+        guard !draft.attachments.isEmpty else { return _ = try await client.call(Self.createRequest(draft, send: false)) }
+        _ = try await saveWithAttachments(draft)
+    }
+
+    /// The documented EWS order for files: create the message in Drafts, then add them.
+    /// Returns the item with the change key it has after the files were added.
+    private func saveWithAttachments(_ draft: Draft) async throws -> ItemRef {
+        let ids = Self.contentIDs(draft)
+        guard let item = Self.parseCreatedItem(try await client.call(Self.createRequest(draft, send: false, contentIDs: ids))) else {
+            throw EWSError(code: "ErrorItemNotCreated", message: "Exchange didn't return the new message")
+        }
+        do {
+            guard let root = Self.parseRootItem(try await client.call(Self.createAttachmentRequest(parentID: item.id, draft.attachments, contentIDs: ids)))
+            else { throw EWSError(code: "ErrorAttachmentNotCreated", message: "Exchange didn't take the attachments") }
+            return root
+        } catch {
+            try? await delete([item.id])  // no half message in Exchange's Drafts
+            throw error
+        }
+    }
+
+    public func maxMessageSize(from address: String) async throws -> Int? {
+        Self.parseMaxMessageSize(try await client.call(Self.mailTipsRequest(from: address)))
+    }
+
+    /// MailTips, as Outlook uses them: the sender's own MaxMessageSize (Exchange 2010 and later).
+    static func mailTipsRequest(from address: String) -> String {
+        let me = "<t:EmailAddress>\(xmlEscape(address))</t:EmailAddress>"
+        return "<m:GetMailTips><m:SendingAs>\(me)</m:SendingAs><m:Recipients><t:Mailbox>\(me)</t:Mailbox></m:Recipients>"
+            + "<m:MailTipsRequested>MaxMessageSize</m:MailTipsRequested></m:GetMailTips>"
+    }
+
+    static func parseMaxMessageSize(_ doc: XMLDocument) -> Int? { doc.text("MaxMessageSize").flatMap { Int($0) } }
+
+    struct ItemRef: Equatable { let id: String, changeKey: String }
+
+    static func parseCreatedItem(_ doc: XMLDocument) -> ItemRef? {
+        guard let i = doc.first("ItemId"), let id = i.attr("Id"), let ck = i.attr("ChangeKey") else { return nil }
+        return ItemRef(id: id, changeKey: ck)
+    }
+
+    /// The item's change key after the last attachment was added.
+    static func parseRootItem(_ doc: XMLDocument) -> ItemRef? {
+        guard let a = doc.all("AttachmentId").last, let id = a.attr("RootItemId"), let ck = a.attr("RootItemChangeKey")
+        else { return nil }
+        return ItemRef(id: id, changeKey: ck)
+    }
+
+    /// A content ID per picture placed in the text, for the HTML body to point at.
+    static func contentIDs(_ d: Draft) -> [Int: String] {
+        Dictionary(uniqueKeysWithValues: d.placedPictures.map { ($0, UUID().uuidString) })
+    }
+
+    /// Files in `contentIDs` are inline: shown in the HTML body where it references them, not in the list.
+    static func createAttachmentRequest(parentID: String, _ files: [DraftAttachment], contentIDs: [Int: String] = [:]) -> String {
+        "<m:CreateAttachment><m:ParentItemId Id=\"\(xmlEscape(parentID))\"/><m:Attachments>"
+            + files.enumerated().map { i, f in
+                "<t:FileAttachment><t:Name>\(xmlEscape(f.name))</t:Name>"
+                    + "<t:ContentType>\(xmlEscape(f.contentType ?? "application/octet-stream"))</t:ContentType>"
+                    + (contentIDs[i].map { "<t:ContentId>\(xmlEscape($0))</t:ContentId><t:IsInline>true</t:IsInline>" } ?? "")
+                    + "<t:Content>\(f.data.base64EncodedString())</t:Content></t:FileAttachment>"
+            }.joined()
+            + "</m:Attachments></m:CreateAttachment>"
+    }
+
+    /// Sends the saved item and keeps a copy in Sent Items.
+    static func sendItemRequest(_ item: ItemRef) -> String {
+        "<m:SendItem SaveItemToFolder=\"true\"><m:ItemIds><t:ItemId Id=\"\(xmlEscape(item.id))\" "
+            + "ChangeKey=\"\(xmlEscape(item.changeKey))\"/></m:ItemIds>"
+            + "<m:SavedItemFolderId><t:DistinguishedFolderId Id=\"sentitems\"/></m:SavedItemFolderId></m:SendItem>"
+    }
 
     static func itemIDs(_ ids: [String]) -> String {
         ids.map { "<t:ItemId Id=\"\(xmlEscape($0))\"/>" }.joined()
@@ -246,7 +368,8 @@ public struct EWSBackend: MailBackend {
         "<m:DeleteItem DeleteType=\"SoftDelete\"><m:ItemIds>\(itemIDs(ids))</m:ItemIds></m:DeleteItem>"
     }
 
-    static func createRequest(_ d: Draft, send: Bool) -> String {
+    /// With content IDs (pictures placed in the text) the body goes as HTML that shows them in their place.
+    static func createRequest(_ d: Draft, send: Bool, contentIDs: [Int: String] = [:]) -> String {
         func recipients(_ tag: String, _ list: String) -> String {
             let boxes = Contact.parseList(list).map {
                 "<t:Mailbox><t:Name>\(xmlEscape($0.name))</t:Name><t:EmailAddress>\(xmlEscape($0.email))</t:EmailAddress></t:Mailbox>"
@@ -256,7 +379,9 @@ public struct EWSBackend: MailBackend {
         let disposition = send ? "SendAndSaveCopy" : "SaveOnly"
         return "<m:CreateItem MessageDisposition=\"\(disposition)\"><m:SavedItemFolderId>"
             + "<t:DistinguishedFolderId Id=\"\(send ? "sentitems" : "drafts")\"/></m:SavedItemFolderId><m:Items><t:Message>"
-            + "<t:Subject>\(xmlEscape(d.subject))</t:Subject><t:Body BodyType=\"Text\">\(xmlEscape(d.body))</t:Body>"
+            + "<t:Subject>\(xmlEscape(d.subject))</t:Subject>"
+            + (contentIDs.isEmpty ? "<t:Body BodyType=\"Text\">\(xmlEscape(d.text))</t:Body>"
+                : "<t:Body BodyType=\"HTML\">\(xmlEscape(d.html { contentIDs[$0] }))</t:Body>")
             + recipients("ToRecipients", d.to) + recipients("CcRecipients", d.cc)
             + "</t:Message></m:Items></m:CreateItem>"
     }
@@ -348,9 +473,7 @@ public struct EWSBackend: MailBackend {
     }
 
     static func parseBody(_ item: XMLNode) -> MessageBody {
-        let attachments = (item.child("Attachments")?.elementChildren ?? [])
-            .filter { $0.text("IsInline") != "true" }
-            .compactMap { $0.child("Name")?.stringValue }
+        let attachments = listedAttachments(item).map(\.attachment)
         let body = item.child("Body")
         let html = body?.attr("BodyType") == "HTML" ? body?.stringValue : nil
         let text = item.child("TextBody")?.stringValue ?? html.map(plainText) ?? body?.stringValue ?? ""

@@ -5,6 +5,8 @@ import SwiftUI
 struct MailCommands: Commands {
     let store: MailStore
     @Environment(\.openWindow) private var openWindow
+    @FocusedValue(\.attachFiles) private var attachFiles
+    @AppStorage("includeAttachmentsWithReplies") private var includeMode = IncludeAttachments.never
 
     private var hasSelection: Bool { !store.selection.isEmpty }
 
@@ -15,17 +17,28 @@ struct MailCommands: Commands {
             Button("New Viewer Window") { openWindow(id: "viewer") }
                 .keyboardShortcut("n", modifiers: [.command, .option])
         }
+        // Titles and shortcuts from MainMenu.nib; the position in the menu is estimated.
+        CommandGroup(after: .saveItem) {
+            Button("Attach Files…") { attachFiles?() }
+                .keyboardShortcut("a", modifiers: [.command, .shift]).disabled(attachFiles == nil)
+            Button("Save Attachments…") {
+                if let m = store.selectedMessage { AttachmentPanels.saveAll(of: m, store: store) }
+            }
+            .disabled(store.selectedMessage?.attachments.isEmpty ?? true)
+            Button("Quick Look Attachments…") {
+                if let m = store.selectedMessage { Task { await store.quickLookAttachments(of: m.id) } }
+            }
+            .keyboardShortcut("y").disabled(store.selectedMessage?.attachments.isEmpty ?? true)
+        }
+        CommandGroup(after: .textEditing) {
+            Picker("Include Attachments With Replies", selection: $includeMode) {
+                ForEach(IncludeAttachments.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+        }
         SidebarCommands()
         CommandGroup(after: .sidebar) {
-            Toggle("Show Mail Categories", isOn: Bindable(store).showCategories)
             Toggle("Enable Message Filter", isOn: Bindable(store).filterUnread)
                 .keyboardShortcut("l")
-            Menu("Go to Mailbox Category") {
-                ForEach(Array(MailCategory.allCases.enumerated()), id: \.offset) { i, c in
-                    Button(c.title) { store.category = c }
-                        .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: [.command, .option])
-                }
-            }
         }
         CommandMenu("Mailbox") {
             Button("Get New Mail") { Task { await store.refresh() } }.keyboardShortcut("n", modifiers: [.command, .shift])
@@ -83,6 +96,6 @@ struct MailCommands: Commands {
 
     private func reply(_ kind: ReplyKind) {
         guard let m = store.selectedMessage else { return }
-        openWindow(id: "compose", value: store.draft(kind, to: m.id))
+        openWindow(id: "compose", value: store.draft(kind, to: m.id, includeAttachments: includeMode))
     }
 }

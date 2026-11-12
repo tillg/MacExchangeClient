@@ -14,7 +14,6 @@ struct DebugSnapshot: ViewModifier {
             guard let out = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT"] else { return }
             // MAIL_SNAPSHOT_SUBJECT picks a message by subject; otherwise the first one.
             let wanted = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_SUBJECT"]
-            if let wanted, let m = store.messages.first(where: { $0.subject == wanted }) { store.category = m.category }
             if let m = store.visibleMessages.first(where: { wanted == nil || $0.subject == wanted }) {
                 store.selection = [m.id]
                 // MAIL_SNAPSHOT_HTML=file.html shows that HTML as the message's body, to check how a mail renders.
@@ -28,18 +27,63 @@ struct DebugSnapshot: ViewModifier {
                 store.progress = p == "loading" ? SyncProgress(text: "Loading Mail…", fraction: nil)
                     : Double(p).map { SyncProgress(text: "Checking for Mail…", fraction: $0) }
             }
-            // MAIL_SNAPSHOT_ANSWER=accept|tentative|decline|propose opens the answer window for the selected
+            // MAIL_SNAPSHOT_MAXSIZE=50000 gives every account that sending limit in bytes, to show "(maximum …)".
+            if let max = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_MAXSIZE"].flatMap({ Int($0) }) {
+                for a in store.accounts { store.setMaxMessageSize(max, for: a.id) }
+            }
+            // MAIL_SNAPSHOT_ANSWER=accept|tentative|decline|propose|forward opens the answer (or forward) window for the selected
             // invite and captures that window instead.
             var windowTitle: String?
             if let answer = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_ANSWER"], let id = store.selection.first {
-                let draft = answer == "propose" ? store.answerDraft(.decline, to: id, proposing: true)
+                let draft = answer == "forward" ? store.draft(.forward, to: id)
+                    : answer == "propose" ? store.answerDraft(.decline, to: id, proposing: true)
                     : store.answerDraft(InviteResponse(rawValue: answer) ?? .decline, to: id)
                 openWindow(id: "compose", value: draft)
                 windowTitle = draft.subject
+                // MAIL_SNAPSHOT_DROP=a.jpg:b.txt drops those files onto the message text through a real pasteboard,
+                // at character MAIL_SNAPSHOT_DROP_AT (default 0).
+                if let list = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_DROP"] {
+                    try? await Task.sleep(for: .seconds(1))
+                    let pb = NSPasteboard(name: NSPasteboard.Name("MailReplica-SnapshotDrop"))
+                    pb.clearContents()
+                    pb.writeObjects(list.split(separator: ":").map { URL(fileURLWithPath: String($0)) as NSURL })
+                    let at = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_DROP_AT"].flatMap { Int($0) } ?? 0
+                    let view = NSApp.windows.compactMap(\.contentView).flatMap(textViews).first
+                    view?.attachFiles(from: pb, at: at)
+                    // MAIL_SNAPSHOT_EDIT=move|delete then moves the first file to the end (as a cut and paste,
+                    // through RTFD) or deletes it, and prints what the text then holds.
+                    if let edit = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_EDIT"], let view, let storage = view.textStorage {
+                        let before = view.content().1
+                        var first: NSRange?
+                        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { v, r, stop in
+                            if v != nil { first = r; stop.pointee = true }
+                        }
+                        if let first {
+                            view.setSelectedRange(first)
+                            let clip = NSPasteboard(name: NSPasteboard.Name("MailReplica-SnapshotMove"))
+                            clip.clearContents()
+                            _ = view.writeSelection(to: clip, types: view.writablePasteboardTypes)
+                            view.delete(nil)
+                            if edit == "move" {
+                                view.setSelectedRange(NSRange(location: storage.length, length: 0))
+                                _ = view.readSelection(from: clip)
+                            }
+                        }
+                        let after = view.content().1
+                        print("EDIT \(edit): before \(before.map { "\($0.name) \($0.data.count)" }), after \(after.map { "\($0.name) \($0.data.count)" }), "
+                              + "same files \(Set(before) == Set(after)), marks \(view.string.filter { $0 == Draft.fileMark }.count), "
+                              + "first file at end \(view.string.last == Draft.fileMark)")
+                    }
+                }
             }
             try? await Task.sleep(for: .seconds(2))
             guard let win = NSApp.windows.first(where: { $0.isVisible && (windowTitle.map($0.title.hasPrefix) ?? ($0.title != "New Message")) }),
                   let view = win.contentView?.superview else { exit(2) }
+            // MAIL_SNAPSHOT_SIZE=1280x800 sets the window's size in points first (the README screenshots).
+            if let size = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_SIZE"]?.split(separator: "x").compactMap({ Double($0) }),
+               size.count == 2 {
+                win.setFrame(NSRect(origin: win.frame.origin, size: NSSize(width: size[0], height: size[1])), display: true)
+            }
             let appearance = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_DARK"] != nil ? "Dark" : "Aqua"
             NSApp.appearance = NSAppearance(named: appearance == "Dark" ? .darkAqua : .aqua)
             try? await Task.sleep(for: .milliseconds(500))
@@ -64,6 +108,14 @@ struct DebugSnapshot: ViewModifier {
             image.draw(in: root.convert(w.bounds, from: w))
             NSGraphicsContext.restoreGraphicsState()
         }
+    }
+
+    private func textViews(in root: NSView) -> [DropTextView] {
+        var stack = [root], found: [DropTextView] = []
+        while let v = stack.popLast() {
+            if let t = v as? DropTextView { found.append(t) } else { stack.append(contentsOf: v.subviews) }
+        }
+        return found
     }
 
     private func webViews(in root: NSView) -> [WKWebView] {

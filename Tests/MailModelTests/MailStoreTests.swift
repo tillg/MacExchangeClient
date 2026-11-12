@@ -73,15 +73,12 @@ struct MailStoreTests {
         #expect(s.visibleMessages.isEmpty)
     }
 
-    @Test func categoryOnlyFiltersInboxes() {
-        let p = msg(work, subject: "p"), promo = msg(work, subject: "promo", category: .promotions)
-        let sentPromo = msg(work, .sent, subject: "sent", category: .promotions)
-        let s = store([p, promo, sentPromo])
-        s.category = .promotions
+    /// No category bar: the Inbox lists every message, whatever its category.
+    @Test func inboxListsAllCategories() {
+        let p = msg(work, subject: "p", minutesAgo: 1), promo = msg(work, subject: "promo", category: .promotions)
+        let s = store([p, promo])
         s.selectedMailbox = .account(work.id, .inbox)
-        #expect(s.visibleMessages.map(\.subject) == ["promo"])
-        s.selectedMailbox = .account(work.id, .sent)
-        #expect(s.visibleMessages.map(\.subject) == ["sent"])
+        #expect(s.visibleMessages.map(\.subject) == ["promo", "p"])
     }
 
     @Test func unreadFilterAndSearch() {
@@ -456,6 +453,31 @@ struct MailStoreTests {
         #expect(draft?.remoteID == nil)
     }
 
+    @Test func failedSendKeepsItsAttachmentsInTheLocalDraft() async throws {
+        let s = synced([])
+        s.downloadsFolder = FileManager.default.temporaryDirectory.appendingPathComponent("FailedTests-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: s.downloadsFolder) }
+        var d = Draft(accountID: work.id, to: "ann@x.com", subject: "S", body: "B")
+        d.attachments = [DraftAttachment(name: "f.txt", contentType: "text/plain", data: Data("x".utf8))]
+        s.send(d)
+        s.failed(s.outbox[0], "Timeout")
+        let draft = try #require(s.messages.first { $0.mailbox == .drafts })
+        #expect(draft.attachments == [MailModel.Attachment(name: "f.txt", size: 1, contentType: "text/plain")])
+        let file = try #require(await s.attachmentFile(0, of: draft.id))
+        #expect(try Data(contentsOf: file) == Data("x".utf8))
+    }
+
+    /// While a forward's original files are still loading, it isn't sent or saved without them.
+    @Test func forwardIsNotSentBeforeItsAttachmentsAreIn() {
+        let s = synced([])
+        var d = Draft(accountID: work.id, to: "ann@x.com", subject: "Fwd: S")
+        d.loadingOriginal = UUID()
+        s.send(d)
+        s.saveDraft(d)
+        #expect(s.outbox.isEmpty)
+        #expect(s.status?.contains("still being loaded") == true)
+    }
+
     @Test func sendFromServerAccountQueuesAndAddsNothingLocally() {
         let s = synced([])
         let d = Draft(accountID: work.id, to: "ann@x.com", subject: "S", body: "B")
@@ -739,6 +761,231 @@ struct MailStoreTests {
         s.setInlineImages(["z@y": png], for: b)
         #expect(s.inlineImages(for: a).isEmpty)
         #expect(s.inlineImages(for: b) == ["z@y": png])
+    }
+
+    func attachmentStore(_ names: [MailModel.Attachment], data: [Data]) -> (MailStore, Message.ID, URL) {
+        var m = msg(work); m.attachments = names
+        let s = store([m])
+        s.setAttachmentData(data, for: m.id)
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("AttachmentTests-\(UUID())")
+        s.downloadsFolder = dir.appendingPathComponent("Mail Downloads")
+        return (s, m.id, dir)
+    }
+
+    /// Opening writes the file under its own name; two files with the same name stay apart; a sender's
+    /// name can't reach outside the downloads folder.
+    @Test func openedAttachmentsAreFilesInTheDownloadsFolder() async throws {
+        let (s, id, dir) = attachmentStore(["a.pdf", "a.pdf", "../../evil.sh"], data: [Data([1]), Data([2]), Data([3])])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let first = try #require(await s.attachmentFile(0, of: id))
+        let second = try #require(await s.attachmentFile(1, of: id))
+        let evil = try #require(await s.attachmentFile(2, of: id))
+        #expect(first.lastPathComponent == "a.pdf" && second.lastPathComponent == "a.pdf" && first != second)
+        #expect(try Data(contentsOf: first) == Data([1]))
+        #expect(try Data(contentsOf: second) == Data([2]))
+        #expect(evil.lastPathComponent == "..:..:evil.sh")
+        #expect(evil.standardizedFileURL.path.hasPrefix(s.downloadsFolder.standardizedFileURL.path + "/"))
+        #expect(await s.attachmentFile(3, of: id) == nil)
+    }
+
+    /// Picked or dropped files are read into the draft with their type; a missing file is left out.
+    @Test func filesAreAttachedToADraft() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("AttachTests-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let pdf = dir.appendingPathComponent("Plan.pdf")
+        try Data([1, 2]).write(to: pdf)
+        let s = store([])
+        var d = Draft(accountID: work.id)
+        s.attach([pdf, dir.appendingPathComponent("Gone.txt")], to: &d)
+        #expect(d.attachments == [DraftAttachment(name: "Plan.pdf", contentType: "application/pdf", data: Data([1, 2]))])
+        #expect(s.status?.contains("Gone.txt") == true)
+    }
+
+    /// Mail forwards with the original's attachments; replies go without them.
+    @Test func forwardTakesTheAttachmentsAlongRepliesDoNot() async throws {
+        let (s, id, dir) = attachmentStore(["a.pdf"], data: [Data([7])])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        #expect(s.draft(.reply, to: id).loadingOriginal == nil)
+        var d = s.draft(.forward, to: id)
+        #expect(d.loadingOriginal == id)
+        await s.includeOriginalAttachments(in: &d)
+        #expect(d.attachments == [DraftAttachment(name: "a.pdf", contentType: "application/pdf", data: Data([7]), fromOriginal: true)])
+        #expect(d.loadingOriginal == nil)
+    }
+
+    /// A folder is attached as a zip archive of it.
+    @Test func foldersAreAttachedAsZip() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ZipTests-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let folder = dir.appendingPathComponent("Photos")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: folder.appendingPathComponent("a.txt"))
+        let s = store([])
+        var d = Draft(accountID: work.id)
+        s.attach([folder], to: &d)
+        let zip = try #require(d.attachments.first)
+        #expect(zip.name == "Photos.zip" && zip.contentType == "application/zip")
+        #expect(zip.data.prefix(2) == Data("PK".utf8))
+        #expect(s.status == nil)
+    }
+
+    /// Edit ▸ Include Attachments With Replies: Always adds them to a reply, Never and Ask don't by themselves.
+    /// Forward always does. The draft remembers the original either way, for the Include Attachments button.
+    @Test func repliesIncludeAttachmentsPerSetting() {
+        var m = msg(work); m.attachments = ["a.pdf"]
+        let s = store([m])
+        #expect(s.draft(.reply, to: m.id, includeAttachments: .never).loadingOriginal == nil)
+        #expect(s.draft(.reply, to: m.id, includeAttachments: .ask).loadingOriginal == nil)
+        #expect(s.draft(.reply, to: m.id, includeAttachments: .never).original == m.id)
+        #expect(s.draft(.reply, to: m.id, includeAttachments: .always).loadingOriginal == m.id)
+        #expect(s.draft(.forward, to: m.id, includeAttachments: .never).loadingOriginal == m.id)
+        #expect(s.draft(.reply, to: msg(work).id, includeAttachments: .always).original == nil)
+    }
+
+    /// When Adding Recipients: someone who wasn't on the original gets its attachments.
+    @Test func addingANewRecipientIncludesTheAttachments() {
+        var m = msg(work, from: "Ann"); m.attachments = ["a.pdf"]
+        m.cc = [Contact(name: "Bob", email: "bob@x.com")]
+        let s = store([m])
+        var d = s.draft(.replyAll, to: m.id, includeAttachments: .whenAddingRecipients)
+        #expect(!s.addsNewRecipient(d))
+        d.cc = "b"  // still typing: not an address yet
+        #expect(!s.addsNewRecipient(d))
+        d.cc = "bob@x.com, Me <me@work.com>"
+        #expect(!s.addsNewRecipient(d))
+        d.to += ", Cy <cy@x.com>"
+        #expect(s.addsNewRecipient(d))
+    }
+
+    /// Include/Exclude Attachments takes out only the original's files, and puts them back.
+    @Test func excludeAndIncludeOriginalAttachments() async {
+        let (s, id, dir) = attachmentStore(["a.pdf"], data: [Data([7])])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var d = s.draft(.forward, to: id, includeAttachments: .never)
+        await s.includeOriginalAttachments(in: &d)
+        let own = DraftAttachment(name: "mine.txt", contentType: "text/plain", data: Data([1]))
+        d.attachments.append(own)
+        #expect(d.hasOriginalAttachments)
+        d.excludeOriginalAttachments()
+        #expect(d.attachments == [own])
+        #expect(!d.hasOriginalAttachments)
+        d.loadingOriginal = d.original
+        await s.includeOriginalAttachments(in: &d)
+        #expect(d.attachments.map(\.name) == ["mine.txt", "a.pdf"])
+    }
+
+    /// The size Exchange counts: files in base64, plus the text. Over the account's maximum, Send asks first.
+    @Test func messageSizeAndTheAccountsMaximum() {
+        let s = store([])
+        var d = Draft(accountID: work.id, body: "Hi")
+        d.attachments = [DraftAttachment(name: "big.bin", contentType: nil, data: Data(count: 3_000_000))]
+        #expect(d.estimatedSize > 4_000_000 && d.estimatedSize < 4_200_000)
+        #expect(s.maximumSize(for: d) == nil)
+        s.setMaxMessageSize(10_485_760, for: work.id)
+        #expect(!s.isOverSizeLimit(d))
+        d.attachments.append(DraftAttachment(name: "big2.bin", contentType: nil, data: Data(count: 6_000_000)))
+        #expect(s.isOverSizeLimit(d))
+    }
+
+    /// Sent from a local account: the copy in Sent has the files, with their size, and they open.
+    @Test func localSentMailKeepsItsAttachments() async throws {
+        let s = store([])
+        s.downloadsFolder = FileManager.default.temporaryDirectory.appendingPathComponent("SentTests-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: s.downloadsFolder) }
+        var d = Draft(accountID: work.id, to: "ann@x.com", subject: "Files")
+        d.attachments = [DraftAttachment(name: "n.txt", contentType: "text/plain", data: Data("hi".utf8))]
+        s.send(d)
+        let sent = try #require(s.messages.first { $0.mailbox == .sent })
+        #expect(sent.attachments == [MailModel.Attachment(name: "n.txt", size: 2, contentType: "text/plain")])
+        let file = try #require(await s.attachmentFile(0, of: sent.id))
+        #expect(try String(contentsOf: file, encoding: .utf8) == "hi")
+    }
+
+    /// Files placed in the text: each sits at a U+FFFC in the body, which never goes out as text.
+    @Test func filesInTheTextLeaveNoMarkInTheSentText() throws {
+        let s = store([])
+        var d = Draft(accountID: work.id, to: "ann@x.com", subject: "Pics", body: "Look:\n\u{FFFC}\nand\u{FFFC}")
+        d.attachments = [DraftAttachment(name: "a.jpg", contentType: "image/jpeg", data: Data([1])),
+                         DraftAttachment(name: "b.pdf", contentType: "application/pdf", data: Data([2]))]
+        #expect(d.text == "Look:\n\nand")
+        #expect(d.estimatedSize == Draft(accountID: work.id, subject: "Pics", body: d.text).estimatedSize
+                + d.attachments.reduce(0) { $0 + Draft.encodedSize($1) })
+        s.send(d)
+        let sent = try #require(s.messages.first { $0.mailbox == .sent })
+        #expect(sent.body == "Look:\n\nand")
+        #expect(sent.attachments.map(\.name) == ["a.jpg", "b.pdf"])
+    }
+
+    /// Exclude Attachments takes the original's files out of the text too; the rest keep their place.
+    @Test func excludingTheOriginalsFilesRemovesTheirMarks() {
+        var d = Draft(accountID: work.id, body: "a\u{FFFC}b\u{FFFC}c")
+        let mine = DraftAttachment(name: "mine.txt", contentType: nil, data: Data([1]))
+        d.attachments = [DraftAttachment(name: "orig.pdf", contentType: nil, data: Data([2]), fromOriginal: true), mine,
+                         DraftAttachment(name: "late.pdf", contentType: nil, data: Data([3]), fromOriginal: true)]
+        d.excludeOriginalAttachments()
+        #expect(d.body == "ab\u{FFFC}c")
+        #expect(d.attachments == [mine])
+    }
+
+    /// Drafts in the outbox from before attachments existed still load.
+    @Test func draftsWithoutAttachmentsStillDecode() throws {
+        let old = #"{"accountID":"\#(work.id.uuidString)","to":"a@x.com","cc":"","subject":"S","body":"B"}"#
+        let d = try JSONDecoder().decode(Draft.self, from: Data(old.utf8))
+        #expect(d.attachments.isEmpty && d.loadingOriginal == nil)
+    }
+
+    /// Bodies cached before attachments had sizes are fetched once more; sample mail isn't.
+    @Test func bodiesCachedWithAttachmentNamesOnlyAreFetchedAgain() {
+        var m = msg(work); m.remoteID = "R"; m.htmlChecked = true; m.attachments = ["a.pdf"]
+        #expect(m.needsBody)
+        m.attachments = [MailModel.Attachment(name: "a.pdf", size: 10)]
+        #expect(!m.needsBody)
+        var local = msg(work); local.attachments = ["a.pdf"]
+        #expect(!local.needsBody)
+    }
+
+    /// Files from mail are quarantined, so Gatekeeper asks before an attached app or script runs.
+    @Test func openedAndSavedAttachmentsAreQuarantined() async throws {
+        let (s, id, dir) = attachmentStore(["run.command"], data: [Data("echo hi".utf8)])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let opened = try #require(await s.attachmentFile(0, of: id))
+        let saved = try #require(await s.saveAttachment(0, of: id, to: dir.appendingPathComponent("Saved")))
+        for url in [opened, saved] {
+            let q = try (url as NSURL).resourceValues(forKeys: [.quarantinePropertiesKey])[.quarantinePropertiesKey]
+                as? [String: Any]
+            #expect(q?[kLSQuarantineTypeKey as String] as? String == kLSQuarantineTypeEmailAttachment as String)
+        }
+    }
+
+    /// Saving never overwrites: a second copy gets " 2", as in the Finder.
+    @Test func savedAttachmentsGetAFreeName() async throws {
+        let (s, id, dir) = attachmentStore(["Report.pdf", "photo"], data: [Data([1]), Data([2])])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let target = dir.appendingPathComponent("Downloads")
+        let a = try #require(await s.saveAttachment(0, of: id, to: target))
+        let b = try #require(await s.saveAttachment(0, of: id, to: target))
+        #expect(a.lastPathComponent == "Report.pdf" && b.lastPathComponent == "Report 2.pdf")
+        let all = await s.saveAllAttachments(of: id, to: target)
+        #expect(all.map(\.lastPathComponent) == ["Report 3.pdf", "photo"])
+        #expect(try Data(contentsOf: b) == Data([1]))
+    }
+
+    /// Quick Look shows every attachment of the message, starting at the chosen one.
+    @Test func quickLookOpensAllAttachmentsAtTheChosenOne() async throws {
+        let (s, id, dir) = attachmentStore(["a.txt", "b.txt"], data: [Data([1]), Data([2])])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        await s.quickLookAttachments(of: id, at: 1)
+        #expect(s.previewItems.map(\.lastPathComponent) == ["a.txt", "b.txt"])
+        #expect(s.previewItem == s.previewItems[1])
+    }
+
+    /// A message without its content (no server, nothing stored) says so instead of opening an empty file.
+    @Test func missingContentShowsAStatus() async {
+        let (s, id, dir) = attachmentStore(["a.pdf"], data: [])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        #expect(await s.attachmentFile(0, of: id) == nil)
+        #expect(s.status?.contains("a.pdf") == true)
     }
 
     @Test func markAllRead() {
