@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [004](BUG-004-control-chars-break-ews-requests.md) | P2 | EWS | Control characters in subject/body/file name/invite comment make the EWS request malformed XML, so Send/Save/Answer fails |
 | [005](BUG-005-parselist-quoted-display-names.md) | P2 | Models | Contact.parseList breaks quoted display names (comma inside quotes splits the contact; quotes kept in name) |
 | [006](BUG-006-opened-message-vanishes-from-unread-filter.md) | P2 | MailStore | Opening a message with the unread filter on (or in the Unread mailbox) removes it from the list at once |
 | [007](BUG-007-reply-all-includes-own-address-when-case-differs.md) | P2 | MailStore | Reply All keeps my own address when the original lists it in different case |

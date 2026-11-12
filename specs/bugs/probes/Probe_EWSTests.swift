@@ -70,25 +70,6 @@ struct Probe_EWSTests {
 
     // MARK: Request building
 
-    /// Text pasted from Word/PDF often carries form feed / vertical tab; the request must stay well-formed XML.
-    @Test func probeCreateRequestWithControlCharactersIsWellFormed() throws {
-        for c in ["\u{000B}", "\u{000C}", "\u{0001}", "\u{001B}", "\u{0000}"] {
-            let draft = Draft(accountID: UUID(), to: "a@x.com", subject: "S\(c)ubject", body: "line\(c)break")
-            let xml = EWSClient.envelope(EWSBackend.createRequest(draft, send: true))
-            #expect((try? XMLDocument(xmlString: xml)) != nil, "control char U+\(String(c.unicodeScalars.first!.value, radix: 16)) breaks the request")
-        }
-    }
-
-    @Test func probeAttachmentNameWithControlCharacterIsWellFormed() throws {
-        let files = [DraftAttachment(name: "scan\u{000C}1.pdf", contentType: "application/pdf", data: Data([1]))]
-        #expect((try? request(EWSBackend.createAttachmentRequest(parentID: "I", files))) != nil)
-    }
-
-    @Test func probeInviteCommentWithControlCharacterIsWellFormed() throws {
-        let reply = InviteReply(response: .decline, comment: "sorry\u{000B}next week")
-        #expect((try? request(EWSBackend.respondRequest("M", reply))) != nil)
-    }
-
     @Test func probeSpecialCharsRoundTrip() throws {
         let subject = "A & B < C > D \" E ' F 😀 עברית \t G"
         let draft = Draft(accountID: UUID(), to: "a@x.com", subject: subject, body: "x")

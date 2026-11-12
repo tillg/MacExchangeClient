@@ -32,7 +32,8 @@ is made, retries, undo): [architecture.md](architecture.md). Types: [domain-mode
   throws its `ResponseCode`/`faultstring`. With `strict` (the default), the first `ResponseCode` other than
   `NoError` throws with its `MessageText`.
 - XML access ignores namespaces. `text(name)`/`first(name)` search all descendants, `child(name)` direct children.
-- Request text is escaped with `xmlEscape` (`&`, `<`, `>`, `"`); control characters are not removed.
+- Request text is escaped with `xmlEscape` (`&`, `<`, `>`, `"`). Characters XML 1.0 forbids (U+0000–U+0008, U+000B,
+  U+000C, U+000E–U+001F, U+FFFE, U+FFFF) are left out there, so pasted text can't make a request malformed.
 - Nothing logs requests, responses or passwords; `EWS_DEBUG=1` logs only the auth method and failure count.
 
 ## Read operations
