@@ -1,7 +1,7 @@
 ---
 title: "Decisions"
 created: 2026-11-12
-edited: 2026-11-12
+edited: 2026-11-13
 ---
 
 # 2026-11-12 23:16 — Unattended bug-fix run {#run-2026-11-12-2316}
@@ -186,7 +186,7 @@ edited: 2026-11-12
 - **Status:** decided
 - **Context:** BUG-020. `Attachment.fileName` didn't limit length, so names over 255 UTF-8 bytes (easy with umlauts or CJK) couldn't be written: open, Quick Look, save and forward failed.
 - **Decision:** `fileName` keeps the extension (if it is at most 32 bytes) and cuts the rest at a whole character so the whole name is at most 255 UTF-8 bytes. `MailStore.freeURL` shortens the same way when it adds " 2", " 3", … The name shown in the message is unchanged.
-- **Why:** 255 bytes is APFS's limit per name; checked here that the file system counts the name as given (composed): 127 × "ä" (254 bytes) writes, 128 fails. Cutting by `Character` keeps valid UTF-8 and never splits an accent from its letter. Keeping the extension keeps the file's type for Quick Look and the Finder.
+- **Why:** 255 bytes is APFS's limit per name; checked here: a name of 127 × "ä" (254 bytes composed) writes, 128 fails, so counting the name's own UTF-8 bytes is safe. Cutting by `Character` keeps valid UTF-8 and never splits an accent from its letter. Keeping the extension keeps the file's type for Quick Look and the Finder.
 - **Alternatives:** A short hash-based name (rejected: users recognise the start of the name).
 
 ## 00:24 — Draft HTML splits on every line ending {#d-bug-021}
