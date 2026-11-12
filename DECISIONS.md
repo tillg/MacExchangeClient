@@ -279,3 +279,10 @@ edited: 2026-11-13
 - **Context:** BUG-030. Without a server, `saveDraft` built the Drafts message without `cc`; `send` and `failed` already kept it.
 - **Decision:** Pass `cc: Contact.parseList(d.cc)` as they do.
 - **Why:** A saved draft must keep what was typed.
+
+## 00:49 — "Search failed" lasts as long as the search {#d-bug-031}
+
+- **Status:** decided
+- **Context:** BUG-031. After an index search failed, "Search failed: …" stayed under the title after the search was cleared and after the next search succeeded.
+- **Decision:** The failure text is cleared in the same places as the 2,000-results notice: when the search is cleared, and when a later index search succeeds (below the limit). Any other status is left alone.
+- **Why:** Both are notices about the current search; a stale failure tells the user search is still broken.

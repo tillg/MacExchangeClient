@@ -32,6 +32,7 @@ public enum WhatsNew {
             "Replying to “RE:”, “AW:” or “FW:” subjects from Outlook no longer piles up a second “Re:” or “Fwd:”.",
             "Reply to a message you sent goes to the people you sent it to, not to yourself.",
             "Saving a draft on this Mac keeps the people in Cc.",
+            "The “Search failed” note goes away once you clear the search or the next search works.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
             "A message now shows together with its replies and forwards, including the ones you sent, as in Apple Mail. You can turn this off in Settings ▸ Viewing.",

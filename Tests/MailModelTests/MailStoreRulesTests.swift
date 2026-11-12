@@ -184,4 +184,41 @@ struct MailStoreRulesTests {
         let d = s.messages.first { $0.mailbox == .drafts }
         #expect(d?.cc.map(\.email) == ["c@x.com", "d@x.com"])
     }
+
+    // MARK: Search
+
+    final class Fail: @unchecked Sendable { var on = true }
+
+    /// "Search failed" goes when the search is cleared.
+    @Test func searchFailedNoticeGoesWhenSearchCleared() async {
+        let s = store([msg(work, subject: "Lunch")])
+        s.searchDebounce = .zero
+        s.searcher = { _, _ in throw DatabaseError(errorDescription: "broken") }
+        s.searchText = "lun"
+        await s.searchTask?.value
+        #expect(s.status?.contains("broken") == true)
+        s.searchText = ""
+        #expect(s.status == nil, "status: \(String(describing: s.status))")
+    }
+
+    /// "Search failed" goes once the next search succeeds; another notice set meanwhile stays.
+    @Test func searchFailedNoticeGoesAfterNextSuccess() async {
+        let m = msg(work, subject: "Lunch")
+        let s = store([m])
+        s.searchDebounce = .zero
+        let fail = Fail()
+        s.searcher = { _, _ in if fail.on { throw DatabaseError(errorDescription: "broken") }; return [m.id] }
+        s.searchText = "lun"
+        await s.searchTask?.value
+        fail.on = false
+        s.searchText = "lunch"
+        await s.searchTask?.value
+        #expect(s.searchHits?.query == "lunch")
+        #expect(s.status == nil, "status: \(String(describing: s.status))")
+        s.status = "Offline"
+        s.searchText = "lunc"
+        await s.searchTask?.value
+        s.searchText = ""
+        #expect(s.status == "Offline")
+    }
 }

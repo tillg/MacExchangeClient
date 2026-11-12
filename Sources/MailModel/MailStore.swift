@@ -270,7 +270,7 @@ public final class MailStore {
         let q = normalizedSearch
         guard !q.isEmpty else {
             searchTask = nil; searchHits = nil; fallbackQuery = nil
-            if status == Self.limitNotice { status = nil }
+            if statusIsAboutSearch { status = nil }
             return
         }
         guard searcher != nil else { return }
@@ -311,17 +311,21 @@ public final class MailStore {
             }
             if ids.count >= MailDatabase.searchLimit {
                 status = Self.limitNotice
-            } else if status == Self.limitNotice {
+            } else if statusIsAboutSearch {
                 status = nil
             }
         } catch {
             guard !Task.isCancelled, normalizedSearch == q else { return }
             fallbackQuery = q
-            status = "Search failed: \(error.localizedDescription)"
+            status = Self.searchFailed + error.localizedDescription
         }
     }
 
     static let limitNotice = "Showing the newest 2,000 results"
+    static let searchFailed = "Search failed: "
+
+    /// The status is a search's own notice (the limit or a failure), which goes with that search.
+    private var statusIsAboutSearch: Bool { status == Self.limitNotice || status?.hasPrefix(Self.searchFailed) == true }
 
     public var selectedMessage: Message? { selection.count == 1 ? selection.first.flatMap(message) : nil }
 
