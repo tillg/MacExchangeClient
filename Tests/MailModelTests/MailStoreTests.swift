@@ -903,6 +903,29 @@ struct MailStoreTests {
     }
 
     /// Files placed in the text: each sits at a U+FFFC in the body, which never goes out as text.
+    @Test func closingAsksOnlyAfterTheUserChangedSomething() {
+        let start = Draft(accountID: work.id, to: "ann@x.com", subject: "Fwd: Pics", body: "\n\nBegin forwarded message:")
+        #expect(!start.hasChanges(since: start))
+        // The original's files arriving by themselves, or being excluded again, are not the user's changes.
+        var d = start
+        d.attachments = [DraftAttachment(name: "o.pdf", contentType: nil, data: Data([1]), fromOriginal: true)]
+        d.body += String(Draft.fileMark)
+        #expect(!d.hasChanges(since: start))
+        d.excludeOriginalAttachments()
+        #expect(!d.hasChanges(since: start))
+        // Anything typed, chosen or attached is.
+        let changes: [(inout Draft) -> Void] = [
+            { $0.body += "x" }, { $0.to += ", bob@x.com" }, { $0.cc = "c@x.com" }, { $0.subject = "Pics" },
+            { $0.accountID = UUID() },
+            { $0.attachments.append(DraftAttachment(name: "a.jpg", contentType: nil, data: Data([2]))) },
+        ]
+        for change in changes {
+            var e = start
+            change(&e)
+            #expect(e.hasChanges(since: start))
+        }
+    }
+
     @Test func filesInTheTextLeaveNoMarkInTheSentText() throws {
         let s = store([])
         var d = Draft(accountID: work.id, to: "ann@x.com", subject: "Pics", body: "Look:\n\u{FFFC}\nand\u{FFFC}")
@@ -992,5 +1015,162 @@ struct MailStoreTests {
         let s = store([msg(work), msg(work), msg(home)])
         s.markAllRead(in: .account(work.id, .inbox))
         #expect(s.unreadCount(.smart(.allInboxes)) == 1)
+    }
+
+    // MARK: Search through the database index
+
+    /// A real database holding `msgs`, searchable; the store's searcher runs against it.
+    func searchDB(_ msgs: [Message]) throws -> (MailDatabase, URL) {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("MailStoreSearch-\(UUID())/Mail.sqlite")
+        let db = try MailDatabase(url: url)
+        try db.write(StoreChanges(upserts: msgs))
+        try db.prepareSearch()
+        return (db, url)
+    }
+
+    /// Holds the searches for some queries until released, and says when one has started.
+    final class Gate: @unchecked Sendable {
+        private let lock = NSLock()
+        private var held: [String: CheckedContinuation<Void, Never>] = [:]
+        private let slow: Set<String>
+        let entered: AsyncStream<String>
+        private let enter: AsyncStream<String>.Continuation
+        init(slow: Set<String>) { self.slow = slow; (entered, enter) = AsyncStream.makeStream() }
+        func pass(_ q: String) async {
+            guard slow.contains(q) else { return }
+            await withCheckedContinuation { c in lock.withLock { held[q] = c }; enter.yield(q) }
+        }
+        func release(_ q: String) { lock.withLock { held.removeValue(forKey: q) }?.resume() }
+    }
+
+    func searching(_ s: MailStore, _ db: MailDatabase, gate: Gate? = nil) {
+        s.searchDebounce = .zero
+        s.searcher = { q, accounts in
+            await gate?.pass(q)
+            return try db.search(q, accounts: accounts)
+        }
+    }
+
+    /// Hits are checked against memory: Trash, another account's mail and messages gone from memory don't show.
+    @Test func searchHitsFollowWhatIsInMemory() async throws {
+        let one = msg(work, subject: "Report one", minutesAgo: 3), two = msg(work, subject: "Report two", minutesAgo: 1),
+            trashed = msg(work, .trash, subject: "Report trashed"), other = msg(home, subject: "Report home"),
+            gone = msg(work, subject: "Report gone"), fragment = msg(work, subject: "Misreported")
+        let (db, url) = try searchDB([one, two, trashed, other, gone, fragment])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        // "Misreported" matches only the old substring search: the list must come from the index.
+        let s = store([one, two, trashed, other, fragment])
+        searching(s, db)
+        s.searchText = "report"
+        await s.searchTask?.value
+        #expect(s.visibleMessages.map(\.subject) == ["Report home", "Report two", "Report one"])
+        // An account mailbox narrows the search to that account.
+        s.selectedMailbox = .account(work.id, .inbox)
+        await s.searchTask?.value
+        #expect(s.visibleMessages.map(\.subject) == ["Report two", "Report one"])
+        // Deleted a moment ago: gone from the results at once, though the database still has it in the Inbox.
+        s.delete([two.id])
+        #expect(s.visibleMessages.map(\.subject) == ["Report one"])
+        s.searchText = ""
+        #expect(s.searchHits == nil)
+        #expect(s.visibleMessages.map(\.subject) == ["Misreported", "Report one"])
+    }
+
+    /// A slow reply for an earlier query never replaces the results of the current one.
+    @Test func aStaleSearchReplyIsIgnored() async throws {
+        let abacus = msg(work, subject: "Abacus"), apple = msg(work, subject: "Apple")
+        let (db, url) = try searchDB([abacus, apple])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let s = store([abacus, apple])
+        let gate = Gate(slow: ["a"])
+        searching(s, db, gate: gate)
+        var started = gate.entered.makeAsyncIterator()
+        s.searchText = "a"
+        _ = await started.next()  // the search for "a" is under way
+        let slow = s.searchTask
+        s.searchText = "ab"
+        await s.searchTask?.value
+        #expect(s.visibleMessages.map(\.subject) == ["Abacus"])
+        gate.release("a")
+        await slow?.value
+        #expect(s.searchHits?.query == "ab")
+        #expect(s.visibleMessages.map(\.subject) == ["Abacus"])
+    }
+
+    /// While the next query's hits are on their way, the list keeps the previous results.
+    @Test func previousResultsStayWhileTheNextArePending() async throws {
+        let one = msg(work, subject: "Report one", minutesAgo: 2), two = msg(work, subject: "Report two", minutesAgo: 1)
+        let (db, url) = try searchDB([one, two])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let s = store([one, two])
+        let gate = Gate(slow: ["report one"])
+        searching(s, db, gate: gate)
+        s.searchText = "report"
+        await s.searchTask?.value
+        var started = gate.entered.makeAsyncIterator()
+        s.searchText = "report one"
+        _ = await started.next()
+        #expect(s.visibleMessages.map(\.subject) == ["Report two", "Report one"])
+        gate.release("report one")
+        await s.searchTask?.value
+        #expect(s.visibleMessages.map(\.subject) == ["Report one"])
+    }
+
+    /// Mail that changes while a search runs is shown as it is now, not as it was when the search began.
+    @Test func changesDuringASearchShowInItsResults() async throws {
+        let one = msg(work, subject: "Report one", minutesAgo: 2), two = msg(work, subject: "Report two", minutesAgo: 1)
+        let (db, url) = try searchDB([one, two])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let s = store([one, two])
+        let gate = Gate(slow: ["report"])
+        searching(s, db, gate: gate)
+        var started = gate.entered.makeAsyncIterator()
+        s.searchText = "report"
+        _ = await started.next()
+        s.delete([two.id])
+        gate.release("report")
+        await s.searchTask?.value
+        #expect(s.visibleMessages.map(\.subject) == ["Report one"])
+    }
+
+    /// Typed while the index wasn't ready yet: memory answers, then the index takes over by itself.
+    @Test func searchTypedBeforeTheIndexIsReady() async throws {
+        let m = msg(work, subject: "Misreported")
+        let (db, url) = try searchDB([m])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let s = store([m])
+        s.searchText = "report"
+        #expect(s.visibleMessages.map(\.subject) == ["Misreported"])  // substring, from memory
+        searching(s, db)
+        #expect(s.visibleMessages.map(\.subject) == ["Misreported"])  // still memory until the index answers
+        await s.searchTask?.value
+        #expect(s.searchHits?.query == "report")
+        #expect(s.visibleMessages.isEmpty)  // word prefix, from the index
+    }
+
+    /// At the limit the status says only the newest are shown; clearing the search removes the notice.
+    @Test func searchLimitIsAnnouncedAndCleared() async throws {
+        let msgs = (0..<MailDatabase.searchLimit).map { msg(work, subject: "Note \($0)", minutesAgo: Double($0)) }
+        let (db, url) = try searchDB(msgs)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let s = store(msgs)
+        searching(s, db)
+        s.searchText = "note"
+        await s.searchTask?.value
+        #expect(s.status == "Showing the newest 2,000 results")
+        #expect(s.visibleMessages.count == 2000)
+        s.searchText = ""
+        #expect(s.status == nil)
+    }
+
+    /// A failing index search falls back to searching memory, and says so.
+    @Test func aFailedIndexSearchFallsBackToMemory() async {
+        let s = store([msg(work, subject: "Lunch")])
+        s.searchDebounce = .zero
+        s.searcher = { _, _ in throw DatabaseError(errorDescription: "broken") }
+        s.searchText = "lun"
+        await s.searchTask?.value
+        #expect(s.visibleMessages.map(\.subject) == ["Lunch"])
+        #expect(s.status?.contains("broken") == true)
     }
 }

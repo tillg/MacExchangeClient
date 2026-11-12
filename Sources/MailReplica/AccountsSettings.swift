@@ -25,6 +25,7 @@ enum AppSetup {
                 store.progress = SyncProgress(text: "Updating Mail Storage…", fraction: nil)
                 if let db = try await MailDatabase.importCache(store: store) {
                     database = db
+                    enableSearch(store, db)  // a new database has its search index already
                     store.progress = nil
                     return
                 }
@@ -46,6 +47,14 @@ enum AppSetup {
                     failedToLoad(store, error)
                 }
                 if store.progress?.fraction == nil { store.progress = nil }
+                // Builds the search index of an older database, once; search scans memory until then.
+                guard database != nil else { return }
+                do {
+                    try await Task.detached(priority: .utility) { try db.prepareSearch() }.value
+                    if database != nil { enableSearch(store, db) }
+                } catch {
+                    store.status = "Couldn't build the search index: \(error.localizedDescription)"
+                }
             }
         } catch {
             failedToLoad(store, error)
@@ -56,8 +65,14 @@ enum AppSetup {
     /// Mail can't be loaded: work on without saving, so mail missing in memory isn't written twice to disk.
     private static func failedToLoad(_ store: MailStore, _ error: Error) {
         database = nil
+        store.searcher = nil
         store.status = "Couldn't load mail from disk: \(error.localizedDescription). Changes aren't saved until relaunch."
         if store.isLoading { store.finishLoading([]) }
+    }
+
+    /// Search asks the database's index from now on.
+    private static func enableSearch(_ store: MailStore, _ db: MailDatabase) {
+        store.searcher = { query, accounts in try db.search(query, accounts: accounts) }
     }
 
     /// False while showing sample data; nothing is then read from or written to disk.
@@ -70,7 +85,10 @@ enum AppSetup {
         guard let db = database else { return }
         let changes = store.takeChanges()
         if now { try? db.write(changes); return }
-        db.writeInBackground(changes) { error in
+        db.writeInBackground(changes, done: {
+            // The index now has what arrived since the last save.
+            Task { @MainActor in store.searchAgain() }
+        }) { error in
             Task { @MainActor in
                 store.retry(changes)
                 store.status = "Couldn't save mail: \(error.localizedDescription)"

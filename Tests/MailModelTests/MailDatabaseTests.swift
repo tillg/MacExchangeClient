@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 @testable import MailModel
 
@@ -242,5 +243,158 @@ struct MailDatabaseTests {
         #expect(try db.meta().outbox == old.outbox)
         // No cache file, nothing to import.
         #expect(try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s) == nil)
+    }
+
+    // MARK: Search (FTS5)
+
+    func mail(_ subject: String, from: Contact = Contact(name: "Ann", email: "ann@x.com"), to: [Contact] = [],
+              preview: String? = nil, body: String = "", account: Account? = nil, minutesAgo: Double = 0) -> Message {
+        Message(accountID: (account ?? work).id, from: from, to: to, subject: subject, body: body,
+                date: Date(timeIntervalSinceReferenceDate: 800_000_000 - minutesAgo * 60), remoteID: subject,
+                serverPreview: preview, bodyLoaded: !body.isEmpty)
+    }
+
+    /// A database with these messages written, ready to search.
+    func searchable(_ msgs: [Message]) throws -> (MailDatabase, URL) {
+        let url = tempURL()
+        let db = try MailDatabase(url: url)
+        try db.write(StoreChanges(upserts: msgs))
+        try db.prepareSearch()
+        return (db, url)
+    }
+
+    @Test func searchFindsEveryIndexedField() throws {
+        let m = mail("Quarterly report", from: Contact(name: "Bob Builder", email: "bob.builder@acme.com"),
+                     to: [Contact(name: "Carol", email: "carol.king@corp.com")], preview: "Kickoff agenda",
+                     body: "Bring the spreadsheet")
+        let (db, url) = try searchable([m, mail("Other")])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        for q in ["quarterly", "builder", "acme", "carol", "king", "kickoff", "spreadsheet"] {
+            #expect(try db.search(q, accounts: nil) == [m.id], "\(q)")
+        }
+    }
+
+    @Test func searchMatchesWordPrefixesNotFragments() throws {
+        let m = mail("Rechnung März")
+        let (db, url) = try searchable([m])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        #expect(try db.search("rech", accounts: nil) == [m.id])
+        #expect(try db.search("chnung", accounts: nil) == [])
+    }
+
+    @Test func searchIgnoresCaseAndDiacritics() throws {
+        let m = mail("Hello", from: Contact(name: "Jürgen Müller", email: "j@x.com"))
+        let (db, url) = try searchable([m])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        #expect(try db.search("muller", accounts: nil) == [m.id])
+        #expect(try db.search("MÜLLER", accounts: nil) == [m.id])
+    }
+
+    @Test func searchANDsWordsAcrossFields() throws {
+        let invoice = mail("Invoice", from: Contact(name: "Bob", email: "b@x.com"))
+        let lunch = mail("Lunch", from: Contact(name: "Bob", email: "b@x.com"))
+        let (db, url) = try searchable([invoice, lunch])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        #expect(try db.search("bob invoice", accounts: nil) == [invoice.id])
+        #expect(Set(try db.search("bob", accounts: nil)) == [invoice.id, lunch.id])
+    }
+
+    @Test func hostileSearchInputNeverThrows() throws {
+        let m = mail("Bob says hi")
+        let (db, url) = try searchable([m])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        for q in ["\"", "-x", "AND (", "*", "\"\"", "bob -", "bob \"", "NEAR(", "a:b", "^", "  ", ""] {
+            #expect(throws: Never.self, "\(q)") { _ = try db.search(q, accounts: nil) }
+        }
+        #expect(try db.search("bob -", accounts: nil) == [m.id])
+        #expect(try db.search("", accounts: nil) == [])
+    }
+
+    /// A rewritten message is found by its new words only; a removed one not at all.
+    @Test func writesKeepTheSearchIndexExact() throws {
+        var m = mail("Oldword")
+        let (db, url) = try searchable([m])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        m.subject = "Newword"
+        try db.write(StoreChanges(upserts: [m]))
+        #expect(try db.search("newword", accounts: nil) == [m.id])
+        #expect(try db.search("oldword", accounts: nil) == [])
+        // A change to no indexed text (read, mailbox) skips the index and keeps it matching the table.
+        m.isRead.toggle(); m.mailbox = .archive
+        try db.write(StoreChanges(upserts: [m]))
+        #expect(try db.search("newword", accounts: nil) == [m.id])
+        var raw: OpaquePointer?
+        #expect(sqlite3_open(url.path, &raw) == SQLITE_OK)
+        #expect(sqlite3_exec(raw, "INSERT INTO messages_fts(messages_fts, rank) VALUES('integrity-check', 1)", nil, nil, nil) == SQLITE_OK)
+        sqlite3_close(raw)
+        try db.write(StoreChanges(removed: [m.id]))
+        #expect(try db.search("newword", accounts: nil) == [])
+        #expect(try db.messages().isEmpty)
+    }
+
+    @Test func searchIsNewestFirstAndLimited() throws {
+        let msgs = (0..<5).map { mail("Note \($0)", minutesAgo: Double($0)) }
+        let (db, url) = try searchable(msgs.shuffled())
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        #expect(try db.search("note", accounts: nil) == msgs.map(\.id))
+        #expect(try db.search("note", accounts: nil, limit: 2) == Array(msgs.prefix(2).map(\.id)))
+    }
+
+    @Test func searchKeepsToTheGivenAccounts() throws {
+        let w = mail("Shared word"), h = mail("Shared word too", account: home)
+        let (db, url) = try searchable([w, h])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        #expect(try db.search("shared", accounts: [home.id]) == [h.id])
+        #expect(Set(try db.search("shared", accounts: nil)) == [w.id, h.id])
+    }
+
+    /// A database from before search: no index, version 0. `prepareSearch` builds the index once.
+    @Test func anOlderDatabaseGetsItsSearchIndexOnce() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let m = mail("Legacy subject")
+        try MailDatabase(url: url).write(StoreChanges(upserts: [m]))
+        // Take it back to the old schema.
+        var raw: OpaquePointer?
+        #expect(sqlite3_open(url.path, &raw) == SQLITE_OK)
+        #expect(sqlite3_exec(raw, """
+            DROP TRIGGER IF EXISTS messages_fts_insert; DROP TRIGGER IF EXISTS messages_fts_delete;
+            DROP TRIGGER IF EXISTS messages_fts_update; DROP TABLE IF EXISTS messages_fts;
+            DROP INDEX IF EXISTS messages_date; PRAGMA user_version = 0;
+            """, nil, nil, nil) == SQLITE_OK)
+        sqlite3_close(raw)
+
+        let db = try reopen(url)
+        #expect(try db.prepareSearch() == true)
+        #expect(try db.search("legacy", accounts: nil) == [m.id])
+        #expect(try db.schemaVersion() == 1)
+        // Written after the migration: indexed by the triggers.
+        let n = mail("Fresh subject")
+        try db.write(StoreChanges(upserts: [n]))
+        #expect(try db.search("fresh", accounts: nil) == [n.id])
+        #expect(try reopen(url).prepareSearch() == false)
+    }
+
+    /// A new database is searchable at once, without a rebuild.
+    @Test func aNewDatabaseNeedsNoRebuild() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let db = try MailDatabase(url: url)
+        #expect(try db.schemaVersion() == 1)
+        try db.write(StoreChanges(upserts: [mail("Brandnew")]))
+        #expect(try db.prepareSearch() == false)
+        #expect(try db.search("brandnew", accounts: nil).count == 1)
+    }
+
+    /// Search reads on its own connection: neither an open write transaction nor a busy write queue holds it up.
+    @Test func searchRunsWhileAWriteIsInProgress() throws {
+        let m = mail("Concurrent")
+        let (db, url) = try searchable([m])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let inTransaction = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+        db.holdWriteTransaction { inTransaction.signal(); release.wait() }
+        inTransaction.wait()
+        defer { release.signal() }
+        #expect(try db.search("concurrent", accounts: nil) == [m.id])
     }
 }

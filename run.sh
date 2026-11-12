@@ -12,11 +12,14 @@ if [ "$1" = test ]; then
   exec swift test --scratch-path .build/tests --skip-build
 fi
 export SDKROOT="${SDKROOT:-$(xcrun --show-sdk-path --sdk macosx26.5 2>/dev/null || echo /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk)}"
-# Sign with the stable identity from make-signing-identity.sh, if there is one. Ad-hoc signatures change with
-# every build, and the Keychain then asks again for the password item.
+# Signing identity: an Apple Development certificate first. It has a Team ID, so the Keychain recognises every
+# new build and stops asking for the password item. Otherwise the self-signed one from make-signing-identity.sh,
+# otherwise ad hoc (both make the Keychain ask after each build).
+IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*\([0-9A-F]\{40\}\) "Apple Development: .*/\1/p' | head -1)
+if [ -z "$IDENTITY" ] && security find-certificate -c "MailReplica Dev" >/dev/null 2>&1; then IDENTITY="MailReplica Dev"; fi
 sign() {
-  if security find-certificate -c "MailReplica Dev" >/dev/null 2>&1; then
-    codesign -f -s "MailReplica Dev" -i MailReplica .build/debug/MailReplica 2>/dev/null
+  if [ -n "$IDENTITY" ]; then
+    codesign -f -s "$IDENTITY" -i MailReplica .build/debug/MailReplica 2>/dev/null
   fi
 }
 # Wrap the binary in MailReplica.app, so Activity Monitor, the Dock and Keychain dialogs show the app's icon.
@@ -50,8 +53,8 @@ bundle() {
   <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
-  if security find-certificate -c "MailReplica Dev" >/dev/null 2>&1; then
-    codesign -f -s "MailReplica Dev" -i MailReplica "$APP" 2>/dev/null
+  if [ -n "$IDENTITY" ]; then
+    codesign -f -s "$IDENTITY" -i MailReplica "$APP" 2>/dev/null
   else
     codesign -f -s - -i MailReplica "$APP" 2>/dev/null
   fi

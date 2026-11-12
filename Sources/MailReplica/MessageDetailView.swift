@@ -4,13 +4,16 @@ import SwiftUI
 
 struct MessageDetailView: View {
     @Environment(MailStore.self) private var store
+    /// The message whose body and inline images have finished loading (or failed to).
+    @State private var loaded: Message.ID?
 
     var body: some View {
         if let m = store.selectedMessage {
-            MessageContent(message: m)
+            MessageContent(message: m, loading: loaded != m.id)
                 .task(id: m.id) {
                     await store.loadBody(m.id)
                     await store.loadInlineImages(for: m.id)
+                    loaded = m.id
                     await store.loadDay(for: m.id)
                 }
         } else if store.selection.count > 1 {
@@ -24,6 +27,7 @@ struct MessageDetailView: View {
 struct MessageContent: View {
     @Environment(MailStore.self) private var store
     let message: Message
+    var loading = false
     /// Messages whose remote content the user loaded, until the window closes (Mail asks again later too).
     @State private var remoteAllowed: Set<Message.ID> = []
     @AppStorage("remoteImages") private var remoteImages = RemoteImages.defaultValue
@@ -60,9 +64,20 @@ extension MessageContent {
         return remoteImages.loadsAutomatically(from: message.from, account: account)
     }
 
+    /// Shown once, complete: not the plain preview before the formatted body, nor the body before its
+    /// pictures (adding them would load the page again). Mail also shows nothing until the message is in.
+    private var waiting: Bool {
+        guard loading else { return false }
+        if message.needsBody { return true }
+        guard let html = message.html else { return false }
+        return store.inlineImages(for: message.id).isEmpty && !HTMLPage.contentIDs(in: html).isEmpty
+    }
+
     private var text: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if message.bodyLoaded, let html = message.html {
+            if waiting {
+                LoadingBody()
+            } else if message.bodyLoaded, let html = message.html {
                 let allowed = remoteAllowed.contains(message.id) || loadsRemoteContent
                 if message.hasRemoteContent && !allowed {
                     RemoteContentBanner { remoteAllowed.insert(message.id) }
@@ -85,6 +100,20 @@ extension MessageContent {
                     .environment(\.colorScheme, onPage ? .light : colorScheme)
             }
         }
+    }
+}
+
+/// The body's place while it loads: empty, with a spinner only if it takes a moment.
+private struct LoadingBody: View {
+    @State private var slow = false
+
+    var body: some View {
+        ZStack { if slow { ProgressView().controlSize(.small) } }
+            .frame(maxWidth: .infinity, minHeight: 120)
+            .task {
+                try? await Task.sleep(for: .milliseconds(400))
+                slow = true
+            }
     }
 }
 

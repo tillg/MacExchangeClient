@@ -15,10 +15,30 @@ public final class MailStore {
     @ObservationIgnored private var countsCache: (revision: Int, total: [MailboxRef: Int], unread: [MailboxRef: Int])?
     @ObservationIgnored private var listCache: (revision: Int, key: ListKey, list: [Message])?
 
-    public var selectedMailbox: MailboxRef = .smart(.allInboxes)
+    public var selectedMailbox: MailboxRef = .smart(.allInboxes) {
+        didSet { if searchScope(selectedMailbox) != searchScope(oldValue) { searchTextChanged() } }
+    }
     public var selection: Set<Message.ID> = []
     public var filterUnread = false
-    public var searchText = ""
+    public var searchText = "" { didSet { if searchText != oldValue { searchTextChanged() } } }
+    /// Searches the mail database's index (words, accounts or nil for all → IDs, newest first). Nil with
+    /// sample data or until the index is ready: search then scans memory.
+    @ObservationIgnored public var searcher: (@Sendable (String, Set<UUID>?) async throws -> [Message.ID])? {
+        didSet {
+            // Typed before the index was ready: memory keeps answering until the index's first answer is in.
+            guard searcher != nil, !normalizedSearch.isEmpty else { return }
+            fallbackQuery = normalizedSearch
+            searchAgain()
+        }
+    }
+    /// The index's answer for a query; shown until the next query's answer arrives.
+    public private(set) var searchHits: (query: String, ids: Set<Message.ID>)? { didSet { hitsGeneration &+= 1 } }
+    @ObservationIgnored private var hitsGeneration = 0
+    /// A query the index couldn't answer: memory is scanned for it instead.
+    private var fallbackQuery: String?
+    @ObservationIgnored private(set) var searchTask: Task<Void, Never>?
+    /// Wait after a keystroke before asking the index.
+    @ObservationIgnored var searchDebounce: Duration = .milliseconds(150)
     /// Last sync problem or notice, shown under the window title.
     public var status: String?
     public private(set) var isRefreshing = false
@@ -138,16 +158,27 @@ public final class MailStore {
     }
 
     private struct ListKey: Equatable {
-        var mailbox: MailboxRef, query: String, filterUnread: Bool
+        var mailbox: MailboxRef, query: String, filterUnread: Bool, hits: Int
     }
 
     /// Messages for the list pane: mailbox (or whole account/all mail while searching),
     /// unread filter, newest first.
     public var visibleMessages: [Message] {
-        let q = searchText.trimmingCharacters(in: .whitespaces).lowercased()
-        let key = ListKey(mailbox: selectedMailbox, query: q, filterUnread: filterUnread)
+        let typed = normalizedSearch
+        // With the index, the list shows its latest answer (the previous query's while the next one is on its
+        // way), or the mailbox until the first answer arrives. Without it, memory is scanned.
+        // Keyed by the answer's query, not the typed text, so keystrokes before the next answer cost nothing.
+        let useIndex = !typed.isEmpty && searcher != nil && fallbackQuery != typed
+        let hits = useIndex ? searchHits : nil
+        let q = useIndex ? hits?.query ?? "" : typed
+        let key = ListKey(mailbox: selectedMailbox, query: q, filterUnread: filterUnread, hits: hits == nil ? -1 : hitsGeneration)
         _ = messages.count  // registers the dependency for SwiftUI even when the cache answers
         if let c = listCache, c.revision == revision, c.key == key { return c.list }
+        if let hits, !q.isEmpty {
+            let list = Self.hitList(messages, hits.ids, scope: searchScope(selectedMailbox))
+            listCache = (revision, key, list)
+            return list
+        }
         let list = messages.filter { m in
             if !q.isEmpty {
                 guard inSearchScope(m), m.mailbox != .trash, m.mailbox != .junk else { return false }
@@ -162,10 +193,93 @@ public final class MailStore {
         return list
     }
 
+    /// The index's hits as they are in memory now: in scope, not in Trash or Junk, newest first.
+    /// Split across the cores: one pass over 180,000 messages takes about 45 ms in a debug build.
+    nonisolated private static func hitList(_ msgs: [Message], _ hits: Set<Message.ID>, scope: Set<UUID>?) -> [Message] {
+        let chunks = 8, size = (msgs.count + chunks - 1) / chunks
+        nonisolated(unsafe) let parts = UnsafeMutableBufferPointer<[Message]>.allocate(capacity: chunks)
+        _ = parts.initialize(from: repeatElement([], count: chunks))
+        defer { parts.deinitialize(); parts.deallocate() }
+        DispatchQueue.concurrentPerform(iterations: chunks) { c in
+            parts[c] = msgs[min(c * size, msgs.count)..<min((c + 1) * size, msgs.count)].filter { m in
+                hits.contains(m.id) && scope?.contains(m.accountID) != false && m.mailbox != .trash && m.mailbox != .junk
+            }
+        }
+        return parts.flatMap { $0 }.sorted { $0.date > $1.date }
+    }
+
     private func inSearchScope(_ m: Message) -> Bool {
         if case let .account(id, _) = selectedMailbox { return m.accountID == id }
         return true
     }
+
+    private var normalizedSearch: String { searchText.trimmingCharacters(in: .whitespaces).lowercased() }
+
+    /// The accounts a search covers: the selected one, or nil for all.
+    private func searchScope(_ ref: MailboxRef) -> Set<UUID>? {
+        if case let .account(id, _) = ref { return [id] }
+        return nil
+    }
+
+    /// Asks the index for the current search, after a short pause for more typing. An answer that arrives
+    /// after the text has changed again is dropped.
+    func searchTextChanged() {
+        searchTask?.cancel()
+        let q = normalizedSearch
+        guard !q.isEmpty else {
+            searchTask = nil; searchHits = nil; fallbackQuery = nil
+            if status == Self.limitNotice { status = nil }
+            return
+        }
+        guard searcher != nil else { return }
+        searchTask = Task { [debounce = searchDebounce] in
+            if debounce > .zero {
+                do { try await Task.sleep(for: debounce) } catch { return }
+            }
+            await runSearch(q)
+        }
+    }
+
+    /// Runs the current search again, without a pause, keeping the results on screen meanwhile: after a save,
+    /// so the index catches up with what arrived since.
+    public func searchAgain() {
+        let q = normalizedSearch
+        guard !q.isEmpty, searcher != nil else { return }
+        searchTask?.cancel()
+        searchTask = Task { await runSearch(q) }
+    }
+
+    private func runSearch(_ q: String) async {
+        guard let searcher else { return }
+        let scope = searchScope(selectedMailbox)
+        let snapshot = messages, snapshotRevision = revision
+        do {
+            // Detached, so neither the query nor the pass over all messages runs on the main actor.
+            let (ids, hits, list) = try await Task.detached(priority: .userInitiated) {
+                let ids = try await searcher(q, scope), hits = Set(ids)
+                return (ids, hits, Self.hitList(snapshot, hits, scope: scope))
+            }.value
+            guard !Task.isCancelled, normalizedSearch == q, searchScope(selectedMailbox) == scope else { return }
+            fallbackQuery = nil
+            searchHits = (q, hits)
+            // The list is ready unless mail changed meanwhile; then `visibleMessages` makes it again.
+            if revision == snapshotRevision {
+                listCache = (revision, ListKey(mailbox: selectedMailbox, query: q, filterUnread: filterUnread,
+                                               hits: hitsGeneration), list)
+            }
+            if ids.count >= MailDatabase.searchLimit {
+                status = Self.limitNotice
+            } else if status == Self.limitNotice {
+                status = nil
+            }
+        } catch {
+            guard !Task.isCancelled, normalizedSearch == q else { return }
+            fallbackQuery = q
+            status = "Search failed: \(error.localizedDescription)"
+        }
+    }
+
+    static let limitNotice = "Showing the newest 2,000 results"
 
     public var selectedMessage: Message? { selection.count == 1 ? selection.first.flatMap(message) : nil }
 

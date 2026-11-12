@@ -4,6 +4,8 @@ import SwiftUI
 struct MessageListView: View {
     @Environment(MailStore.self) private var store
     @Environment(\.openWindow) private var openWindow
+    /// A pull to refresh is checking for mail: the spinner above the list.
+    @State private var pulling = false
 
     var body: some View {
         let msgs = store.visibleMessages
@@ -44,6 +46,12 @@ struct MessageListView: View {
                 }
             }
             .listStyle(.inset)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if pulling {
+                    ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding(.vertical, 10)
+                }
+            }
+            .background(PullToRefresh { pullToRefresh() })
             .overlay {
                 if isEmpty {
                     if store.searchText.isEmpty {
@@ -67,6 +75,22 @@ struct MessageListView: View {
                 guard store.selection.count == 1 else { return }
                 Task { @MainActor in store.markSelectionRead() }
             }
+        }
+    }
+}
+
+extension MessageListView {
+    /// Checks the Inbox and the mailbox on screen, as Get New Mail does. The spinner stays until the check is
+    /// done (also one already running), and at least a moment, so it doesn't just flash.
+    private func pullToRefresh() {
+        guard !pulling else { return }
+        withAnimation { pulling = true }
+        Task {
+            let start = ContinuousClock.now
+            await store.refresh()
+            while store.isRefreshing { try? await Task.sleep(for: .milliseconds(100)) }
+            try? await Task.sleep(until: start + .milliseconds(800), clock: .continuous)
+            withAnimation { pulling = false }
         }
     }
 }

@@ -67,11 +67,17 @@ public struct DatabaseError: LocalizedError {
 }
 
 /// Server mail on disk, in SQLite: one row per message, so the Inbox loads without reading the rest and a
-/// change writes only what changed. All calls run one after the other on a private queue; call them off the
-/// main thread, except on quit.
+/// change writes only what changed. All calls run one after the other on a private queue (search on a second
+/// one, with its own read-only connection); call them off the main thread, except on quit.
 public final class MailDatabase: @unchecked Sendable {
     private var db: OpaquePointer?
     private let queue = DispatchQueue(label: "MailDatabase")
+    private let url: URL
+    /// Search reads on a connection of its own, so it never waits for a background write (WAL lets it read meanwhile).
+    private var reader: OpaquePointer?
+    private let readQueue = DispatchQueue(label: "MailDatabase.search")
+    /// Most results a search returns, newest first.
+    public static let searchLimit = 2000
 
     /// `~/Library/Application Support/MailReplica/Mail.sqlite`, next to the old `Cache.json`.
     public static var defaultURL: URL {
@@ -79,6 +85,7 @@ public final class MailDatabase: @unchecked Sendable {
     }
 
     public init(url: URL) throws {
+        self.url = url
         let fm = FileManager.default
         try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
                                attributes: [.posixPermissions: 0o700])
@@ -90,6 +97,8 @@ public final class MailDatabase: @unchecked Sendable {
         guard sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else {
             throw DatabaseError(errorDescription: "Couldn't open the mail database: \(String(cString: sqlite3_errmsg(db)))")
         }
+        var isNew = true
+        try query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'messages'") { _ in isNew = false }
         try exec("""
             PRAGMA journal_mode=WAL;
             PRAGMA synchronous=NORMAL;
@@ -105,9 +114,115 @@ public final class MailDatabase: @unchecked Sendable {
               position INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS outbox(position INTEGER PRIMARY KEY, change BLOB NOT NULL);
             """)
+        // A new database gets the search index right away; an older one in `prepareSearch()`, after the Inbox has loaded.
+        if isNew { try exec(Self.searchSchema + "PRAGMA user_version = \(Self.schemaVersion);") }
     }
 
-    deinit { sqlite3_close(db) }
+    deinit {
+        sqlite3_close(reader)
+        sqlite3_close(db)
+    }
+
+    // MARK: Search
+
+    /// 1: the full-text index `messages_fts`.
+    private static let schemaVersion = 1
+
+    private static let indexed = ["subject", "from_name", "from_email", "to_list", "cc_list", "preview", "body"]
+
+    /// The full-text index over `messages`, kept exact by triggers in the same transaction as each write.
+    /// A rewrite that changes no indexed text (read, flag, mailbox) leaves the index alone.
+    /// The to/cc separators (U+001F, U+001E) are word breaks for the tokenizer.
+    private static var searchSchema: String {
+        let cols = indexed.joined(separator: ", ")
+        func values(_ row: String) -> String { indexed.map { "\(row).\($0)" }.joined(separator: ", ") }
+        return """
+            CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(\(cols),
+              content='messages', content_rowid='rowid', tokenize='unicode61 remove_diacritics 2');
+            CREATE TRIGGER IF NOT EXISTS messages_fts_insert AFTER INSERT ON messages BEGIN
+              INSERT INTO messages_fts(rowid, \(cols)) VALUES(new.rowid, \(values("new")));
+            END;
+            CREATE TRIGGER IF NOT EXISTS messages_fts_delete AFTER DELETE ON messages BEGIN
+              INSERT INTO messages_fts(messages_fts, rowid, \(cols)) VALUES('delete', old.rowid, \(values("old")));
+            END;
+            CREATE TRIGGER IF NOT EXISTS messages_fts_update AFTER UPDATE ON messages
+            WHEN \(indexed.map { "old.\($0) IS NOT new.\($0)" }.joined(separator: " OR ")) BEGIN
+              INSERT INTO messages_fts(messages_fts, rowid, \(cols)) VALUES('delete', old.rowid, \(values("old")));
+              INSERT INTO messages_fts(rowid, \(cols)) VALUES(new.rowid, \(values("new")));
+            END;
+            CREATE INDEX IF NOT EXISTS messages_date ON messages(date DESC);
+            """
+    }
+
+    /// Builds the search index of a database from before search (about 1.2 s at 180,000 messages), in one
+    /// transaction. Returns false when there was nothing to do.
+    @discardableResult
+    public func prepareSearch() throws -> Bool {
+        try queue.sync {
+            guard try version() < Self.schemaVersion else { return false }
+            try exec("BEGIN IMMEDIATE")
+            do {
+                try exec(Self.searchSchema + """
+                    INSERT INTO messages_fts(messages_fts) VALUES('rebuild');
+                    PRAGMA user_version = \(Self.schemaVersion);
+                    COMMIT;
+                    """)
+            } catch {
+                try? exec("ROLLBACK")
+                throw error
+            }
+            return true
+        }
+    }
+
+    func schemaVersion() throws -> Int { try queue.sync { try version() } }
+
+    private func version() throws -> Int {
+        var v = 0
+        try query("PRAGMA user_version") { v = $0.int(0) }
+        return v
+    }
+
+    /// IDs of stored messages matching `query`, newest first. Every word must match the start of a word in
+    /// any field. Scope and Trash/Junk filtering is the caller's job (the database may lag memory).
+    public func search(_ query: String, accounts: Set<UUID>?, limit: Int = searchLimit) throws -> [Message.ID] {
+        guard let match = Self.matchExpression(query), accounts?.isEmpty != true else { return [] }
+        return try readQueue.sync {
+            if reader == nil {
+                guard sqlite3_open_v2(url.path, &reader, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, nil) == SQLITE_OK else {
+                    defer { sqlite3_close(reader); reader = nil }
+                    throw DatabaseError(errorDescription: "Couldn't open the mail database for search: "
+                                        + String(cString: sqlite3_errmsg(reader)))
+                }
+            }
+            let scope = accounts.map { a in " AND m.account IN (" + a.map { _ in "?" }.joined(separator: ",") + ")" } ?? ""
+            var ids: [Message.ID] = []
+            try self.query("""
+                SELECT m.id FROM messages_fts f JOIN messages m ON m.rowid = f.rowid
+                WHERE messages_fts MATCH ?\(scope) ORDER BY m.date DESC LIMIT \(max(limit, 0))
+                """, [match] + (accounts ?? []).map(\.uuidString), on: reader) { r in
+                if let id = UUID(uuidString: r.text(0)) { ids.append(id) }
+            }
+            return ids
+        }
+    }
+
+    /// The user's words as an FTS5 query: each one quoted (so no input is FTS syntax) with a prefix star,
+    /// all of them required. Words without a letter or digit match nothing and are left out.
+    static func matchExpression(_ text: String) -> String? {
+        let terms = text.split(whereSeparator: \.isWhitespace).filter { $0.contains { $0.isLetter || $0.isNumber } }
+        guard !terms.isEmpty else { return nil }
+        return terms.map { "\"" + $0.replacingOccurrences(of: "\"", with: "\"\"") + "\"*" }.joined(separator: " ")
+    }
+
+    /// For tests: holds a write transaction open on the write connection while `body` runs.
+    func holdWriteTransaction(_ body: @escaping @Sendable () -> Void) {
+        queue.async {
+            try? self.exec("BEGIN IMMEDIATE")
+            body()
+            try? self.exec("ROLLBACK")
+        }
+    }
 
     /// Where an import builds the database; it gets its real name only once complete.
     public static func importingURL(for url: URL) -> URL {
@@ -177,10 +292,11 @@ public final class MailDatabase: @unchecked Sendable {
         try queue.sync { try commit(c) }
     }
 
-    /// Writes in the background, after the writes before it; `failed` is called on an error.
-    public func writeInBackground(_ c: StoreChanges, failed: @escaping @Sendable (Error) -> Void) {
+    /// Writes in the background, after the writes before it; then `done` is called, or `failed` on an error.
+    public func writeInBackground(_ c: StoreChanges, done: @escaping @Sendable () -> Void = {},
+                                  failed: @escaping @Sendable (Error) -> Void) {
         guard !c.isEmpty else { return }
-        queue.async { do { try self.commit(c) } catch { failed(error) } }
+        queue.async { do { try self.commit(c); done() } catch { failed(error) } }
     }
 
     private func commit(_ changes: StoreChanges) throws {
@@ -189,7 +305,9 @@ public final class MailDatabase: @unchecked Sendable {
         do {
             if !c.upserts.isEmpty {
                 let marks = Array(repeating: "?", count: Self.columnCount).joined(separator: ",")
-                try prepared("INSERT OR REPLACE INTO messages(\(Self.columns)) VALUES(\(marks))") { st in
+                // An upsert, not INSERT OR REPLACE: REPLACE doesn't fire the delete trigger, which would leave
+                // the old words in the search index.
+                try prepared("INSERT INTO messages(\(Self.columns)) VALUES(\(marks)) ON CONFLICT(id) DO UPDATE SET \(Self.upsertSet)") { st in
                     for m in c.upserts { try Self.bind(m, st); try step(st) }
                 }
             }
@@ -291,6 +409,8 @@ public final class MailDatabase: @unchecked Sendable {
     private static let columns = "id, account, mailbox, remote, date, read, flag, from_name, from_email, to_list, cc_list, "
         + "subject, body, category, bits, attachments, preview, invite, html, is_invite, html_checked"
     private static let columnCount = 21
+    private static let upsertSet = columns.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        .filter { $0 != "id" }.map { "\($0) = excluded.\($0)" }.joined(separator: ", ")
 
     // Bits: VIP, has attachments, body loaded.
     private static let vip = 1, attach = 2, loaded = 4
@@ -360,9 +480,10 @@ public final class MailDatabase: @unchecked Sendable {
         }
     }
 
-    private func prepared(_ sql: String, _ body: (Statement) throws -> Void) throws {
+    private func prepared(_ sql: String, on connection: OpaquePointer? = nil, _ body: (Statement) throws -> Void) throws {
+        let c = connection ?? db
         var st: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &st, nil) == SQLITE_OK else { throw lastError() }
+        guard sqlite3_prepare_v2(c, sql, -1, &st, nil) == SQLITE_OK else { throw lastError(c) }
         defer { sqlite3_finalize(st) }
         try body(Statement(st))
     }
@@ -373,20 +494,21 @@ public final class MailDatabase: @unchecked Sendable {
         sqlite3_clear_bindings(st.pointer)
     }
 
-    private func query(_ sql: String, _ args: [String] = [], _ row: (Statement) throws -> Void) throws {
-        try prepared(sql) { st in
+    private func query(_ sql: String, _ args: [String] = [], on connection: OpaquePointer? = nil,
+                       _ row: (Statement) throws -> Void) throws {
+        try prepared(sql, on: connection) { st in
             for (i, a) in args.enumerated() { st.bind(Int32(i + 1), a) }
             while true {
                 let rc = sqlite3_step(st.pointer)
                 if rc == SQLITE_DONE { break }
-                guard rc == SQLITE_ROW else { throw lastError() }
+                guard rc == SQLITE_ROW else { throw lastError(connection ?? db) }
                 try row(st)
             }
         }
     }
 
-    private func lastError() -> DatabaseError {
-        DatabaseError(errorDescription: "Mail database: " + String(cString: sqlite3_errmsg(db)))
+    private func lastError(_ connection: OpaquePointer? = nil) -> DatabaseError {
+        DatabaseError(errorDescription: "Mail database: " + String(cString: sqlite3_errmsg(connection ?? db)))
     }
 }
 

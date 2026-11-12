@@ -223,6 +223,14 @@ extension Draft {
     /// Some of the files came from the message replied to or forwarded.
     public var hasOriginalAttachments: Bool { attachments.contains(where: \.fromOriginal) }
 
+    /// Changed by the user since `start`, so closing the window asks first, as in Mail. The original's files
+    /// arrive (and go) by themselves, so they don't count.
+    public func hasChanges(since start: Draft) -> Bool { userContent != start.userContent }
+
+    private var userContent: [AnyHashable] {
+        [accountID, to, cc, subject, text, attachments.filter { !$0.fromOriginal }]
+    }
+
     /// Exclude Attachments: takes out the original's files, keeps the ones added here.
     public mutating func excludeOriginalAttachments() {
         var k = 0

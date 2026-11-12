@@ -34,6 +34,7 @@ struct DebugSnapshot: ViewModifier {
             // MAIL_SNAPSHOT_ANSWER=accept|tentative|decline|propose|forward opens the answer (or forward) window for the selected
             // invite and captures that window instead.
             var windowTitle: String?
+            var dragCheck: (DropTextView, Int, Int)?
             if let answer = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_ANSWER"], let id = store.selection.first {
                 let draft = answer == "forward" ? store.draft(.forward, to: id)
                     : answer == "propose" ? store.answerDraft(.decline, to: id, proposing: true)
@@ -75,8 +76,35 @@ struct DebugSnapshot: ViewModifier {
                               + "first file at end \(view.string.last == Draft.fileMark)")
                     }
                 }
+                // MAIL_SNAPSHOT_DRAG_AT=index points a file drag at that character, as the pointer would, and
+                // leaves the drop caret showing; after the capture its pixels are checked (a "DRAG" line).
+                if let at = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_DRAG_AT"].flatMap({ Int($0) }) {
+                    try? await Task.sleep(for: .seconds(1))
+                    if let view = NSApp.windows.compactMap(\.contentView).flatMap(textViews).first {
+                        let r = view.caretRect(at: at)
+                        dragCheck = (view, at, view.showDrop(at: NSPoint(x: r.midX + 1, y: r.midY)))
+                    }
+                }
             }
             try? await Task.sleep(for: .seconds(2))
+            // MAIL_SNAPSHOT_CLOSE=1 closes the captured window as its close button does and prints whether it asked
+            // (a "CLOSE" line). =Save, =Don’t Save or =Cancel then clicks that button of the sheet and prints the
+            // outcome. If the window closed, there is nothing to capture.
+            if let answer = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_CLOSE"], let title = windowTitle,
+               let win = NSApp.windows.first(where: { $0.isVisible && $0.title.hasPrefix(title) }) {
+                let drafts = { store.messages.filter { $0.mailbox == .drafts }.count }
+                let before = drafts()
+                win.performClose(nil)
+                try? await Task.sleep(for: .seconds(1))
+                let question = (win.attachedSheet?.contentView).map(texts)?.first ?? "none"
+                print("CLOSE: still open \(win.isVisible), asked \(question)")
+                if let sheet = win.attachedSheet, let button = (sheet.contentView.map(buttons) ?? []).first(where: { $0.title == answer }) {
+                    button.performClick(nil)
+                    try? await Task.sleep(for: .seconds(1))
+                    print("CLOSE \(answer): still open \(win.isVisible), sheet \(win.attachedSheet != nil), drafts \(before) → \(drafts())")
+                }
+                if !win.isVisible { exit(0) }
+            }
             guard let win = NSApp.windows.first(where: { $0.isVisible && (windowTitle.map($0.title.hasPrefix) ?? ($0.title != "New Message")) }),
                   let view = win.contentView?.superview else { exit(2) }
             // MAIL_SNAPSHOT_SIZE=1280x800 sets the window's size in points first (the README screenshots).
@@ -87,12 +115,30 @@ struct DebugSnapshot: ViewModifier {
             let appearance = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_DARK"] != nil ? "Dark" : "Aqua"
             NSApp.appearance = NSAppearance(named: appearance == "Dark" ? .darkAqua : .aqua)
             try? await Task.sleep(for: .milliseconds(500))
+            // MAIL_SNAPSHOT_PULL=1 acts as if the message list had been pulled down: it checks for mail with the spinner.
+            // (AppKit doesn't rubber-band for made-up scroll events, so the pull itself can't be acted out here.)
+            if ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_PULL"] != nil {
+                for d in PullToRefresh.Detector.detectors(in: view) { d.onPull() }
+                try? await Task.sleep(for: .milliseconds(300))
+            }
             // HTML bodies load in another process; wait for them (up to 15s) and for their height to settle.
             for _ in 0..<150 where webViews(in: view).contains(where: { $0.isLoading || $0.frame.height <= 1 }) { try? await Task.sleep(for: .milliseconds(100)) }
             if !webViews(in: view).isEmpty { try? await Task.sleep(for: .seconds(1)) }
             guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { exit(3) }
             view.cacheDisplay(in: view.bounds, to: rep)
             await drawWebViews(in: view, onto: rep)
+            // A sheet is a window of its own: paint it in where it hangs.
+            if let sheet = win.attachedSheet, let sv = sheet.contentView?.superview,
+               let s = sv.bitmapImageRepForCachingDisplay(in: sv.bounds) {
+                sv.cacheDisplay(in: sv.bounds, to: s)
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+                let at = NSRect(origin: NSPoint(x: sheet.frame.minX - win.frame.minX, y: sheet.frame.minY - win.frame.minY),
+                                size: sheet.frame.size)
+                s.draw(in: at)
+                NSGraphicsContext.restoreGraphicsState()
+            }
+            if let (text, wanted, got) = dragCheck { print(caretCheck(text, wanted: wanted, got: got, root: view, rep: rep)) }
             try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: out))
             exit(0)
         }
@@ -108,6 +154,52 @@ struct DebugSnapshot: ViewModifier {
             image.draw(in: root.convert(w.bounds, from: w))
             NSGraphicsContext.restoreGraphicsState()
         }
+    }
+
+    /// "DRAG ok" when the pointer found the wanted character and the caret's pixels have the caret colour
+    /// while the background just left of it doesn't.
+    private func caretCheck(_ text: DropTextView, wanted: Int, got: Int, root: NSView, rep: NSBitmapImageRep) -> String {
+        let r = root.convert(text.caretRect(at: got), from: text)
+        let scale = CGFloat(rep.pixelsWide) / root.bounds.width
+        func pixel(_ x: CGFloat) -> NSColor? {
+            let y = root.isFlipped ? r.midY : root.bounds.height - r.midY
+            return rep.colorAt(x: Int(x * scale), y: Int(y * scale))?.usingColorSpace(.sRGB)
+        }
+        // A system colour has its components only under an appearance, and comes out of the bitmap's colour space.
+        var want: NSColor?
+        text.effectiveAppearance.performAsCurrentDrawingAppearance {
+            want = text.insertionPointColor.usingColorSpace(rep.colorSpace)?.usingColorSpace(.sRGB)
+        }
+        func near(_ c: NSColor?) -> Bool {
+            guard let c, let want else { return false }
+            return abs(c.redComponent - want.redComponent) + abs(c.greenComponent - want.greenComponent)
+                + abs(c.blueComponent - want.blueComponent) < 0.5  // colour matching shifts it a little
+        }
+        let onCaret = near(pixel(r.midX)), beside = near(pixel(r.minX - 4))
+        let ok = got == wanted && onCaret && !beside
+        return "DRAG \(ok ? "ok" : "FAILED"): wanted index \(wanted), got \(got), caret \(r.integral) height \(r.height), "
+            + "caret pixel \(onCaret), background pixel \(beside) (want \(want.map(String.init(describing:)) ?? "nil"), "
+            + "saw \(pixel(r.midX).map(String.init(describing:)) ?? "nil"))"
+    }
+
+    /// The labels' texts, top to bottom (a sheet's question first).
+    private func texts(in root: NSView) -> [String] {
+        var stack = [root], found: [(CGFloat, String)] = []
+        while let v = stack.popLast() {
+            if let t = v as? NSTextField, !t.isEditable, !t.stringValue.isEmpty {
+                found.append((root.convert(t.bounds, from: t).maxY, t.stringValue))
+            }
+            stack.append(contentsOf: v.subviews)
+        }
+        return found.sorted { root.isFlipped ? $0.0 < $1.0 : $0.0 > $1.0 }.map(\.1)
+    }
+
+    private func buttons(in root: NSView) -> [NSButton] {
+        var stack = [root], found: [NSButton] = []
+        while let v = stack.popLast() {
+            if let b = v as? NSButton { found.append(b) } else { stack.append(contentsOf: v.subviews) }
+        }
+        return found
     }
 
     private func textViews(in root: NSView) -> [DropTextView] {

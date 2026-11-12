@@ -239,23 +239,84 @@ final class DropTextView: NSTextView {
 
     // MARK: Dropping files
 
+    /// Where dragged files would go, shown as a caret as in Mail. nil when nothing is dragged over the text.
+    private(set) var dropIndex: Int? {
+        didSet { if dropIndex != oldValue { needsDisplay = true } }
+    }
+
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        isFileDrop(sender) ? (files == nil ? [] : .copy) : super.draggingEntered(sender)
+        guard isFileDrop(sender) else { return super.draggingEntered(sender) }
+        return draggingUpdated(sender)
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
         guard isFileDrop(sender) else { return super.draggingUpdated(sender) }
         guard files != nil else { return [] }
-        // Show where the files will go.
-        let i = characterIndexForInsertion(at: convert(sender.draggingLocation, from: nil))
-        setSelectedRange(NSRange(location: i, length: 0))
+        showDrop(at: convert(sender.draggingLocation, from: nil))
         return .copy
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        dropIndex = nil
+        super.draggingExited(sender)
+    }
+
+    override func draggingEnded(_ sender: NSDraggingInfo) {
+        dropIndex = nil
+        super.draggingEnded(sender)
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         guard isFileDrop(sender) else { return super.performDragOperation(sender) }
-        let i = characterIndexForInsertion(at: convert(sender.draggingLocation, from: nil))
+        let i = showDrop(at: convert(sender.draggingLocation, from: nil))
+        dropIndex = nil
+        window?.makeFirstResponder(self)
         return attachFiles(from: sender.draggingPasteboard, at: i)
+    }
+
+    /// Moves the drop caret to the place nearest `point` (in this view) and returns that character index.
+    @discardableResult func showDrop(at point: NSPoint) -> Int {
+        let i = characterIndexForInsertion(at: point)
+        dropIndex = i
+        return i
+    }
+
+    func hideDrop() { dropIndex = nil }
+
+    /// The caret at character `index`: as tall as its line, at the left of that character (or after the last one).
+    func caretRect(at index: Int) -> NSRect {
+        let origin = textContainerOrigin
+        let lineHeight = (layoutManager?.defaultLineHeight(for: Self.plain[.font] as! NSFont)) ?? 16
+        guard let lm = layoutManager, let tc = textContainer, lm.numberOfGlyphs > 0 else {
+            return NSRect(x: origin.x + (textContainer?.lineFragmentPadding ?? 5), y: origin.y, width: 2, height: lineHeight)
+        }
+        let length = textStorage?.length ?? 0
+        var rect: NSRect
+        if index >= length, !lm.extraLineFragmentRect.isEmpty {
+            // After a final newline: the empty last line.
+            rect = NSRect(x: lm.extraLineFragmentRect.minX + tc.lineFragmentPadding, y: lm.extraLineFragmentRect.minY,
+                          width: 0, height: lm.extraLineFragmentRect.height)
+        } else if index >= length {
+            let g = lm.glyphIndexForCharacter(at: length - 1)
+            let line = lm.lineFragmentRect(forGlyphAt: g, effectiveRange: nil)
+            let glyph = lm.boundingRect(forGlyphRange: NSRange(location: g, length: 1), in: tc)
+            rect = NSRect(x: glyph.maxX, y: line.minY, width: 0, height: line.height)
+        } else {
+            let g = lm.glyphIndexForCharacter(at: index)
+            let line = lm.lineFragmentRect(forGlyphAt: g, effectiveRange: nil)
+            rect = NSRect(x: line.minX + lm.location(forGlyphAt: g).x, y: line.minY, width: 0, height: line.height)
+        }
+        rect.origin.x += origin.x - 1
+        rect.origin.y += origin.y
+        rect.size.width = 2
+        return rect
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let dropIndex else { return }
+        insertionPointColor.setFill()
+        NSBezierPath(roundedRect: caretRect(at: dropIndex), xRadius: 1, yRadius: 1).fill()
     }
 
     /// Files from outside. A file moved within the text is the text view's own drag and stays a move.

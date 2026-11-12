@@ -13,6 +13,8 @@ struct ComposeView: View {
     @State private var askInclude = false
     @State private var confirmSize = false
     @FocusState private var inRecipients: Bool
+    /// The draft as the window opened, to tell whether closing it loses anything.
+    @State private var start: Draft?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,7 +46,9 @@ struct ComposeView: View {
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in drop(providers) }
         .task(id: draft.loadingOriginal) { await includeOriginal() }
         .task(id: draft.accountID) { await store.loadMaxMessageSize(for: draft.accountID) }
+        .background(WindowCloseGuard(shouldClose: shouldClose))
         .onAppear {
+            if start == nil { start = draft }
             // Ask: a reply to a message with attachments, which a forward or Always would already include.
             if includeMode == .ask && draft.original != nil && draft.loadingOriginal == nil && !draft.hasOriginalAttachments {
                 askInclude = true
@@ -190,6 +194,27 @@ struct ComposeView: View {
         add(panel.urls)
     }
 
+    /// Closing an unsent message with changes asks first, with Mail's sheet (Compose.loctable: SaveUnsentQuestion).
+    /// An invite answer can't be kept as a draft, so it closes without asking.
+    private func shouldClose(_ window: NSWindow) -> Bool {
+        guard draft.inviteAnswer == nil, let start, draft.hasChanges(since: start) else { return true }
+        let alert = NSAlert()
+        alert.messageText = "Save this message as a draft?"
+        alert.informativeText = "This message has not been sent and contains unsaved changes. You can save it as a draft to work on later."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Don’t Save").keyEquivalent = "\u{7F}"  // ⌘⌫, as in other save sheets
+        alert.buttons[2].keyEquivalentModifierMask = .command
+        alert.beginSheetModal(for: window) { response in
+            switch response {
+            case .alertFirstButtonReturn: store.saveDraft(draft); window.close()
+            case .alertThirdButtonReturn: window.close()
+            default: break
+            }
+        }
+        return false
+    }
+
     private func send() {
         if store.isOverSizeLimit(draft) { return confirmSize = true }
         store.send(draft)
@@ -206,6 +231,45 @@ struct ComposeView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             Divider().padding(.leading, 12)
+        }
+    }
+}
+
+/// Lets the view decide whether its window may close (the close button, ⌘W, File ▸ Close). SwiftUI has no hook
+/// for that, so the window's delegate is wrapped: `windowShouldClose` asks first, everything else goes to
+/// SwiftUI's own delegate.
+struct WindowCloseGuard: NSViewRepresentable {
+    let shouldClose: (NSWindow) -> Bool
+
+    func makeNSView(context: Context) -> GuardView { GuardView() }
+    func updateNSView(_ view: GuardView, context: Context) { view.shouldClose = shouldClose }
+
+    final class GuardView: NSView {
+        var shouldClose: ((NSWindow) -> Bool)?
+        private var proxy: DelegateProxy?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window, proxy == nil else { return }
+            let p = DelegateProxy(original: window.delegate, guardView: self)
+            proxy = p  // the window holds its delegate weakly
+            window.delegate = p
+        }
+    }
+
+    final class DelegateProxy: NSObject, NSWindowDelegate {
+        weak var original: NSWindowDelegate?
+        weak var guardView: GuardView?
+        init(original: NSWindowDelegate?, guardView: GuardView) { self.original = original; self.guardView = guardView }
+
+        override func responds(to selector: Selector!) -> Bool {
+            super.responds(to: selector) || (original?.responds(to: selector) ?? false)
+        }
+        override func forwardingTarget(for selector: Selector!) -> Any? { original }
+
+        func windowShouldClose(_ window: NSWindow) -> Bool {
+            if let ask = guardView?.shouldClose, !ask(window) { return false }
+            return original?.windowShouldClose?(window) ?? true
         }
     }
 }
