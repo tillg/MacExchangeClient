@@ -20,15 +20,6 @@ struct Probe_StoreCoreTests {
 
     func store(_ msgs: [Message]) -> MailStore { MailStore(accounts: [work, home], messages: msgs) }
 
-    // 4. Move to Junk on a mixed selection: everything ends up in Junk (like Mark as Read for a mixed selection).
-    @Test func junkOnMixedSelectionMovesAllToJunk() {
-        let a = msg(work, .junk, subject: "a", flag: .red), b = msg(work, subject: "b", flag: .red)
-        let s = store([a, b])
-        s.toggleJunk([a.id, b.id])
-        #expect(s.message(a.id)?.mailbox == .junk)
-        #expect(s.message(b.id)?.mailbox == .junk)
-    }
-
     // 6. Next selection: deleting the last row selects the one above.
     @Test func deletingTheLastRowSelectsThePrevious() {
         let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)

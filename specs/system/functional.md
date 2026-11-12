@@ -1,7 +1,7 @@
 ---
 title: "Functional"
 created: 2026-11-12
-edited: 2026-11-12
+edited: 2026-11-13
 ---
 
 # Functional
@@ -50,7 +50,7 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 |---|---|
 | Delete (⌘⌫) | Messages in Trash are erased (removed; server: `DeleteItem` SoftDelete); others move to the account's Trash |
 | Archive (⌃⌘A) | Move to `.archive`, also when already there |
-| Junk (⇧⌘J) | Per message: Junk → Inbox, anything else → Junk |
+| Junk (⇧⌘J) | All to Junk if any selected message is outside Junk; if all are in Junk, all to the Inbox (Not Junk) |
 | Mark as Read/Unread (⇧⌘U) | All become read if any is unread, else all unread |
 | Toggle Flag (⇧⌘L) | Clears the flag if any selected message is flagged, else flags red |
 | Flag ▸ colour / Clear Flag | Sets that colour on all; seven colours, red to gray |
