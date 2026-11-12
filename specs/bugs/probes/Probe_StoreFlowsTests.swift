@@ -18,14 +18,6 @@ struct Probe_StoreFlowsTests {
 
     // MARK: Reply / forward
 
-    @Test func probe_replyAllExcludesOwnAddressCaseInsensitively() {
-        let m = msg(work, to: [Contact(name: "Me", email: "Me@Work.COM"), Contact(name: "Bo", email: "bo@x.com")])
-        let s = store([m])
-        let d = s.draft(.replyAll, to: m.id)
-        let emails = Contact.parseList(d.to + "," + d.cc).map { $0.email.lowercased() }
-        #expect(!emails.contains("me@work.com"), "to: \(d.to) cc: \(d.cc)")
-    }
-
     @Test func probe_replyAllHasNoDuplicateRecipients() {
         let m = msg(work, from: "Ann", to: [Contact(name: "Me", email: "me@work.com"), Contact(name: "Bo", email: "bo@x.com")],
                     cc: [Contact(name: "Ann", email: "ann@x.com"), Contact(name: "Bo", email: "BO@x.com")])

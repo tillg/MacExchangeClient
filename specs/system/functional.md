@@ -98,8 +98,8 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
   - Subject gets "Re: " or "Fwd: " unless it already starts with exactly that prefix (case-sensitive).
   - Body: an attribution line ("On <date>, Name <addr> wrote:") or a "Begin forwarded message:" block, then every
     line of the plain-text body (split on `\n`) prefixed with "> ".
-  - Reply: To = the sender's address. Reply All: To = sender, To and Cc addresses minus the account address (exact
-    match), in that order, with duplicates; Cc stays empty. Forward: To empty.
+  - Reply: To = the sender's address. Reply All: To = sender, To and Cc addresses minus the account address
+    (compared without case), in that order, with duplicates; Cc stays empty. Forward: To empty.
 - Original attachments: Forward always loads them. Replies follow Edit ▸ Include Attachments With Replies (Never,
   default; Ask: an alert when the window opens; When Adding Recipients: on leaving To/Cc or Return, if an address with
   "@" wasn't on the original; Always). Ask and When Adding Recipients work for every reply; Always only for replies

@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [007](BUG-007-reply-all-includes-own-address-when-case-differs.md) | P2 | MailStore | Reply All keeps my own address when the original lists it in different case |
 | [008](BUG-008-reply-quote-ignores-crlf-lines.md) | P2 | MailStore | Reply/forward quoting marks only the first line of a CRLF body |
 | [009](BUG-009-corrupt-cache-json-blocks-database-forever.md) | P3 | MailDatabase | An unreadable Cache.json blocks creating Mail.sqlite on every launch; nothing is ever saved again |
 | [010](BUG-010-iso-dates-without-z-or-with-fraction-dropped.md) | P3 | EWS | Dates with fractional seconds or without a zone suffix aren't parsed: message dated year 1, invite and calendar events dropped |
