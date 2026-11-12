@@ -173,6 +173,10 @@ struct MailStoreRulesTests {
         let d = s.draft(.reply, to: m.id)
         #expect(d.to == "bo@x.com, cy@x.com", "to: \(d.to)")
         #expect(d.cc == "")
+        // A note to myself only: the reply still goes to me.
+        let note = Message(accountID: work.id, mailbox: .inbox, from: Contact(name: "Me", email: "me@work.com"),
+                           to: [Contact(name: "Me", email: "ME@work.com")], subject: "Note", body: "x", date: .now)
+        #expect(store([note]).draft(.reply, to: note.id).to == "me@work.com")
     }
 
     // MARK: Drafts

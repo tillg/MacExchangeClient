@@ -49,6 +49,14 @@ struct MailStorePerformanceTests {
         #expect(sidebar < Self.limit)
     }
 
+    /// Memory search (before the index is ready) folds every message's fields once per query. About 0.17s here;
+    /// the limit is ten times that, so a busy machine doesn't fail it.
+    @Test func memorySearchStaysFastAt70kMessages() {
+        let t = seconds { s in s.searchText = "subject 4"; _ = s.visibleMessages }
+        print(String(format: "PERF memory search 70k %.3fs", t))
+        #expect(t < 2.0)
+    }
+
     @Test func mergingASyncPageStaysFastAt70kMessages() {
         let page = (0..<512).map { i in
             Message(accountID: work.id, from: Contact(name: "N", email: "n@x.com"), to: [], subject: "New \(i)", body: "",

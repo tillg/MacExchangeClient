@@ -240,7 +240,7 @@ edited: 2026-11-13
 - **Status:** decided
 - **Context:** BUG-025. Exchange moves a deleted folder into Deleted Items, so its mail arrives with a folder whose `parent` chain reaches `.trash`. Conversations, Flagged (list and count) and search only compared `mailbox == .trash`.
 - **Decision:** `MailStore` keeps, per account, the set of folders inside Trash at any depth (worked out from `folders` whenever they change). Every place that leaves out Trash also leaves those out: conversations, the Flagged list and count, the memory search and the check of the index's hits against memory. Changing `folders` now also bumps `revision`, so cached counts and lists follow a new folder tree. Junk's subfolders are unchanged.
-- **Why:** Mail in a deleted folder is deleted mail. Worked out once per folder change, the per-message check is one dictionary lookup, so the 70k-message timings are unchanged.
+- **Why:** Mail in a deleted folder is deleted mail. Worked out once per folder change (only when the tree really changed, so an unchanged folder list from a sync doesn't clear the caches), the per-message check is one dictionary lookup, so the 70k-message timings are unchanged.
 - **Known limit:** The database's search still leaves out only `trash` and `junk` before its 2,000-hit limit (it doesn't know the folder tree), so hits in deleted folders can take up places in that limit before memory drops them. Rare (deleted folders with many matching messages); left as is.
 - **Alternatives:** Walk each message's parent chain on every check (rejected: per-message cost in the 70k paths).
 
@@ -270,7 +270,7 @@ edited: 2026-11-13
 
 - **Status:** decided (Mail's behaviour from memory ⚠️)
 - **Context:** BUG-029. Reply always went to the sender, so replying to a message from Sent (or a sent card in a conversation) addressed it to myself.
-- **Decision:** When the sender is the account's own address (compared without case), Reply goes to the original To recipients (each once, my own address left out). Cc stays empty, as for any Reply.
+- **Decision:** When the sender is the account's own address (compared without case), Reply goes to the original To recipients (each once, my own address left out). Cc stays empty, as for any Reply. A note only to myself (no other To recipient) still replies to me, as before.
 - **Why:** That is what Mail and Outlook do; a reply to yourself is never what's meant.
 
 ## 00:48 — A local Save Draft keeps Cc {#d-bug-030}
@@ -292,7 +292,7 @@ edited: 2026-11-13
 - **Status:** decided
 - **Context:** BUG-032. A proposed new time with only a start or only an end was queued; EWS writes `ProposedStart`/`ProposedEnd` only as a pair, so the organizer got a plain answer and no proposal.
 - **Decision:** `respond(_:to:)` refuses such a reply with the status "The proposed meeting needs both a start and an end." and queues nothing, like the existing end-before-start check.
-- **Why:** The user would otherwise believe a time was proposed.
+- **Why:** The user would otherwise believe a time was proposed. The compose window always sets both times, so this guards the store's API only; no What's New line.
 
 ## 00:52 — Memory search follows the search rules, but keeps matching inside words {#d-bug-052}
 
@@ -300,4 +300,5 @@ edited: 2026-11-13
 - **Context:** BUG-052. The in-memory search (sample data, every launch until stored mail has loaded, and after an index error) matched the whole query as one substring in subject, sender and body only, accent-sensitively.
 - **Decision:** Every typed word must match, in any order, in any of subject, sender, To, Cc (names and addresses), the server's preview or the body; case and accents don't matter. **Deviation:** a word may still match inside a word (`report` finds "Misreported"), not only at the start of one.
 - **Why:** #d-memory-search said "at the start of a word" and assumed the existing tests used only single words. But `searchTypedBeforeTheIndexIsReady` pins memory finding "Misreported" for `report` (and `searchHitsFollowWhatIsInMemory` relies on the same difference), and existing tests are never changed. Matching more on the memory path never hides mail the index would show.
+- **Cost:** Each query folds every message's fields once: 0.17 s for 70,000 messages in a debug build (new test `memorySearchStaysFastAt70kMessages`). Only the launch window and index errors pay it.
 - **Alternatives:** Word-start matching as decided (rejected: breaks an existing test). Keep "as before" (rejected in #d-memory-search).

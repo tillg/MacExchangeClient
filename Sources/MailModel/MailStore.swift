@@ -10,7 +10,7 @@ public final class MailStore {
     public private(set) var messages: [Message] { didSet { revision &+= 1 } }
     /// Bumped on every change to `messages` (and `folders`); the caches below are valid for one revision.
     @ObservationIgnored private var revision = 0
-    /// Changes when the messages change, to skip saving an unchanged cache.
+    /// Changes when the messages (or folders) change, to skip saving an unchanged cache.
     public var changeCount: Int { revision }
     @ObservationIgnored private var countsCache: (revision: Int, total: [MailboxRef: Int], unread: [MailboxRef: Int])?
     @ObservationIgnored private var listCache: (revision: Int, key: ListKey, list: [Message])?
@@ -55,7 +55,10 @@ public final class MailStore {
 
     /// Each account's folders of its own, as a tree (see `children(of:account:)`).
     public private(set) var folders: [UUID: [Folder]] = [:] {
-        didSet { foldersChanged = true; foldersInTrash = Self.foldersInTrash(folders); revision &+= 1 }
+        didSet {
+            foldersChanged = true
+            if folders != oldValue { foldersInTrash = Self.foldersInTrash(folders); revision &+= 1 }
+        }
     }
     /// Each account's folders inside Trash, at any depth (Exchange keeps deleted folders there): their mail
     /// counts as deleted, like Trash's own.
@@ -1347,7 +1350,9 @@ public final class MailStore {
         switch kind {
         case .reply:
             // Replying to my own message (from Sent, or in a conversation) goes to its recipients, as in Mail.
-            to = m.from.email.lowercased() == me?.lowercased() ? addresses(m.to) : m.from.email
+            // A note only to myself still goes to me.
+            let recipients = m.from.email.lowercased() == me?.lowercased() ? addresses(m.to) : ""
+            to = recipients.isEmpty ? m.from.email : recipients
         case .replyAll:
             to = addresses([m.from] + m.to)
             cc = addresses(m.cc)

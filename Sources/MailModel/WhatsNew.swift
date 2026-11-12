@@ -33,7 +33,6 @@ public enum WhatsNew {
             "Reply to a message you sent goes to the people you sent it to, not to yourself.",
             "Saving a draft on this Mac keeps the people in Cc.",
             "The “Search failed” note goes away once you clear the search or the next search works.",
-            "Proposing a new meeting time now asks for both a start and an end, instead of quietly sending a plain answer.",
             "Search right after the app starts follows the same rules as later: every word counts, people in To and Cc are found, and accents don't matter.",
         ]),
         ChangeLogDay(date: "2026-11-12", features: [
