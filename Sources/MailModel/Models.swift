@@ -114,15 +114,22 @@ public struct Contact: Hashable, Codable, Sendable {
     /// except inside double quotes or `<>`; the quotes around a name are removed. A piece without an address
     /// followed by one with `<…>` is a name with a comma written without quotes (Outlook's `Last, First <addr>`).
     public static func parseList(_ s: String) -> [Contact] {
-        var pieces: [String] = [], piece = "", quoted = false, escaped = false, inAngle = false
-        for c in s {
-            if escaped { escaped = false } else if quoted && c == "\\" { escaped = true } else if c == "\"" { quoted.toggle() }
-            else if !quoted && c == "<" { inAngle = true } else if !quoted && c == ">" { inAngle = false }
-            else if !quoted && !inAngle && (c == "," || c == ";") { pieces.append(piece); piece = ""; continue }
-            piece.append(c)
+        /// Nil when a quote or `<` is never closed: it would swallow the recipients after it.
+        func split(nesting: Bool) -> [String]? {
+            var pieces: [String] = [], piece = "", quoted = false, escaped = false, inAngle = false
+            for c in s {
+                if nesting {
+                    if escaped { escaped = false } else if quoted && c == "\\" { escaped = true }
+                    else if c == "\"" { quoted.toggle() } else if !quoted && c == "<" { if inAngle { return nil }; inAngle = true }
+                    else if !quoted && c == ">" { inAngle = false }
+                }
+                if !quoted && !inAngle && (c == "," || c == ";") { pieces.append(piece); piece = ""; continue }
+                piece.append(c)
+            }
+            return quoted || inAngle ? nil : pieces + [piece]
         }
-        pieces.append(piece)
-        pieces = pieces.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        let pieces = (split(nesting: true) ?? split(nesting: false)!)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         var merged: [String] = []
         for p in pieces {
             if let last = merged.last, !last.contains("@"), !last.contains("<"), !last.contains("\""), p.contains("<") {

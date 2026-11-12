@@ -49,6 +49,13 @@ struct ContactTests {
         #expect(Contact.parseList("Jane < jane@x.com >").first?.email == "jane@x.com")
     }
 
+    /// A quote or `<` that never closes must not swallow the recipients after it.
+    @Test func anUnclosedQuoteOrBracketDropsNoRecipient() {
+        #expect(Contact.parseList(#"Bob "Bobby Smith <bob@x.com>, ann@y.com"#).map(\.email) == ["bob@x.com", "ann@y.com"])
+        #expect(Contact.parseList("Ann <a@x.com, Bob <b@y.com>").map(\.email).last == "b@y.com")
+        #expect(Contact.parseList("Ann <a@x.com, Bob <b@y.com>").count == 2)
+    }
+
     /// What already worked stays as it was.
     @Test func plainListsParseAsBefore() {
         let c = Contact.parseList("a@b.com, Name <c@d.com>, ,Tom <tom+tag@bücher.de>")
