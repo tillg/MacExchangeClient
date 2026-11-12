@@ -367,23 +367,49 @@ public final class MailStore {
         scheduleFlush()
     }
 
-    public func move(_ ids: Set<Message.ID>, to box: MailboxKind) { update(ids) { $0.mailbox = box } }
+    public func move(_ ids: Set<Message.ID>, to box: MailboxKind) {
+        keepingSelectionVisible(ids) { update(ids) { $0.mailbox = box } }
+    }
 
     public func delete(_ ids: Set<Message.ID>) {
-        let erase = messages.filter { ids.contains($0.id) && $0.mailbox == .trash }
-        let eraseIDs = Set(erase.map(\.id))
-        messages.removeAll { eraseIDs.contains($0.id) }
-        forget(eraseIDs)
-        for (acct, group) in Dictionary(grouping: erase.filter { $0.remoteID != nil }, by: \.accountID) {
-            enqueue(group, account: acct) { .delete($0) }
+        keepingSelectionVisible(ids) {
+            let erase = messages.filter { ids.contains($0.id) && $0.mailbox == .trash }
+            let eraseIDs = Set(erase.map(\.id))
+            messages.removeAll { eraseIDs.contains($0.id) }
+            forget(eraseIDs)
+            for (acct, group) in Dictionary(grouping: erase.filter { $0.remoteID != nil }, by: \.accountID) {
+                enqueue(group, account: acct) { .delete($0) }
+            }
+            update(ids.subtracting(eraseIDs)) { $0.mailbox = .trash }
         }
-        move(ids.subtracting(eraseIDs), to: .trash)
     }
 
     public func archive(_ ids: Set<Message.ID>) { move(ids, to: .archive) }
 
     public func toggleJunk(_ ids: Set<Message.ID>) {
-        update(ids) { $0.mailbox = $0.mailbox == .junk ? .inbox : .junk }
+        keepingSelectionVisible(ids) { update(ids) { $0.mailbox = $0.mailbox == .junk ? .inbox : .junk } }
+    }
+
+    /// Runs a move or delete of `ids`. Selected messages it takes out of the list (or erases) don't stay
+    /// selected, so a second Delete can't erase a message the user never saw in Trash. When that was the whole
+    /// selection, the message that followed it in the list is selected, as after Delete.
+    private func keepingSelectionVisible(_ ids: Set<Message.ID>, _ body: () -> Void) {
+        guard !selection.isDisjoint(with: ids) else { body(); return }
+        let list = visibleMessages.map(\.id), before = selection
+        body()
+        let remaining = Set(visibleMessages.map(\.id))
+        let gone = before.intersection(ids).subtracting(remaining)
+        guard !gone.isEmpty, selection == before else { return }
+        selection = gone == before ? Self.following(before, in: list, remaining: remaining) ?? [] : before.subtracting(gone)
+    }
+
+    /// The message after the last of `ids` in `list` that is still in it (else the one before), as Mail selects
+    /// after an action; nil when none of `ids` was in the list.
+    private static func following(_ ids: Set<Message.ID>, in list: [Message.ID], remaining: Set<Message.ID>) -> Set<Message.ID>? {
+        guard let lastIdx = list.lastIndex(where: ids.contains) else { return nil }
+        let next = list[(lastIdx + 1)...].first { remaining.contains($0) && !ids.contains($0) }
+            ?? list[..<lastIdx].last { remaining.contains($0) && !ids.contains($0) }
+        return next.map { [$0] } ?? []
     }
 
     public func setFlag(_ c: FlagColor?, for ids: Set<Message.ID>) { update(ids) { $0.flag = c } }
@@ -400,17 +426,14 @@ public final class MailStore {
     }
 
     /// Runs `action` on the selection, then selects the message that followed it in the list – as Mail does.
+    /// A selection that wasn't in the list (hidden by the unread filter or a search) isn't kept selected
+    /// once the action takes it out of the list.
     public func actOnSelection(_ action: (Set<Message.ID>) -> Void) {
         let list = visibleMessages.map(\.id)
-        let lastIdx = list.lastIndex { selection.contains($0) }
         let ids = selection
         action(ids)
         let remaining = Set(visibleMessages.map(\.id))
-        if let lastIdx {
-            let next = list[(lastIdx + 1)...].first { remaining.contains($0) && !ids.contains($0) }
-                ?? list[..<lastIdx].last { remaining.contains($0) && !ids.contains($0) }
-            selection = next.map { [$0] } ?? []
-        }
+        selection = Self.following(ids, in: list, remaining: remaining) ?? ids.intersection(remaining)
     }
 
     public func deleteSelection() { actOnSelection(delete) }
@@ -441,14 +464,14 @@ public final class MailStore {
         }
         guard !moving.isEmpty else { return false }
         let apply: (Set<Message.ID>) -> Void = { ids in
-            self.update(ids) { m in
+            self.keepingSelectionVisible(ids) { self.update(ids) { m in
                 switch ref {
                 case .smart(.flagged): if m.flag == nil { m.flag = .red }
                 case .smart(.allInboxes): m.mailbox = .inbox
                 case let .account(acct, kind): m.accountID = acct; m.mailbox = kind
                 case .smart(.vip), .smart(.unread): break
                 }
-            }
+            } }
         }
         if ids == selection { actOnSelection(apply) } else { apply(moving) }
         return true

@@ -52,6 +52,95 @@ struct MailStoreTests {
         #expect(s.selection == [c.id])
     }
 
+    /// A selected message hidden by the unread filter is trashed but not kept selected, so a second Delete
+    /// can't erase it from Trash unseen.
+    @Test func deletingAHiddenSelectionTwiceDoesNotEraseIt() {
+        let a = msg(work, subject: "a", read: true, minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
+        let s = store([a, b])
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.selection = [a.id]
+        s.filterUnread = true  // a is read: hidden now, still selected
+        s.deleteSelection()
+        #expect(s.message(a.id)?.mailbox == .trash)
+        #expect(s.selection.isSubset(of: Set(s.visibleMessages.map(\.id))))
+        s.deleteSelection()
+        #expect(s.message(a.id)?.mailbox == .trash, "a second Delete erased a message never seen in Trash")
+        #expect(s.message(b.id)?.mailbox == .inbox)
+    }
+
+    /// Swipe ▸ Trash or the context menu's Delete on the selected row, then ⌘⌫.
+    @Test func deletingTheSelectedRowDirectlyThenDeleteKeyDoesNotEraseIt() {
+        let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
+        let s = store([a, b])
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.selection = [a.id]
+        s.delete([a.id])
+        #expect(s.selection == [b.id])
+        s.deleteSelection()
+        #expect(s.message(a.id)?.mailbox == .trash, "erased from Trash without ever being shown there")
+    }
+
+    @Test func searchHidingTheSelectionThenDeleteTwiceDoesNotEraseIt() {
+        let a = msg(work, subject: "alpha", minutesAgo: 1), b = msg(work, subject: "beta", minutesAgo: 2)
+        let s = store([a, b])
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.selection = [a.id]
+        s.searchText = "beta"
+        s.deleteSelection()
+        #expect(s.selection.isSubset(of: Set(s.visibleMessages.map(\.id))))
+        s.deleteSelection()
+        #expect(s.message(a.id)?.mailbox == .trash)
+    }
+
+    /// Moving the selected row from its context menu (Archive, Move to Junk) selects the next one too.
+    @Test func movingTheSelectedRowDirectlyLeavesNoHiddenSelection() {
+        let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2),
+            c = msg(work, subject: "c", minutesAgo: 3)
+        let s = store([a, b, c])
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.selection = [a.id]
+        s.archive([a.id])
+        #expect(s.selection == [b.id])
+        s.toggleJunk([b.id])
+        #expect(s.selection == [c.id])
+        s.selection = [c.id]
+        s.archive([b.id])  // not selected: the selection stays
+        #expect(s.selection == [c.id])
+    }
+
+    /// Deleting one of several selected rows only takes that one out of the selection.
+    @Test func deletingPartOfTheSelectionKeepsTheRest() {
+        let a = msg(work, subject: "a", minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2),
+            c = msg(work, subject: "c", minutesAgo: 3)
+        let s = store([a, b, c])
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.selection = [a.id, b.id]
+        s.delete([a.id])
+        #expect(s.selection == [b.id])
+    }
+
+    /// Archive on a selection hidden by the unread filter: it isn't kept selected afterwards.
+    @Test func archivingAHiddenSelectionDropsIt() {
+        let a = msg(work, subject: "a", read: true, minutesAgo: 1), b = msg(work, subject: "b", minutesAgo: 2)
+        let s = store([a, b])
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.selection = [a.id]
+        s.filterUnread = true
+        s.archiveSelection()
+        #expect(s.message(a.id)?.mailbox == .archive)
+        #expect(s.selection.isEmpty)
+    }
+
+    /// Viewing Flagged, archiving the selected flagged row keeps it in the list, so it stays selected.
+    @Test func movingASelectedRowThatStaysInTheListKeepsIt() {
+        let a = msg(work, subject: "a", minutesAgo: 1, flag: .red), b = msg(work, subject: "b", minutesAgo: 2, flag: .red)
+        let s = store([a, b])
+        s.selectedMailbox = .smart(.flagged)
+        s.selection = [a.id]
+        s.archive([a.id])
+        #expect(s.selection == [a.id])
+    }
+
     @Test func archiveAndJunkToggle() {
         let m = msg(work)
         let s = store([m])

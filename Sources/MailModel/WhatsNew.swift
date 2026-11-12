@@ -27,6 +27,7 @@ public enum WhatsNew {
             "A cancelled meeting offers Remove from Calendar instead of Accept or Decline.",
             "About MailReplica shows the build number and when it was built.",
             "Mail kept by an older version of the app is carried over again, even messages with attachments, and changes still waiting to reach the server are no longer lost.",
+            "Pressing Delete twice no longer erases a message for good that was hidden by a filter or a search; it stays in the Trash.",
         ]),
         ChangeLogDay(date: "2026-11-11", features: [
             "Nicely formatted emails now look the way the sender designed them, with their pictures.",
