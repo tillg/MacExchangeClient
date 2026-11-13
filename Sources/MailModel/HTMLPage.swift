@@ -13,8 +13,15 @@ public enum HTMLPage {
     /// run time; the values are recalled from Mail's "Color quoted text" defaults (blue, green, purple), not read.
     static let quoteColours = ["rgb(0, 64, 214)", "rgb(0, 128, 64)", "rgb(128, 0, 160)"]
 
-    /// The element whose height is the message's height.
+    /// The element the message's HTML is put in.
     public static let bodyID = "mail-replica-body"
+
+    /// The app's script for the message's height (app scripts run with content JavaScript off): the bottom of the
+    /// root element, whose box holds the body with its margins. Not our wrapper: a stray `</div>` in the mail closes
+    /// it early, and what follows lands outside it.
+    public static let measureScript = """
+        Math.ceil(document.documentElement.getBoundingClientRect().bottom)
+        """
 
     /// `inline` replaces `cid:` references with the message's own images, as `data:` URIs the policy allows.
     /// References without an image stay `cid:` and hidden.

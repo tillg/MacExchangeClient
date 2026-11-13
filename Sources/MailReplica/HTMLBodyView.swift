@@ -60,12 +60,7 @@ private struct MailWebView: NSViewRepresentable {
         init(_ parent: MailWebView) { self.parent = parent }
 
         func measure(_ v: WKWebView) {
-            // App scripts still run with content JavaScript off. Adds the body's bottom margin, which mail may change.
-            v.evaluateJavaScript("""
-                Math.ceil(document.getElementById('\(HTMLPage.bodyID)').getBoundingClientRect().bottom
-                    + parseFloat(getComputedStyle(document.body).marginBottom))
-                """) {
-                [weak self] result, _ in
+            v.evaluateJavaScript(HTMLPage.measureScript) { [weak self] result, _ in
                 guard let self, let h = result as? Double, h > 0, abs(h - parent.height) > 0.5 else { return }
                 parent.height = h
             }
