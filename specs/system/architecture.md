@@ -60,6 +60,8 @@ flowchart LR
    `loadMail` runs once per launch. The store ignores a second `restore(meta)`, and `restore(_:boxes:)` /
    `finishLoading` after loading has finished (BUG-219).
 3. `loadMail`: without `Mail.sqlite`, `MailDatabase.importCache` moves `Cache.json` in (see [storage.md](storage.md)).
+   Otherwise it first calls `store.beginLoading()`, so a check started while the database is read (a mailbox
+   clicked) waits for the stored sync positions instead of starting the history from scratch (BUG-224).
    Otherwise, on a detached task: open the database, read `meta()` and the Inbox of every account. The store
    `restore`s meta (sync tokens, folders, outbox; `loadedBoxes = []`), then the Inboxes. A second task reads the rest
    (`messages(notIn:)`) and calls `finishLoading`, which allows flushing and starts the history sync. Both add only

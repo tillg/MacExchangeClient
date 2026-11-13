@@ -207,36 +207,6 @@ struct Probe_R5GRaces {
             + "IncludesLastItemInRange=\"true\"><t:Items>\(items)</t:Items></m:RootFolder>"))
     }
 
-    /// R5G: launch. `loadMail` is still reading the database (stored state not restored yet) when the user clicks a
-    /// mailbox: the sidebar's check runs and starts the history sync, which treats every folder as new. R2 was deleted
-    /// on the server while the app was closed; the history's complete pass from the start doesn't list it, yet it stays.
-    @Test func aCheckBeforeTheStoredStateIsReadLeavesDeletedMail() async throws {
-        let server = RaceServer([], hold: true)
-        defer { server.stop() }
-        let s = MailStore(accounts: [], messages: [])
-        s.add(acct, backend: backend(server))
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX")], account: acct.id)  // the check's folder list
-        s.progress = SyncProgress(text: "Loading Mail…", fraction: nil)  // AppSetup.loadMail: database being read
-        s.selectedMailbox = .account(acct.id, .inbox)
-        let check = Task { await s.refresh() }  // SidebarView .onChange(of: selectedMailbox)
-        try await serve(server, [Self.found(RX.summary("R1")),   // quick check: Inbox not known complete, newest 50
-                                 Self.found(RX.summary("R1")),   // history phase 1: newest 200
-                                 RX.sync(RX.create(RX.summary("R1")), token: "P1", last: false)])  // phase 2, from the start
-        await check.value
-        // The database read finishes: the stored Inbox is complete at token STORED and holds R1 and R2.
-        var meta = StoredMeta()
-        meta.sync = [SyncState(account: acct.id, mailbox: .inbox, token: "STORED", complete: true)]
-        let first = [MailboxKey(account: acct.id, mailbox: .inbox)]
-        s.restore(meta)
-        s.restore([summary("R1"), summary("R2")], boxes: first)
-        s.finishLoading([])
-        try await serve(server, [RX.sync("", token: "P2", last: true)])  // the pass from the start ends: it listed R1 only
-        try await waitFor { s.progress == nil }
-        let stuck = s.messages.contains { $0.remoteID == "R2" }
-        for _ in 0..<6 { server.push(RX.fault("ErrorScriptExhausted", "end")) }
-        #expect(!stuck, "R2 stays; inbox token \(s.syncToken(acct.id, .inbox) ?? "nil"), complete \(s.isComplete(acct.id, .inbox))")
-    }
-
     /// R5G: two accounts; A's server doesn't answer (an on-prem server off the VPN drops the connection: each request
     /// waits for the 60 s timeout). A has a flag change queued. B's new mail waits for A: the check first waits for
     /// the outbox, which sends A's change and waits on it; B's own changes wait behind it too.
