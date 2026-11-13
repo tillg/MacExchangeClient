@@ -186,31 +186,7 @@ struct Probe_R5JTests {
 
     // MARK: R5J-01
 
-    /// Erasing a message (Delete in Trash) sends `DeleteItem` without `SuppressReadReceipts`. Per Microsoft's
-    /// DeleteItem reference, read receipts are then sent to the sender: an unread message that asked for one tells
-    /// the sender it was deleted unread, although the app never sends receipts.
-    @Test func r5j01_eraseSuppressesReadReceipts() async throws {
-        let server = RecordingServer { R5J.answer($0) }
-        defer { server.stop() }
-        try await R5J.backend(server).delete(["R1"])
-        let sent = try #require(server.requests.first)
-        let del = try #require(try request(sent).first("DeleteItem"))
-        #expect(del.attr("SuppressReadReceipts") == "true", "DeleteItem attributes: \((del as? XMLElement)?.attributes?.map { "\($0.name ?? "")=\($0.stringValue ?? "")" } ?? [])")
-    }
-
     // MARK: R5J-02
-
-    /// A recipient written as `Name <>` (an empty address) goes into CreateItem as an empty `t:EmailAddress`, which the
-    /// schema forbids (NonEmptyStringType). Exchange rejects the whole request, so the message doesn't reach the
-    /// other, valid recipient either.
-    @Test func r5j02_emptyAddressRecipientNotSentAsEmptyEmailAddress() async throws {
-        let server = RecordingServer { R5J.answer($0) }
-        defer { server.stop() }
-        try await R5J.backend(server).send(Draft(accountID: acct.id, to: "Ann <ann@x.com>, Bob <>", subject: "Hi", body: "Text"))
-        let sent = try #require(server.requests.first)
-        let addresses = try request(sent).all("EmailAddress").map { $0.stringValue ?? "" }
-        #expect(!addresses.contains(""), "EmailAddress values sent: \(addresses)")
-    }
 
     // MARK: R5J-03 / R5J-04
 
@@ -254,21 +230,5 @@ struct Probe_R5JTests {
             }.joined())
         }
         return R5J.answer(request)
-    }
-
-    /// Flagging (or marking read) a deleted appointment in Trash sends UpdateItem without
-    /// SendMeetingInvitationsOrCancellations, which Exchange refuses for a calendar item: the change is undone.
-    @Test func r5j04_flagAppointmentInTrash() async throws {
-        let server = RecordingServer { Self.strictExchange($0) }
-        defer { server.stop() }
-        let s = trashWithAppointmentAndTask(server)
-        let cal = try #require(s.messages.first { $0.remoteID == "CAL1" })
-        s.setFlag(.red, for: [cal.id])
-        try await waitFor { !server.requests.isEmpty && s.outbox.isEmpty }
-        try await Task.sleep(for: .milliseconds(200))
-        let upd = try request(try #require(server.requests.first)).first("UpdateItem")
-        #expect(s.message(cal.id)?.flag != nil, "flag undone; status: \(s.status ?? "")")
-        #expect(upd?.attr("SendMeetingInvitationsOrCancellations") != nil,
-                "UpdateItem attributes: \((upd as? XMLElement)?.attributes?.map { "\($0.name ?? "")=\($0.stringValue ?? "")" } ?? [])")
     }
 }

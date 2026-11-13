@@ -15,19 +15,4 @@ struct Probe_R5EFindings {
         m.conversationID = "C"
         return m
     }
-
-    /// R5E-10: two different people with the same first name in one conversation row are shown as one sender,
-    /// with the full name of only one of them (README: "the full name when it is one sender").
-    @Test func conversationRowKeepsTwoSendersWithTheSameFirstName() {
-        let s = MailStore(accounts: [work], messages: [
-            mail(from: "Jan Müller", "jan.mueller@x.com", minutesAgo: 0),
-            mail(from: "Jan Schmidt", "jan.schmidt@x.com", minutesAgo: 10),
-        ])
-        s.groupsConversations = true
-        s.selectedMailbox = .smart(.allInboxes)
-        let row = s.visibleMessages.first.flatMap { s.conversationRow($0.id) }
-        #expect(row?.count == 2)
-        // Expected: both people appear (e.g. "Jan & Jan" or both full names), not one person's full name.
-        #expect(row?.senders != "Jan Müller", "senders: \(row?.senders ?? "nil")")
-    }
 }

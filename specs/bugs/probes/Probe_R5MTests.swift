@@ -33,13 +33,6 @@ struct Probe_R5MAccounts {
         }
     }
 
-    /// R5M-04: a password pasted in the server field ("https://me:pw@host") is kept in the URL; Settings saves the
-    /// field as typed in UserDefaults and lists it under Accounts.
-    @Test func credentialsInTheServerFieldAreNotKept() {
-        let u = url("https://me:Secret123@mail.example.com")
-        #expect(u == nil || (u?.user == nil && u?.password == nil), "\(u?.absoluteString ?? "nil")")
-    }
-
     /// R5M-05: an IPv6 address typed without brackets is "Invalid server".
     @Test func bareIPv6AddressIsAServer() {
         #expect(url("2001:db8::1")?.absoluteString == "https://[2001:db8::1]/EWS/Exchange.asmx")

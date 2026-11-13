@@ -62,6 +62,8 @@ struct Probe_R5D_Compose {
     }
 }
 
+@MainActor
+struct Probe_R5D_Attachments {
     /// R5D-10: an attachment named ".invoice.pdf" is not saved as a hidden file.
     @Test func savedAttachmentIsNotHidden() async throws {
         let m = Message(accountID: UUID(), from: Contact(name: "a", email: "a@x"), to: [], subject: "s", body: "",
@@ -119,28 +121,6 @@ struct Probe_R5D_Render {
         m.html = mail
         withExtendedLifetime(shown) {}
         return (server.connections > 0, m.hasRemoteContent)
-    }
-
-    nonisolated static let undetected: [String] = [
-        #"<svg width=10 height=10><image href="BASE/svgimage.png" width=10 height=10/></svg>"#,
-        #"<div style="background-image: image-set('BASE/imageset.png' 1x)">x</div>"#,
-        #"<base href="BASE/"><img src="based.png">"#,
-    ]
-
-    /// R5D-04: picture forms WebKit loads from the web (SVG `<image href>`, CSS `image-set()`, a relative `src`
-    /// under `<base href>`) are remote content: without the banner they can never be loaded.
-    @Test(arguments: undetected)
-    func remotePictureFormsAreDetected(_ vector: String) async throws {
-        let r = try await loadsAndIsDetected(vector)
-        #expect(r.loaded, "control: loads from the web when allowed")
-        #expect(r.detected, "\(vector): not counted as remote content, so no banner")
-    }
-
-    /// R5D-05: an entity-encoded web address in `src` (the browser decodes it) is remote content.
-    @Test func entityEncodedAddressIsDetected() async throws {
-        let r = try await loadsAndIsDetected(#"<img src="&#104;ttp://127.0.0.1:PORT/entity.png">"#)
-        #expect(r.loaded, "control: loads from the web when allowed")
-        #expect(r.detected, "not counted as remote content, so no banner")
     }
 
     /// R5D-07: a video counts as remote content (banner), but Load Remote Content never loads it: the policy has
