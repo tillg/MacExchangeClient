@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Marking or flagging a message that was deleted elsewhere in the meantime no longer ends in \"Exchange refused a change\".",
             "Clicking a mailbox while \"Loading Mail…\" is shown no longer makes Inbox messages appear twice.",
             "Signing in to another account keeps the mailbox and message you were reading.",
             "Switching to another account's mailbox during a search keeps the results on screen until the new ones are in, instead of showing \"No Results\" for a moment.",

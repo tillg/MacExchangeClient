@@ -830,3 +830,9 @@ edited: 2026-11-13
 - **Decision:** Launch skips a stored message whose server ID is already in memory for that account; the copy in memory (newer) stays, and the stored row is deleted with the next save, so the next launch has one row too. `restore(meta)` keeps sync positions fetched before it and marks them to be saved.
 - **Why:** no storage change: rows are written and deleted as before. The stored body of such a message is fetched again when it is shown.
 - **Alternatives:** don't check before launch has loaded (rejected: the probe's sequence calls the store directly; and the Inbox would wait for the database); give the memory copy the stored local ID (rejected: the selection may already hold the new ID).
+
+## 06:55 — A server deletion drops the deleted message from queued read and flag changes {#d-bug-093}
+
+- **Status:** decided
+- **Context:** BUG-093. A deletion done elsewhere wins over a pending read or flag change, but the change stayed queued and was sent, refused and reported ("Exchange refused a change").
+- **Decision:** When a sync reports messages deleted (not those held for a pending move), their IDs and undo copies leave the account's queued `setRead`/`setFlagged` entries; an entry left with no ID goes. Other kinds (move, erase, answers, sends) are untouched.

@@ -797,6 +797,18 @@ struct MailStoreSyncTests {
     // MARK: Server pages while a change is queued (BUG-072, BUG-073, BUG-074)
 
     /// A store without a backend: queued changes stay queued, as while their request is on its way.
+    /// A message deleted elsewhere: its queued read and flag changes leave the outbox (they would be sent, refused
+    /// and reported); another message's part of the same flag change stays (BUG-093).
+    @Test func serverDeletionDropsTheMessagesQueuedChanges() {
+        let s = synced(["A", "B"])
+        s.toggleRead([id(s, "A")])
+        s.setFlag(.red, for: [id(s, "A"), id(s, "B")])
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: ["A"], token: "t1", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(id(s, "B")) != nil)
+        #expect(s.outbox.map(\.change) == [.setFlagged(["B"], true)], "outbox still has \(s.outbox.map(\.change))")
+        #expect(s.outbox.first?.previous.map(\.remoteID) == ["B"])
+    }
+
     func synced(_ rids: [String], in box: MailboxKind = .inbox) -> MailStore {
         let s = MailStore(accounts: [work, home], messages: [])
         s.apply(SyncResult(upserts: rids.map { var m = remote($0); m.mailbox = box; return m }, deletedRemoteIDs: [],

@@ -833,6 +833,7 @@ public final class MailStore {
                 changed = true
             }
         }
+        if !gone.isEmpty { dropQueuedReadsAndFlags(of: gone, account: account) }
         var index = [String: Int]()
         for i in ms.indices where ms[i].accountID == account { if let r = ms[i].remoteID { index[r] = i } }
         for (mailbox, upserts) in groups {
@@ -1203,6 +1204,30 @@ public final class MailStore {
             await drain()
             flushTask = nil
         }
+    }
+
+    /// Read and flag changes still queued for messages the server reports deleted are moot: their IDs are taken out
+    /// (with the undo copies), so they aren't sent, refused and undone for a message that no longer exists.
+    private func dropQueuedReadsAndFlags(of gone: Set<String>, account: UUID) {
+        func kept(_ ids: [String]) -> [String]? {
+            let k = ids.filter { !gone.contains($0) }
+            return k.count == ids.count ? nil : k
+        }
+        var box = outbox, touched = false
+        box = box.compactMap { p in
+            guard p.account == account else { return p }
+            var q = p
+            switch p.change {
+            case let .setRead(ids, v): guard let k = kept(ids) else { return p }; q.change = .setRead(k, v)
+            case let .setFlagged(ids, v): guard let k = kept(ids) else { return p }; q.change = .setFlagged(k, v)
+            default: return p
+            }
+            touched = true
+            if q.change.remoteIDs.isEmpty { return nil }
+            q.previous = p.previous.filter { $0.remoteID.map { !gone.contains($0) } ?? true }
+            return q
+        }
+        if touched { outbox = box }
     }
 
     /// Writes queued changes in order. When an account's server can't be reached, its changes stay queued for the
