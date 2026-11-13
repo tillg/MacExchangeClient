@@ -52,7 +52,8 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
 - Allowed when the user clicked Load Remote Content for this message (kept until the view goes away), or when
   `RemoteImages.loadsAutomatically(from:account:)` says so for the Privacy setting:
   - Always: yes. Ask before downloading: no.
-  - My organisation (default): the sender address starts with `/o=` (Exchange X.500), or its domain (after the last
+  - My organisation (default): the sender address starts with `/o=` and has no `@` (Exchange X.500; `/o=…@domain` is an
+    internet address and is judged by its domain), or its domain (after the last
     `@`, lowercased) equals the account address's domain or ends with `.` + that domain.
 - If the message has remote content and it isn't allowed: the banner "This message contains remote content." with
   Load Remote Content above the page. When it is allowed, the less strict CSP is used.

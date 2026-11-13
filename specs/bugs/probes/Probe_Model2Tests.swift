@@ -80,16 +80,6 @@ struct Probe_Model2Tests {
         #expect(r as? String == "Embedded:loaded", "\(String(describing: r))")
     }
 
-    // MARK: RemoteImages
-
-    let me = Account(name: "Work", address: "alex@work.com")
-
-    @Test func externalSenderWhoseAddressStartsWithSlashOIsNotOrganisation() {
-        // An internet address may legally start with "/o=" in its local part; it is not an X.500 address.
-        let s = Contact(name: "IT Department", email: "/o=work/cn=it@evil.example")
-        #expect(!RemoteImages.organisation.loadsAutomatically(from: s, account: me))
-    }
-
     // MARK: Draft.hasChanges
 
     @Test func movingAPictureInTheTextIsAChange() {
