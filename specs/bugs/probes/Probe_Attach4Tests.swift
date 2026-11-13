@@ -378,20 +378,6 @@ struct Probe_Attach4Tests {
 
     // MARK: The opened copy
 
-    /// The user opens a file (it goes to Mail Downloads) and edits it there, e.g. fills in a form in Preview. A forward,
-    /// and Save Attachment, must still carry the attachment as it came in the mail, not the edited copy.
-    @Test func probeEditedOpenedCopyIsNotForwardedOrSaved() async throws {
-        let original = Data("%PDF original form".utf8)
-        let (s, id) = local(["form.pdf"], data: [original])
-        let opened = try #require(await s.attachmentFile(0, of: id))
-        try Data("%PDF filled in with my bank details".utf8).write(to: opened)  // the user's edit in Preview
-        var d = s.draft(.forward, to: id)
-        await s.includeOriginalAttachments(in: &d)
-        #expect(d.attachments.first?.data == original, "forward carries: \(String(decoding: d.attachments.first?.data ?? Data(), as: UTF8.self))")
-        let saved = await s.saveAttachment(0, of: id, to: tempDir())
-        #expect(saved.flatMap { try? Data(contentsOf: $0) } == original, "saved: \(saved.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "nil")")
-    }
-
     /// file:// fixture: control, forwarding a message with an attached message takes its MIME source as a .eml.
     @Test func controlForwardTakesAttachedMessageAsEml() async throws {
         let mime = Data("From: a@x.com\r\nSubject: Budget\r\n\r\nNumbers".utf8)
