@@ -98,7 +98,7 @@ What's on screen comes first:
 
 4. **Folders not on screen:** once history is done, fully synced folders are also asked for changes, one small request each.
 
-If Exchange rejects the password, the app stops sending requests for that account until you relaunch, because repeated wrong passwords lock domain accounts. A folder whose history fails is skipped, and the error stays under the window title.
+If Exchange rejects the password, the app stops sending requests for that account until you relaunch, because repeated wrong passwords lock domain accounts. A folder whose history fails is skipped, and the error stays under the window title. While one account's server can't be reached, its history waits for the next check and the other accounts' history and checks go on.
 
 A change you made that hasn't reached the server yet is kept when a sync reports the old state. Sidebar counts and the message list are computed once per change, so a mailbox with 70,000 messages stays smooth.
 

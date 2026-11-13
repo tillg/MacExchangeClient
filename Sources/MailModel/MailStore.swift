@@ -1428,10 +1428,11 @@ public final class MailStore {
 
     /// Fetches every folder's full contents in the background: first the newest messages of each folder,
     /// then one page at a time, shown in batches (`historyBatch`). The next folder is picked after every batch,
-    /// so switching mailboxes takes effect within moments. A failing folder doesn't stop the others; offline,
-    /// the history waits for the next check.
+    /// so switching mailboxes takes effect within moments. A failing folder doesn't stop the others; an account
+    /// whose server can't be reached (or is busy) waits for the next check, while the other accounts go on.
     public func syncHistory() async {
         defer { progress = nil }
+        var unreachable = Set<UUID>()
         for (acct, backend) in backends where !paused.contains(acct) {
             var fetched: [(MailboxKind, [Message])] = [], since = ContinuousClock.now
             func show() {
@@ -1453,7 +1454,7 @@ public final class MailStore {
             }
             show()
         }
-        while let (acct, backend, folder) = nextHistoryFolder() {
+        while let (acct, backend, folder) = nextHistoryFolder(skipping: unreachable) {
             showHistoryProgress(acct)
             var pages: [SyncResult] = []
             // Whatever arrived is shown, also when a page fails; in one merge.
@@ -1470,8 +1471,8 @@ public final class MailStore {
             } catch is SyncTokenRejected {
                 pages = []  // the pass starts over; nothing of the old one is applied
                 resetSync(acct, folder.role)
-            } catch is URLError {
-                return
+            } catch where error is URLError || error is ServerBusy {
+                unreachable.insert(acct)
             } catch {
                 historyFailed.insert(key(acct, folder.role))
                 historyError = "\(name(of: folder.role, in: acct)): \(error.localizedDescription)"
@@ -1480,7 +1481,7 @@ public final class MailStore {
         }
         progress = nil
         // History is done: bring the complete folders that aren't on screen up to date (one small request each).
-        for (acct, backend) in backends where !paused.contains(acct) {
+        for (acct, backend) in backends where !paused.contains(acct) && !unreachable.contains(acct) {
             for role in backgroundDeltaRoles(acct, (remoteFolders[acct] ?? []).map(\.role)) {
                 guard let folder = remoteFolders[acct]?.first(where: { $0.role == role }) else { continue }
                 do {
@@ -1505,8 +1506,8 @@ public final class MailStore {
         return Self.prioritized(roles).filter { isComplete(acct, $0) && !quick.contains($0) }
     }
 
-    private func nextHistoryFolder() -> (UUID, any MailBackend, RemoteFolder)? {
-        for acct in accounts.map(\.id) {
+    private func nextHistoryFolder(skipping unreachable: Set<UUID>) -> (UUID, any MailBackend, RemoteFolder)? {
+        for acct in accounts.map(\.id) where !unreachable.contains(acct) {
             guard let backend = backends[acct], let folders = remoteFolders[acct], !paused.contains(acct) else { continue }
             for role in historyOrder(acct, folders.map(\.role))
             where !isComplete(acct, role) && !historyFailed.contains(key(acct, role)) {

@@ -671,4 +671,20 @@ struct MailStoreSyncTests {
         #expect(s.outbox.isEmpty)
         #expect(s.message(id(s, "A"))?.isRead == true)
     }
+
+    // MARK: Accounts are checked independently (BUG-098, BUG-100)
+
+    /// While one account's server can't be reached, the other accounts' history still completes.
+    @Test func unreachableAccountDoesNotStopTheOtherAccountsHistory() async throws {
+        let missing = FileManager.default.temporaryDirectory.appendingPathComponent("ews-sync-missing-\(UUID().uuidString).xml")
+        let s = MailStore(accounts: [work, home], messages: [])
+        s.add(work, backend: backend(missing))  // file:// fixture that isn't there: a network error
+        s.add(home, backend: backend(try responseFile(success)))  // file:// fixture
+        // Both folder lists were read while Work was still reachable.
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "FA"), RemoteFolder(role: .sent, id: "FA2")], account: work.id)
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "FB"), RemoteFolder(role: .sent, id: "FB2")], account: home.id)
+        await s.syncHistory()
+        #expect(s.isComplete(home.id, .inbox) && s.isComplete(home.id, .sent))
+        #expect(!s.isComplete(work.id, .inbox))
+    }
 }

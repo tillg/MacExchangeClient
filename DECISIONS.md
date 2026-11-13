@@ -451,3 +451,10 @@ edited: 2026-11-13
 - **Decision:** `HTMLPage.document` starts with `<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">`, which gives almost-standards (limited-quirks) mode for every mail (`compatMode` reports `CSS1Compat`).
 - **Why:** Tables inherit the 14 px default as in standards mode, while a picture alone in a table cell gets no baseline gap under it (checked: 12 px cell for a 10 px picture with `<!DOCTYPE html>`, 10 px with this one); newsletters built from sliced pictures in table cells rely on that. The sample newsletter looks the same before and after, except that its button text inherits the table's 14 px.
 - **Alternatives:** `<!DOCTYPE html>` (rejected: gaps under pictures in cells). Keep quirks mode and add `table { font-size: inherit }` (rejected: the other quirks, such as percentage heights against the window, stay; see BUG-110). Use the mail's own doctype (rejected: mail without one, most Outlook mail, would keep 16 px tables).
+
+## 02:01 — An unreachable account doesn't stop the other accounts' history {#d-bug-098}
+
+- **Status:** decided
+- **Context:** BUG-098. `syncHistory` returned at the first network error. Accounts are tried in order, so while the first account's server was unreachable, no other account's history progressed and their complete folders got no background check.
+- **Decision:** On a `URLError` or `ServerBusy`, the history notes the account as unreachable for this run and goes on with the other accounts (`nextHistoryFolder(skipping:)`); the background checks of complete folders skip that account. Its folder isn't marked failed, so it is tried again at the next run, as before.
+- **Why:** README: a folder whose history fails is skipped; offline is per server, as for the quick check and the outbox (BUG-096).
