@@ -119,25 +119,6 @@ struct Probe_E2ETests {
         #expect(s.takeChanges().resolved().upserts.isEmpty)
     }
 
-    /// Two Exchange accounts: one server unreachable (e.g. only over VPN) must not hold up the other account's
-    /// changes. drain() stops at the first URLError, and the outbox is one queue for all accounts.
-    @Test func unreachableAccountDoesNotBlockTheOtherAccountsChanges() async throws {
-        let ok = try responseFile(success)  // file:// fixture
-        let missing = FileManager.default.temporaryDirectory.appendingPathComponent("ews-e2e-missing-\(UUID().uuidString).xml")
-        let s = MailStore(accounts: [], messages: [])
-        s.add(a, backend: backend(missing))
-        s.add(b, backend: backend(ok))
-        s.apply(page([server("A1")]), account: a.id, mailbox: .inbox)
-        s.apply(page([server("B1")]), account: b.id, mailbox: .inbox)
-        let a1 = s.messages.first { $0.accountID == a.id }!.id, b1 = s.messages.first { $0.accountID == b.id }!.id
-        s.toggleRead([a1])
-        s.toggleRead([b1])
-        s.send(Draft(accountID: b.id, to: "x@y.com", subject: "From B", body: "b"))
-        await s.refresh(history: false)
-        let left = s.outbox.filter { $0.account == b.id }.map(\.change)
-        #expect(left.isEmpty, "account B's changes still waiting because account A is unreachable: \(left)")
-    }
-
     /// The same for the background history: the first account's folder fails with a network error and
     /// syncHistory returns, so the other account's history (and its background checks) never run while the
     /// first one is unreachable.

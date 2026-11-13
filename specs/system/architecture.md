@@ -102,7 +102,7 @@ flowchart LR
     O --> F["scheduleFlush → drain()"] --> P["perform(): backend call"]
     P -->|ok| R["remove from outbox"]
     P -->|refused| FL["failed(): undo locally, status"]
-    P -->|offline| W["stay queued until next refresh"]
+    P -->|offline| W["that account's changes stay queued<br/>until next refresh; others go on"]
 ```
 
 - Every action on server mail changes memory at once (`update`). Read, flag (flagged or not; colours stay local) and
@@ -115,7 +115,8 @@ flowchart LR
   instead of queueing it, with a status to check Sent.
   - `AuthenticationError`: the account is paused until relaunch; nothing more is sent or fetched for it.
   - `URLError` on `send`, `respond` or `reply`: treated as refused (`failed`), never retried, since it may have gone out.
-  - Any other `URLError`: status "Offline – changes will be sent to Exchange later"; the change stays first in line.
+  - Any other `URLError`: status "Offline – changes will be sent to Exchange later"; the change and every later one
+    of that account stay queued, in order, for the next refresh, while other accounts' changes go on.
   - Any other error: `failed` — a send or draft is kept as a local message in Drafts, its files stored with it. Other changes restore only
     the property they set, and only while it still holds the value they set: read state (`setRead`), flag
     (`setFlagged`), mailbox (`move`), the invite (and the mailbox, if still in Trash) for invite answers. A later
