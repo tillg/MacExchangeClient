@@ -440,7 +440,10 @@ public struct EWSBackend: MailBackend {
             "<t:ItemChange><t:ItemId Id=\"\(xmlEscape($0))\"/><t:Updates><t:SetItemField><t:FieldURI FieldURI=\"\(field)\"/>"
                 + "<t:Message>\(value)</t:Message></t:SetItemField></t:Updates></t:ItemChange>"
         }.joined()
-        return "<m:UpdateItem MessageDisposition=\"SaveOnly\" ConflictResolution=\"AlwaysOverwrite\" SuppressReadReceipts=\"true\">"
+        // SendMeetingInvitationsOrCancellations is required for calendar items (deleted appointments in Trash) and
+        // optional otherwise; nobody is sent anything (BUG-217).
+        return "<m:UpdateItem MessageDisposition=\"SaveOnly\" ConflictResolution=\"AlwaysOverwrite\" SuppressReadReceipts=\"true\" "
+            + "SendMeetingInvitationsOrCancellations=\"SendToNone\">"
             + "<m:ItemChanges>\(changes)</m:ItemChanges></m:UpdateItem>"
     }
 
@@ -602,7 +605,8 @@ public struct EWSBackend: MailBackend {
         var m = Message(accountID: UUID(), from: from, to: names(item.text("DisplayTo")), cc: names(item.text("DisplayCc")),
                        subject: item.child("Subject")?.stringValue ?? "",
                        body: "", date: item.text("DateTimeReceived").flatMap(isoDate) ?? .distantPast,
-                       isRead: item.text("IsRead") == "true",
+                       // Appointments and tasks (in Trash) have no read state: they don't count as unread (BUG-217).
+                       isRead: item.text("IsRead") == "true" || ["CalendarItem", "Task", "Contact", "DistributionList"].contains(item.localName ?? ""),
                        flag: item.child("Flag")?.text("FlagStatus") == "Flagged" ? .red : nil,
                        remoteID: rid, hasAttachments: item.text("HasAttachments") == "true",
                        serverPreview: item.child("Preview")?.stringValue ?? "", bodyLoaded: false,

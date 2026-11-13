@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Deleted appointments and tasks in Trash no longer count as unread, and flagging them no longer springs back.",
             "A server address ending in /EWS (as some admins give it) now signs in instead of failing.",
             "If the mail storage file is damaged, it is kept aside and a fresh one is started, so mail is saved again; mail is downloaded again from the server.",
             "A message with a file of 2 GB or more waiting to be sent no longer makes the app quit while saving.",

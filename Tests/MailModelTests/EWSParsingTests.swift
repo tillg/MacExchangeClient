@@ -790,4 +790,17 @@ struct EWSParsingTests {
             #expect(ExchangeAccount(email: "", username: "", server: s).ewsURL?.absoluteString == want, "\(s) -> \(ExchangeAccount(email: "", username: "", server: s).ewsURL?.absoluteString ?? "nil")")
         }
     }
+
+    /// BUG-217: Trash also lists deleted appointments and tasks. Updates say they send no meeting update (required for
+    /// calendar items, optional otherwise), and items without a read state (appointments, tasks) count as read.
+    @Test func appointmentsInTrashCanBeUpdatedAndAreRead() throws {
+        let u = try #require(try request(EWSBackend.updateRequest(["A"], field: "message:IsRead", value: "<t:IsRead>true</t:IsRead>")).first("UpdateItem"))
+        #expect(u.attr("SendMeetingInvitationsOrCancellations") == "SendToNone")
+        let d = try doc(#"<t:CalendarItem><t:ItemId Id="CAL1"/><t:Subject>Old meeting</t:Subject></t:CalendarItem>"#)
+        #expect(EWSBackend.message(try #require(d.first("CalendarItem")))?.isRead == true)
+        let t = try doc(#"<t:Task><t:ItemId Id="T1"/><t:Subject>Old task</t:Subject></t:Task>"#)
+        #expect(EWSBackend.message(try #require(t.first("Task")))?.isRead == true)
+        let m = try doc(#"<t:Message><t:ItemId Id="M1"/><t:Subject>Mail</t:Subject></t:Message>"#)
+        #expect(EWSBackend.message(try #require(m.first("Message")))?.isRead == false)
+    }
 }
