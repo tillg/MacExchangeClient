@@ -794,3 +794,9 @@ edited: 2026-11-13
 - **Why:** framing by Content-Length and one connection per request rule out both pipe races by construction; the real `EWSClient`, `EWSBackend` and `MailStore` still run unchanged, and nothing leaves the machine. Stress check: 3,000 sequential requests, 0 wrong or slow, idle and with every core busy; 12 full runs green (8 idle, 4 with every core busy).
 - **Alternatives:** a handshake on the pipe (wait until the reader has closed it): the loader's descriptor can't be told apart from the next request's, and inspecting it disturbed the loader. One pipe per answer: see above. A longer pause: still a fixed sleep and still racy.
 - **Note:** the tests keep their `// file:// fixture` markers; the plain-file fixtures (one fixed answer per file) are unchanged.
+
+## 06:20 — A cancelled calendar load doesn't mark the day unavailable {#d-loadday-cancel}
+
+- **Status:** decided
+- **Context:** `loadDay` added the invite to `unavailableDays` on any error, also when its task was only cancelled (the user moved to another message), so "Calendar not available" could show when coming back.
+- **Decision:** A cancelled load returns without marking anything; the next showing loads the day again. Errors that aren't cancellations still mark it, as before.

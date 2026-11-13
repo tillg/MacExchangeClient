@@ -1349,8 +1349,10 @@ public final class MailStore {
         let from = Calendar.current.startOfDay(for: invite.start)
         let to = Calendar.current.date(byAdding: .day, value: 1, to: from) ?? from.addingTimeInterval(86400)
         do { setDayEvents(try await backend.events(from: from, to: to), for: id) } catch {
+            // A cancelled load (the user moved on) says nothing about the calendar: the next showing loads it again.
+            if Self.wasCancelled(error) { return }
             if dayEvents[id] == nil { unavailableDays.insert(id) }
-            if !Self.wasCancelled(error), !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load the calendar: \(error.localizedDescription)" }
+            if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load the calendar: \(error.localizedDescription)" }
         }
     }
 

@@ -339,6 +339,26 @@ struct MailStoreRaceTests {
         }
     }
 
+    /// An invite's calendar load cancelled (the user moved on to another message) doesn't mark its day as
+    /// unavailable: coming back loads it again instead of flashing "Calendar not available".
+    // file:// fixture
+    @Test func cancelledDayLoadDoesNotMarkTheDayUnavailable() async throws {
+        let server = RaceServer([RX.fault("Unused", "for the cancelled read")])
+        defer { server.stop() }
+        let s = store(server)
+        var m = summary("R1")
+        m.bodyLoaded = true; m.htmlChecked = true
+        m.invite = Invite(start: Date(timeIntervalSince1970: 1_700_000_000), end: Date(timeIntervalSince1970: 1_700_003_600),
+                          isCancellation: false)
+        s.merge([m], account: acct.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        let t = Task { await s.loadDay(for: id) }
+        t.cancel()
+        await t.value
+        #expect(!s.unavailableDays.contains(id))
+        try await drained(server)
+    }
+
     /// A forward's compose window closed while the original loads: nothing to report either.
     // file:// fixture
     @Test func closingAForwardWhileItsOriginalLoadsIsNotAnError() async throws {

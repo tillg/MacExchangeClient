@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Moving on from an invitation before its calendar day has loaded no longer makes it say \"Calendar not available\" when you come back.",
             "Quick Look no longer jumps back to an earlier message's attachment when its download finishes after you looked at another one.",
             "Quick Look on an attachment that can't be loaded no longer shows a different attachment instead.",
             "A picture attachment that can't be loaded shows as a file icon instead of a spinner that never stops, so you can still try to open or save it.",
