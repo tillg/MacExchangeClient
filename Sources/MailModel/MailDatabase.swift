@@ -659,7 +659,9 @@ struct Statement {
 
     /// With the byte count, so a NUL character in the text is stored, not the end of it.
     func bind(_ i: Int32, _ v: String?) {
-        if let v { sqlite3_bind_text(pointer, i, v, Int32(v.utf8.count), Self.transient) } else { sqlite3_bind_null(pointer, i) }
+        // 64-bit lengths: a value over SQLite's limit fails the statement instead of trapping on Int32 (BUG-176).
+        if let v { sqlite3_bind_text64(pointer, i, v, sqlite3_uint64(v.utf8.count), Self.transient, UInt8(SQLITE_UTF8)) }
+        else { sqlite3_bind_null(pointer, i) }
     }
     func bind(_ i: Int32, _ v: Int?) {
         if let v { sqlite3_bind_int64(pointer, i, Int64(v)) } else { sqlite3_bind_null(pointer, i) }
@@ -667,7 +669,7 @@ struct Statement {
     func bind(_ i: Int32, _ v: Double) { sqlite3_bind_double(pointer, i, v) }
     func bind(_ i: Int32, _ v: Data?) {
         guard let v else { sqlite3_bind_null(pointer, i); return }
-        _ = v.withUnsafeBytes { sqlite3_bind_blob(pointer, i, $0.baseAddress, Int32(v.count), Self.transient) }
+        _ = v.withUnsafeBytes { sqlite3_bind_blob64(pointer, i, $0.baseAddress, sqlite3_uint64(v.count), Self.transient) }
     }
     func bind(_ i: Int, _ v: String?) { bind(Int32(i), v) }
     func bind(_ i: Int, _ v: Int?) { bind(Int32(i), v) }

@@ -673,4 +673,16 @@ struct MailDatabaseTests {
         let stored = try d.meta().sync
         #expect(stored.allSatisfy { $0.token == nil && !$0.complete }, "stored sync: \(stored)")
     }
+
+    /// BUG-176: a file of 2 GiB or more kept with a draft (or a send waiting in the outbox) is bound with
+    /// `Int32(v.count)`, which traps: the save crashes the app instead of failing.
+    @Test func aHugeKeptFileDoesNotCrashTheSave() async {
+        await #expect(processExitsWith: .success) {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("MailDatabaseTests-big-\(UUID())")
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let db = try! MailDatabase(url: dir.appendingPathComponent("Mail.sqlite"))
+            let big = Data(count: Int(Int32.max) + 1)  // zero pages: not touched before the bind
+            _ = try? db.write(StoreChanges(files: [UUID(): [big]]))
+        }
+    }
 }
