@@ -207,7 +207,7 @@ struct MessageContextMenu: View {
         }
         Divider()
         Button("Archive") { store.archive(ids) }
-        Button("Move to Junk") { store.toggleJunk(ids) }
+        Button(store.isAllJunk(ids) ? "Not Junk" : "Move to Junk") { store.toggleJunk(ids) }
         Button("Delete", role: .destructive) { store.delete(ids) }
     }
 }

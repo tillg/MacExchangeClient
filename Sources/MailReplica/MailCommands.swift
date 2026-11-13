@@ -77,7 +77,7 @@ struct MailCommands: Commands {
             Divider()
             Button("Archive") { store.archiveSelection() }
                 .keyboardShortcut("a", modifiers: [.command, .control]).disabled(!hasSelection)
-            Button("Move to Junk") { store.junkSelection() }
+            Button(store.isAllJunk(store.withConversations(store.selection)) ? "Not Junk" : "Move to Junk") { store.junkSelection() }
                 .keyboardShortcut("j", modifiers: [.command, .shift]).disabled(!hasSelection)
             Button("Delete") {
                 // ⌘⌫ is also the text system's "delete to the start of the line". In Mail, Delete goes to the first

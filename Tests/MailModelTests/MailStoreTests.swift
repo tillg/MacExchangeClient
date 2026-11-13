@@ -1966,4 +1966,13 @@ struct MailStoreTests {
         #expect(s.draft(.reply, to: m.id).to == work.address)
         #expect(s.draft(.replyAll, to: m.id).to == work.address)
     }
+
+    /// BUG-182: Junk on mail that is all in Junk is Not Junk; the buttons ask `isAllJunk` for their title.
+    @Test func junkOnMailInJunkIsNotJunk() {
+        let a = msg(work, .junk), b = msg(work, .junk), c = msg(work)
+        let s = store([a, b, c])
+        #expect(s.isAllJunk([a.id, b.id]))
+        #expect(!s.isAllJunk([a.id, c.id]))
+        #expect(!s.isAllJunk([]))
+    }
 }

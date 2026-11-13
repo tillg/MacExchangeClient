@@ -81,8 +81,10 @@ struct MessageViewer: View {
                     .help("Archive selected messages")
                 Button { store.deleteSelection() } label: { Label("Delete", systemImage: "trash") }
                     .help("Delete selected messages")
-                Button { store.junkSelection() } label: { Label("Junk", systemImage: "xmark.bin") }
-                    .help("Mark selected messages as junk mail")
+                // Mail's toolbar: "Not Junk" in Junk (MainWindow.toolbar altTitle, ToolTipNotJunk) (BUG-182).
+                let notJunk = store.isAllJunk(store.withConversations(store.selection))
+                Button { store.junkSelection() } label: { Label(notJunk ? "Not Junk" : "Junk", systemImage: "xmark.bin") }
+                    .help(notJunk ? "Move selected messages to Inbox" : "Move selected messages to Junk")
             }
             .disabled(none)
         }

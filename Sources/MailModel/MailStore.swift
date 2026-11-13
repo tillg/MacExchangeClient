@@ -705,8 +705,14 @@ public final class MailStore {
     public func archive(_ ids: Set<Message.ID>) { move(ids, to: .archive) }
 
     /// Move to Junk; when every message is already in Junk, Not Junk (back to the Inbox).
+    /// Junk on these messages means Not Junk (back to the Inbox): all of them are in Junk. The buttons then say so,
+    /// as Mail's do (BUG-182).
+    public func isAllJunk(_ ids: Set<Message.ID>) -> Bool {
+        !ids.isEmpty && !messages.contains { ids.contains($0.id) && $0.mailbox != .junk }
+    }
+
     public func toggleJunk(_ ids: Set<Message.ID>) {
-        let allJunk = !messages.contains { ids.contains($0.id) && $0.mailbox != .junk }
+        let allJunk = isAllJunk(ids)
         keepingSelectionVisible(ids) { update(ids) { $0.mailbox = allJunk ? .inbox : .junk } }
     }
 
