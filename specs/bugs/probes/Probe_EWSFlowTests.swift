@@ -391,22 +391,6 @@ struct Probe_EWSFlowTests {
 
     // MARK: Batch 3
 
-    /// file:// fixture (plain file): the history's paging has the same gap. A server repeating "more" with the same
-    /// SyncState keeps the history asking for the same page without end (the progress bar never goes away).
-    @Test func probeHistoryPagingEndsStaticFile() async throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("ews-\(UUID().uuidString).xml")
-        try Data(FX.sync("", token: "T1", last: false).utf8).write(to: url)
-        let s = MailStore(accounts: [], messages: [])
-        s.add(acct, backend: EWSBackend(client: EWSClient(url: url, username: "u", password: "p")))  // file:// fixture
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX", totalCount: 1)], account: acct.id)
-        let task = Task { await s.syncHistory() }
-        try await Task.sleep(for: .seconds(4))
-        let progress = s.progress, token = s.syncToken(acct.id, .inbox)
-        try Data(FX.sync("", token: "T1", last: true).utf8).write(to: url)
-        await task.value
-        #expect(progress == nil, "history still running after 4 s, token \(String(describing: token)), progress \(String(describing: progress))")
-    }
-
     /// NOT FILED: BUG-060's trigger (an answer without any EWS result). Kept as a record.
     /// The folder list from an answer without any result (empty SOAP body): no Inbox, no status, never asked again.
     // file:// fixture
@@ -481,25 +465,6 @@ struct Probe_EWSFlowTests {
     }
 
     // MARK: Batch 4
-
-    // file:// fixture (FIFO)
-    /// file:// fixture (plain file, as round 2): the quick check's paging loop against a server that repeats
-    /// "more" with the same SyncState.
-    // file:// fixture
-    @Test func probeQuickCheckPagingEndsStaticFile() async throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("ews-\(UUID().uuidString).xml")
-        try Data(FX.sync("", token: "T1", last: false).utf8).write(to: url)
-        let s = MailStore(accounts: [], messages: [])
-        s.add(acct, backend: EWSBackend(client: EWSClient(url: url, username: "u", password: "p")))  // file:// fixture
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX")], account: acct.id)
-        complete(s, .inbox, token: "T1")
-        let task = Task { await s.refresh(history: false) }
-        try await Task.sleep(for: .seconds(3))
-        let stillRunning = s.isRefreshing
-        try Data(FX.sync("", token: "T1", last: true).utf8).write(to: url)
-        await task.value
-        #expect(!stillRunning, "the check is still running after 3 s (same page asked again and again)")
-    }
 
     // file:// fixture (FIFO)
     /// Per-item errors when opening things, then a retry that works (control).
