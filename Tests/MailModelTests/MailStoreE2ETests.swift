@@ -34,6 +34,32 @@ struct MailStoreE2ETests {
         return s
     }
 
+    // MARK: Saving only what changed (BUG-120, BUG-121)
+
+    /// Mark All as Read on a mailbox where one message is unread writes one row, not every message.
+    @Test func markAllReadWritesOnlyTheMessagesItChanged() {
+        let s = MailStore(accounts: [a], messages: [])
+        s.apply(page((0..<1000).map { server("R\($0)", read: $0 != 7) }), account: a.id, mailbox: .inbox)
+        _ = s.takeChanges()
+        s.markAllRead(in: .account(a.id, .inbox))
+        let written = s.takeChanges().resolved().upserts
+        #expect(s.outbox.count == 1)
+        #expect(written.count == 1, "Mark All as Read on 1 unread of 1,000 rewrites \(written.count) rows")
+    }
+
+    /// Setting the flag colour a message already has, opening a read message or moving it where it is writes nothing.
+    @Test func noOpActionsWriteNothing() {
+        let s = MailStore(accounts: [a], messages: [])
+        s.apply(page([server("R1", read: true, flagged: true)]), account: a.id, mailbox: .inbox)
+        _ = s.takeChanges()
+        let id = s.messages[0].id
+        s.setFlag(.red, for: [id])
+        s.selection = [id]
+        s.markSelectionRead()
+        s.move([id], to: .inbox)
+        #expect(s.takeChanges().resolved().upserts.isEmpty)
+    }
+
     // MARK: Selection (BUG-119)
 
     /// With the unread filter on (Trash), two selected unread messages marked read leave the list and the

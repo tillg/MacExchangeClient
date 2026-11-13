@@ -474,19 +474,20 @@ public final class MailStore {
 
     /// Every local action goes through here or `delete`. Server messages change locally at once and
     /// the change is queued for the server.
+    /// Only messages it actually changes are saved again.
     private func update(_ ids: Set<Message.ID>, _ f: (inout Message) -> Void) {
-        changedIDs.formUnion(ids)
         var changed: [(old: Message, new: Message)] = []
         for i in messages.indices where ids.contains(messages[i].id) {
             let old = messages[i]
             f(&messages[i])
-            guard old.remoteID != nil, messages[i] != old else { continue }
-            if messages[i].accountID != old.accountID {
+            guard messages[i] != old else { continue }
+            if old.remoteID != nil, messages[i].accountID != old.accountID {
                 messages[i] = old
                 status = "Exchange messages can't be moved to another account yet"
                 continue
             }
-            changed.append((old, messages[i]))
+            changedIDs.insert(old.id)
+            if old.remoteID != nil { changed.append((old, messages[i])) }
         }
         queue(changed)
     }
