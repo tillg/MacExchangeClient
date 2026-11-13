@@ -182,4 +182,13 @@ struct HTMLPageTests {
         #expect(HTMLPage.document(link, allowRemote: true).contains(link))
         #expect(HTMLPage.document("<p>linked &lt;link&gt; <linkage></p>", allowRemote: false).contains("<p>linked &lt;link&gt; <linkage></p>"))
     }
+
+    /// BUG-198: Outlook writes quotes inside style attributes as `&quot;`; such a `cid:` picture is found and shown.
+    @Test func cidInEntityQuotedCSSURL() {
+        let h = #"<td style="background-image:url(&quot;cid:image001.png@01DA.5678&quot;)">x</td>"#
+        let ids = HTMLPage.contentIDs(in: h)
+        #expect(ids == ["image001.png@01DA.5678"], "\(ids)")
+        let page = HTMLPage.document(h, allowRemote: false, inline: ["image001.png@01DA.5678": InlineImage(contentType: "image/png", data: Data([1]))])
+        #expect(page.contains("data:image/png;base64,AQ=="))
+    }
 }

@@ -151,8 +151,10 @@ public enum HTMLPage {
     }
 
     /// A reference starts where a scheme can (not inside a word such as `acid:rain`) and runs to the closing quote,
-    /// bracket, space, or the `/>` of a self-closing tag, so `cid:a@x` never matches inside `cid:a@x2`.
-    private static let cidReference = try! NSRegularExpression(pattern: #"(?<![\w+.-])cid:((?:(?!/>)[^"'\s)<>])+)"#,
+    /// bracket, space, or the `/>` of a self-closing tag, so `cid:a@x` never matches inside `cid:a@x2`; a quote
+    /// written as a character reference (`&quot;`, as Outlook's style attributes have) ends it too (BUG-198).
+    private static let cidReference = try! NSRegularExpression(
+        pattern: #"(?<![\w+.-])cid:((?:(?!/>|&quot;|&apos;|&#0*3[49];|&#x0*2[27];)[^"'\s)<>])+)"#,
                                                                options: .caseInsensitive)
 
     /// Calls `replacement` with each referenced content ID (character references decoded, percent-decoded, without
