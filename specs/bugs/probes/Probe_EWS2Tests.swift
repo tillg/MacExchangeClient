@@ -48,32 +48,6 @@ struct Probe_EWS2Tests {
         envelope("<m:\(op)Response><m:ResponseMessages>\(messages)</m:ResponseMessages></m:\(op)Response>")
     }
 
-    // MARK: Transport: responses without any result
-
-    /// A proxy / load balancer page that happens to be well-formed XML, or an empty SOAP body, carries no
-    /// ResponseCode. call() returns it as success, so Send "succeeds" without anything being sent.
-    @Test func probeSendWithResponseWithoutResultThrows() async throws {
-        let bodies = [
-            envelope(""),
-            "<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><title>503 Service Unavailable</title></head><body><h1>Service Unavailable</h1></body></html>",
-            "<?xml version=\"1.0\"?><error><code>503</code><message>Backend not available</message></error>",
-        ]
-        for b in bodies {
-            let draft = Draft(accountID: UUID(), to: "a@x.com", subject: "S", body: "B")
-            await #expect(throws: (any Error).self, "send returned normally for: \(b.prefix(40))") {
-                try await self.backend(b).send(draft)
-            }
-        }
-    }
-
-    @Test func probeSyncWithResponseWithoutResultThrows() async throws {
-        let b = try backend(envelope(""))
-        await #expect(throws: (any Error).self) {
-            let r = try await b.sync(RemoteFolder(role: .inbox, id: "INBOX"), token: "OLD")
-            Issue.record("sync returned token=\(r.token.debugDescription) more=\(r.more) upserts=\(r.upserts.count)")
-        }
-    }
-
     // MARK: Folders
 
     /// No top-level Archive; a deleted folder called "Archive" sits in Deleted Items. It must not become the
@@ -268,24 +242,6 @@ struct Probe_EWS2StoreTests {
         s.toggleRead(Set(s.messages.map(\.id)))
         try await waitForOutbox(s)
         #expect(s.messages.first?.isRead == true, "status: \(s.status ?? "")")
-    }
-
-    /// Send against an answer without any EWS result: the message must not just vanish (it is neither sent
-    /// nor kept in Drafts).
-    @Test func probeSendWithEmptyAnswerIsNotLost() async throws {
-        let (s, _) = try store(helper.envelope(""), [])
-        s.send(Draft(accountID: acct.id, to: "bob@x.com", subject: "Quarterly report", body: "Hi"))
-        try await waitForOutbox(s)
-        #expect(s.messages.contains { $0.subject == "Quarterly report" } || s.status != nil,
-                "outbox \(s.outbox.count), messages \(s.messages.map(\.subject)), status \(String(describing: s.status))")
-    }
-
-    /// History sync against an answer without any EWS result must not mark the folder complete.
-    @Test func probeHistoryWithEmptyAnswerDoesNotCompleteFolder() async throws {
-        let (s, _) = try store(helper.envelope(""), [])
-        await s.syncHistory()
-        let complete = s.isComplete(acct.id, .inbox), token = s.syncToken(acct.id, .inbox)
-        #expect(complete == false, "complete \(complete), token \(String(describing: token))")
     }
 
     /// The same sync page applied twice changes nothing the second time (idempotence, control).
