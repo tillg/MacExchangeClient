@@ -86,6 +86,9 @@ flowchart LR
   folder's server messages it didn't list are removed (deleted or moved elsewhere meanwhile). One with a queued
   change stays until that change is done (`drain` checks again). In memory only: a pass interrupted by quitting
   resumes from its token and removes nothing.
+- **Rejected token** (`SyncTokenRejected`, Exchange's `ErrorInvalidSyncStateData`): the quick check, the history and
+  the background checks forget that folder's token and `complete` mark (`resetSync`); it syncs again from the start,
+  once, and the rule above removes what is gone.
 - Bodies, inline images, calendar days, attachment content and MailTips are fetched on demand by the views.
 
 ## Writing to the server: the outbox

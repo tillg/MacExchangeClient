@@ -268,17 +268,6 @@ struct Probe_EWS2StoreTests {
         #expect(read["A"] == true && read["C"] == true, "local read state: \(read), status: \(s.status ?? "")")
     }
 
-    /// A stored SyncState Exchange no longer accepts (ErrorInvalidSyncStateData) must be dropped so the folder
-    /// syncs again from scratch; otherwise every check fails forever.
-    @Test func probeInvalidSyncStateIsReset() async throws {
-        let xml = helper.response("SyncFolderItems", helper.err("SyncFolderItems", "ErrorInvalidSyncStateData"))
-        let (s, _) = try store(xml, [serverMessage("A")])
-        s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], token: "OLD", more: false), account: acct.id, mailbox: .inbox)
-        await s.refresh(history: false)
-        await s.refresh(history: false)
-        #expect(s.syncToken(acct.id, .inbox) != "OLD", "status: \(s.status ?? "")")
-    }
-
     /// Exchange throttling (ErrorServerBusy, with BackOffMilliseconds) is transient. The user's change must not be
     /// undone as if Exchange had refused it.
     @Test func probeServerBusyDoesNotUndoChange() async throws {

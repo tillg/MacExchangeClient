@@ -25,7 +25,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [049](BUG-049-local-send-empty-subject-inconsistent.md) | P4 | MailStore | Sending without a server stores an empty subject; Drafts and failed sends use "(No Subject)" |
 | [050](BUG-050-reply-all-trailing-comma-for-addressless-recipient.md) | P4 | MailStore | Reply All leaves a trailing ", " (empty recipient) when the original lists a recipient without address |
 | [051](BUG-051-symlink-to-folder-cannot-be-attached.md) | P4 | MailStore | Attaching a symbolic link to a folder fails with "Couldn't attach" instead of zipping the folder |
-| [054](BUG-054-invalid-sync-state-never-reset.md) | P2 | EWS | A SyncState Exchange rejects (ErrorInvalidSyncStateData) is kept: every later check of that folder fails the same way |
 | [055](BUG-055-failed-send-draft-loses-attachment-content-after-relaunch.md) | P2 | MailStore | A message that failed to send is kept "in Drafts on this Mac", but after a relaunch its attached files can no longer be opened |
 | [056](BUG-056-sign-in-removes-exchange-account-without-password.md) | P2 | MailStore | Signing in (e.g. to re-enter a missing password) removes an Exchange account that has no Keychain password; its mail stays in All Inboxes without an account |
 | [057](BUG-057-summary-sync-wipes-loaded-addresses.md) | P2 | MailStore | A later list summary of an opened message replaces its sender/recipient addresses with names only (Reply/Reply All go to empty addresses) and brings back the paperclip |

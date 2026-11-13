@@ -83,6 +83,8 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
   when the element is `MeetingRequest` or `MeetingCancellation`. `bodyLoaded` false, `serverPreview` = `Preview`.
 - **Sync** (`parseSync`): `Create`/`Update` → upsert of the first child element; `Delete` → removed ID;
   `ReadFlagChange` → read state; `more` when `IncludesLastItemInRange` is "false"; token from `SyncState`.
+  `ErrorInvalidSyncStateData` for a request that carried a token is thrown as `SyncTokenRejected` (any other error,
+  and that code without a token, as `EWSError`).
 - **Body** (`parseBody`): `html` = `Body` when `BodyType="HTML"`. `text` = `TextBody` if present (even empty), else a
   rough plain text of the HTML (`plainText`: drop head/style/script, line breaks for `br` and closing block tags,
   strip tags, decode six entities, trim lines, drop empty ones), else the body. From/To/Cc from the full `Mailbox`es.
