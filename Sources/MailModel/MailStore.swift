@@ -697,8 +697,9 @@ public final class MailStore {
     }
 
     /// Merges server messages into one mailbox without touching its sync position (used for the newest-N
-    /// lookup). Known messages keep their local ID, selection and loaded body. Messages with a change still
-    /// waiting for the server keep their local read state, flag and mailbox.
+    /// lookup). Known messages keep their local ID, selection and loaded body. A message with a change still
+    /// waiting for the server keeps the property that change sets (read state, flag or mailbox), and takes the
+    /// server's word for the others.
     public func merge(_ upserts: [Message], deleted: [String] = [], reads: [String: Bool] = [:],
                       account: UUID, mailbox: MailboxKind) {
         merge([(mailbox, upserts)], deleted: deleted, reads: reads, account: account)
@@ -711,7 +712,9 @@ public final class MailStore {
         serverAccounts.insert(account)
         guard groups.contains(where: { !$0.1.isEmpty }) || !deleted.isEmpty || !reads.isEmpty else { return }
         let mine = outbox.lazy.filter { $0.account == account }
-        let pending = Set(mine.flatMap(\.change.remoteIDs))
+        // Each queued change keeps only the property it changes; the server's word stands for the others.
+        var guarded: [String: Guarded] = [:]
+        for p in mine { for rid in p.change.remoteIDs { guarded[rid, default: []].formUnion(Guarded(p.change)) } }
         // A pending move makes the source folder report the message as deleted; that one stays.
         // Any other deletion (done elsewhere) wins over a pending read or flag change.
         let moving = Set<String>(mine.flatMap { (p: PendingChange) -> [String] in
@@ -755,10 +758,14 @@ public final class MailStore {
                         m.html = old.html; m.htmlChecked = old.htmlChecked
                         m.from = from; m.to = to; m.cc = cc; m.hasAttachments = old.hasAttachments
                     }
-                    if pending.contains(rid) { m.isRead = old.isRead; m.flag = old.flag; m.mailbox = old.mailbox }
+                    if let g = guarded[rid] {
+                        if g.contains(.read) { m.isRead = old.isRead }
+                        if g.contains(.flag) { m.flag = old.flag }
+                        if g.contains(.mailbox) { m.mailbox = old.mailbox }
+                    }
                     guard m != old else { continue }
                     ms[i] = m
-                } else if let rid = m.remoteID, pending.contains(rid) {
+                } else if let rid = m.remoteID, guarded[rid] != nil {
                     // Gone here with a change still queued (erased, or moved and erased): a page fetched before
                     // that change reached the server doesn't bring it back.
                     continue
@@ -770,10 +777,26 @@ public final class MailStore {
                 changed = true
             }
         }
-        for (rid, read) in reads where !pending.contains(rid) {
+        for (rid, read) in reads where guarded[rid]?.contains(.read) != true {
             if let i = index[rid], ms[i].isRead != read { ms[i].isRead = read; changedIDs.insert(ms[i].id); changed = true }
         }
         if changed { messages = ms }
+    }
+
+    /// The properties of a message a server change sets: a server page doesn't undo them while it is queued.
+    private struct Guarded: OptionSet {
+        let rawValue: UInt8
+        static let read = Guarded(rawValue: 1), flag = Guarded(rawValue: 2), mailbox = Guarded(rawValue: 4)
+        init(rawValue: UInt8) { self.rawValue = rawValue }
+        init(_ c: ServerChange) {
+            switch c {
+            case .setRead: self = .read
+            case .setFlagged: self = .flag
+            case .move, .respond, .reply, .removeFromCalendar: self = .mailbox
+            case .delete: self = [.read, .flag, .mailbox]
+            case .send, .saveDraft: self = []
+            }
+        }
     }
 
     /// The loaded contacts, with any address a summary gives in their place; nil when the summary names other people.

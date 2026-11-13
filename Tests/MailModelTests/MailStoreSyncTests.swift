@@ -827,4 +827,39 @@ struct MailStoreSyncTests {
         await s.syncHistory()
         #expect(s.isComplete(work.id, .inbox))
     }
+
+    // MARK: A queued change protects only the property it changes (BUG-075)
+
+    /// A queued read change doesn't swallow a flag set on the phone.
+    @Test func pendingReadChangeKeepsTheServersFlag() {
+        let s = synced(["A"])
+        let a = id(s, "A")
+        s.toggleRead([a])  // queued: setRead true
+        var flagged = remote("A"); flagged.flag = .red
+        s.apply(SyncResult(upserts: [flagged], deletedRemoteIDs: [], token: "t1", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.isRead == true)
+        #expect(s.message(a)?.flag != nil, "flagged on the phone, lost here")
+    }
+
+    /// A queued flag change doesn't swallow a read change from the server.
+    @Test func pendingFlagChangeKeepsTheServersReadState() {
+        let s = synced(["A"])
+        let a = id(s, "A")
+        s.setFlag(.red, for: [a])
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], readChanges: ["A": true], token: "t1", more: false),
+                account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.isRead == true, "read on the phone, still unread here")
+        #expect(s.message(a)?.flag == .red)
+    }
+
+    /// Nor does a queued move.
+    @Test func pendingMoveKeepsTheServersReadState() {
+        let s = synced(["A"])
+        let a = id(s, "A")
+        s.archive([a])
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], readChanges: ["A": true], token: "t1", more: false),
+                account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.mailbox == .archive)
+        #expect(s.message(a)?.isRead == true, "read on the phone, still unread here")
+    }
 }

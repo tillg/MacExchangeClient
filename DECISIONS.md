@@ -552,3 +552,9 @@ edited: 2026-11-13
 - **Decision:** An inline attachment that isn't a picture (`image/` type, or generic type with an image or unknown extension) is listed. Such files come after the non-inline ones, not in server order.
 - **Why:** Attachments are fetched by position (`attachment(remoteID:index:)`) against the list stored with the body; appending keeps every stored position valid, inserting would open the wrong file for bodies loaded before.
 - **Not covered:** an inline picture the body doesn't reference (a text mail with an inline photo) stays unlisted, as the pinned tests require.
+## 02:35 — A queued change protects only the property it changes {#d-bug-075}
+
+- **Status:** decided
+- **Context:** BUG-075. While any change of a message was queued, `merge` kept its read state, flag and mailbox together and skipped the server's read changes for it: a queued read dropped a flag set on the phone, a queued flag or move dropped a read change.
+- **Decision:** `merge` keeps per message only what its queued changes set: read state for `setRead`, flag for `setFlagged`, mailbox for a move or an invite answer, everything for an erase. The server's word stands for the rest. A page still doesn't bring back a message gone here with any change queued (d-bug-072).
+- **Why:** Exchange keeps the properties separately and the outbox writes them separately (README); the guard exists so the server doesn't undo the user's change, which only needs that one property.
