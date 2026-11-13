@@ -789,19 +789,19 @@ edited: 2026-11-13
 ## 06:05 — Scripted EWS servers in tests answer over loopback HTTP, not named pipes {#d-test-harness-loopback}
 
 - **Status:** decided
-- **Context:** Three pipe-based tests failed now and then in full runs ("XML declaration allowed only at the start of the document"), and `failedSendWithFilesLeavesNoHalfDraft` sometimes timed out. `ScriptedServer` and `RaceServer` served answers through one named pipe at a `file://` URL, with a fixed 300 ms pause (plus 1 s in `serve`) between answers. Measured in this run: (1) URLSession's file loader keeps the pipe open after an answer, under load longer than the pause, so the next answer was written into the previous request; (2) when the loader has read an answer before the writer closed the pipe, it never notices the end and waits for its 60 s time-out (reproduced by a 300 ms gap between write and close; also seen in about 1 of 300–1,000 requests with no gap, without load). One pipe per answer behind a moved symbolic link fixes (1) but not (2), and moving the link either widened the window of (2) or let a fast next request open the old pipe. Waiting for the loader's descriptors to close (via `proc_pidinfo`) made it worse.
+- **Context:** Three pipe-based tests failed now and then in full runs ("XML declaration allowed only at the start of the document"), and `failedSendWithFilesLeavesNoHalfDraft` sometimes timed out. `ScriptedServer` and `RaceServer` served answers through one named pipe at a `file://` URL, with a fixed 300 ms pause (plus 1 s in `serve`) between answers. Measured in this run: (1) URLSession's file loader keeps the pipe open after an answer, under load longer than the pause, so the next answer was written into the previous request; (2) when the loader has read an answer before the writer closed the pipe, it never notices the end and waits for its 60 s time-out (reproduced by a 300 ms gap between write and close; also seen in about 1 of 300–1,000 requests with no gap, without load). One pipe per answer behind a moved symbolic link fixes (1) but not (2), and moving the link either widened the window of (2) or let a fast next request open the old pipe. A run that waited for the loader's descriptors to close (via `proc_pidinfo`) did worse (33 of 100 answers wrong); the cause wasn't isolated.
 - **Decision:** `LoopbackEndpoint` (in `EWSFlowTests.swift`): an HTTP server in the test process on 127.0.0.1 with a free port. Each request has its own connection and gets the next answer, with its length; a held request waits until an answer is pushed; a request given up (task cancelled, connection closed) doesn't use an answer. No fixed pauses: `serve` waits only until the answer was taken. Both test `waitFor`s count a step that took longer than 100 ms as 100 ms, so another suite holding the main actor for seconds (the 70k-message performance tests run beside `EWSFlowTests`) doesn't use up the wait. That was the cause of the `failedSendWithFilesLeavesNoHalfDraft` time-outs: its 5 s wait ran out while the main actor was held for about 7 s. No assertion changed.
 - **Why:** framing by Content-Length and one connection per request rule out both pipe races by construction; the real `EWSClient`, `EWSBackend` and `MailStore` still run unchanged, and nothing leaves the machine. Stress check: 3,000 sequential requests, 0 wrong or slow, idle and with every core busy; 12 full runs green (8 idle, 4 with every core busy).
-- **Alternatives:** a handshake on the pipe (wait until the reader has closed it): the loader's descriptor can't be told apart from the next request's, and inspecting it disturbed the loader. One pipe per answer: see above. A longer pause: still a fixed sleep and still racy.
+- **Alternatives:** a handshake on the pipe (wait until the reader has closed it): the loader's descriptor can't be told apart from the next request's, and the run that inspected it did worse (see above). One pipe per answer: see above. A longer pause: still a fixed sleep and still racy.
 - **Note:** the tests keep their `// file:// fixture` markers; the plain-file fixtures (one fixed answer per file) are unchanged.
 
-## 06:20 — A cancelled calendar load doesn't mark the day unavailable {#d-loadday-cancel}
+## 06:14 — A cancelled calendar load doesn't mark the day unavailable {#d-loadday-cancel}
 
 - **Status:** decided
 - **Context:** `loadDay` added the invite to `unavailableDays` on any error, also when its task was only cancelled (the user moved to another message), so "Calendar not available" could show when coming back.
 - **Decision:** A cancelled load returns without marking anything; the next showing loads the day again. Errors that aren't cancellations still mark it, as before.
 
-## 06:35 — Mail of an account no longer set up stays on disk but isn't loaded {#d-bug-079}
+## 06:19 — Mail of an account no longer set up stays on disk but isn't loaded {#d-bug-079}
 
 - **Status:** decided
 - **Context:** BUG-079. Launch loaded every stored message, also those of an account no longer in the account list; they showed in All Inboxes without their account in the sidebar.
@@ -809,7 +809,7 @@ edited: 2026-11-13
 - **Why:** there is no UI to remove an account; an account dropped by editing the saved accounts may come back, and deleting its mail would make it download everything again. Not loading is the safe half of the fix.
 - **Alternatives:** delete the rows (and index entries) of unknown accounts at launch (rejected for now: irreversible, a product call once removing an account is a feature).
 
-## 06:40 — During a search, another account's mailbox keeps showing the previous answer as it was {#d-bug-080}
+## 06:20 — During a search, another account's mailbox keeps showing the previous answer as it was {#d-bug-080}
 
 - **Status:** decided
 - **Context:** BUG-080. `searchHits` was keyed by the query only; after selecting another account's mailbox, the old hits were filtered by the new account, so the list was empty ("No Results") until the new answer came.
@@ -817,13 +817,13 @@ edited: 2026-11-13
 - **Why:** fast-search spec §4: keep the previous results while the next answer is on its way, never flash an empty list.
 - **Alternatives:** show the new mailbox's normal content meanwhile (rejected: a flash of other content, and "No Results" when it's empty).
 
-## 06:45 — Signing in another account keeps the view when no sample account goes {#d-bug-088}
+## 06:22 — Signing in another account keeps the view when no sample account goes {#d-bug-088}
 
 - **Status:** decided
 - **Context:** BUG-088. `removeLocalAccounts()` reset the selection and jumped to All Inboxes even when there was no sample account to remove.
 - **Decision:** With nothing to remove it returns at once; when sample accounts go, the reset stays as before (their messages and mailboxes are gone).
 
-## 06:50 — A check before launch has read the Inbox: its copy wins, the stored row goes {#d-bug-092}
+## 06:23 — A check before launch has read the Inbox: its copy wins, the stored row goes {#d-bug-092}
 
 - **Status:** decided
 - **Context:** BUG-092. A check that ran before launch had restored the database (a mailbox clicked during "Loading Mail…") merged the newest Inbox mail under new local IDs; the restore then added the stored copies again (it matched by local ID only), and `restore(meta)` put back the older sync positions.
@@ -831,13 +831,13 @@ edited: 2026-11-13
 - **Why:** no storage change: rows are written and deleted as before. The stored body of such a message is fetched again when it is shown.
 - **Alternatives:** don't check before launch has loaded (rejected: the probe's sequence calls the store directly; and the Inbox would wait for the database); give the memory copy the stored local ID (rejected: the selection may already hold the new ID).
 
-## 06:55 — A server deletion drops the deleted message from queued read and flag changes {#d-bug-093}
+## 06:25 — A server deletion drops the deleted message from queued read and flag changes {#d-bug-093}
 
 - **Status:** decided
 - **Context:** BUG-093. A deletion done elsewhere wins over a pending read or flag change, but the change stayed queued and was sent, refused and reported ("Exchange refused a change").
 - **Decision:** When a sync reports messages deleted (not those held for a pending move), their IDs and undo copies leave the account's queued `setRead`/`setFlagged` entries; an entry left with no ID goes. Other kinds (move, erase, answers, sends) are untouched.
 
-## 07:00 — Read and flag changes let go of messages they take out of the list, without selecting the next {#d-bug-119}
+## 06:26 — Read and flag changes let go of messages they take out of the list, without selecting the next {#d-bug-119}
 
 - **Status:** decided
 - **Context:** BUG-119. With the unread filter on, Mark as Read (or Clear Flag in Flagged) took the selected messages out of the list but left them selected; in Trash the next Delete erased them unseen.
@@ -845,7 +845,7 @@ edited: 2026-11-13
 - **Why:** selecting the next message would open it and mark it read, which would chain through an unread list. Mail's exact behaviour here isn't checked (⚠️).
 - **Alternatives:** select the next message as after Delete (rejected: see above).
 
-## 07:10 — Queued read, flag and move changes keep slim undo copies {#d-bug-121}
+## 06:29 — Queued read, flag and move changes keep slim undo copies {#d-bug-121}
 
 - **Status:** decided
 - **Context:** BUG-121. Each queued change kept whole messages in `previous` (body, HTML, files) only to undo read state, flag or mailbox; archiving an opened Inbox of 2,870 messages made a 35 MB outbox, which is saved whole on every outbox change.
@@ -853,20 +853,20 @@ edited: 2026-11-13
 - **Why:** no storage change: `PendingChange` and its JSON are the same, only smaller; rows written before still decode and undo as before (`outboxRowWithAttachmentNamesOnlyStillLoads` reads such a row).
 - **Not covered:** the outbox table is still rewritten whole when it changes; with slim copies that is small. Writing only changed rows would need a new table layout.
 
-## 07:15 — Mark All as Read during launch loading is applied again when loading ends {#d-bug-122}
+## 06:30 — Mark All as Read during launch loading is applied again when loading ends {#d-bug-122}
 
 - **Status:** decided
 - **Context:** BUG-122. During launch only the Inboxes are in memory; Mark All Messages as Read on Flagged (or an account mailbox not loaded yet) marked only what was in memory, and the rest arrived unread.
-- **Decision:** While `isLoading`, the mailbox is remembered and `finishLoading` marks it all read once more, which also queues the server changes for the newly loaded messages. Mail that arrives later from the server is not included (the action covers what the mailbox held when it ran, plus what was stored then).
+- **Decision:** While `isLoading`, the mailbox is remembered, and `finishLoading` marks read the stored messages it adds that the mailbox contains (and queues their server changes). Mail that arrived from the server after the action, or that the user marked unread since, keeps its state: the action covers what the mailbox held when it ran, plus what was stored then.
 
-## 07:20 — A mailbox selected while a check runs is checked by that check {#d-bug-125}
+## 06:32 — A mailbox selected while a check runs is checked by that check {#d-bug-125}
 
 - **Status:** decided
 - **Context:** BUG-125. The sidebar's `refresh()` on selection returned at once while a check ran, and the running check had fixed its mailboxes at its start, so the new mailbox waited for the next poll (up to 15 s).
 - **Decision:** The running check reads the mailboxes to check again after each folder (`quickCheckRoles`), per account, and covers a newly selected one before it ends; for an account it has already passed it goes round once more for the new mailbox only. A second `refresh` while one runs still returns at once.
 - **Alternatives:** queue a whole second check (rejected: it asks the Inbox again for nothing, and a caller waiting on it would wait for both).
 
-## 07:25 — Paging stops when the server repeats a page with the same SyncState {#d-bug-126}
+## 06:33 — Paging stops when the server repeats a page with the same SyncState {#d-bug-126}
 
 - **Status:** decided
 - **Context:** BUG-126. The quick check, the history and the background checks followed "more" without checking that the SyncState moved on; a server repeating the same page made the check never end (every later check skipped) and the history ask forever.

@@ -607,7 +607,7 @@ public final class MailStore {
         if isLoading { markAllReadWhenLoaded.append(ref) }
     }
 
-    /// Mailboxes marked all read while launch was loading, applied again to what `finishLoading` brings.
+    /// Mailboxes marked all read while launch was loading, applied to the stored mail `finishLoading` brings.
     @ObservationIgnored private var markAllReadWhenLoaded: [MailboxRef] = []
 
     /// Runs `action` on the selection, then selects the message that followed it in the list – as Mail does.
@@ -1031,11 +1031,16 @@ public final class MailStore {
     /// Launch, step 3: everything else. A message changed meanwhile keeps its version in memory.
     /// Then waiting changes go to the server and the history sync may start.
     public func finishLoading(_ rest: [Message]) {
-        messages += notInMemory(withoutRemovedFolders(rest))
+        let added = notInMemory(withoutRemovedFolders(rest))
+        messages += added
         removedFolders = [:]
         loadedBoxes = nil
-        for ref in markAllReadWhenLoaded { markAllRead(in: ref) }
-        markAllReadWhenLoaded = []
+        if !markAllReadWhenLoaded.isEmpty {
+            // Only the stored mail just added: what arrived or was marked unread since the action keeps its state.
+            let refs = markAllReadWhenLoaded
+            update(Set(added.lazy.filter { m in refs.contains { self.contains($0, m) } }.map(\.id))) { $0.isRead = true }
+            markAllReadWhenLoaded = []
+        }
         scheduleFlush()
         if !backends.isEmpty { startHistory() }
     }

@@ -191,8 +191,11 @@ struct MailStoreE2ETests {
         s2.restore(try db.messages(in: first), boxes: first)
         #expect(s2.unreadCount(.smart(.flagged)) == 1)
         s2.markAllRead(in: .smart(.flagged))
+        s2.merge([server("N1", flagged: true)], account: a.id, mailbox: .inbox)  // arrives after the action
         s2.finishLoading(try db.messages(notIn: first))
-        #expect(s2.unreadCount(.smart(.flagged)) == 0, "\(s2.unreadCount(.smart(.flagged))) flagged still unread")
+        let stored = s2.messages.filter { $0.remoteID != "N1" && $0.flag != nil }
+        #expect(stored.allSatisfy { $0.isRead }, "\(stored.filter { !$0.isRead }.count) flagged still unread")
+        #expect(s2.messages.first { $0.remoteID == "N1" }?.isRead == false, "mail that arrived after the action is marked too")
         #expect(s2.outbox.flatMap(\.change.remoteIDs).sorted() == ["I1", "R1", "R2"])
     }
 }
