@@ -766,4 +766,19 @@ struct MailStoreSyncTests {
         s.merge([remote("A")], account: work.id, mailbox: .trash)
         #expect(s.messages.filter { $0.remoteID == "A" }.isEmpty, "erased message is back from the newest lookup")
     }
+
+    /// While a move is on its way, the destination's sync can already list the moved copy under its new ID; when the
+    /// move's answer then renames the message, it stays one message, with its local ID and selection.
+    @Test func renameOntoAnIDTheSyncAlreadyBroughtDoesNotDuplicate() {
+        let s = synced(["A"])
+        let a = id(s, "A")
+        s.archive([a])
+        s.apply(page(["A2"], token: "a1"), account: work.id, mailbox: .archive)
+        s.selection = Set(s.messages.map(\.id))
+        s.renameRemote(["A": "A2"], account: work.id)
+        #expect(s.messages.map(\.id) == [a])
+        #expect(s.message(a)?.remoteID == "A2" && s.message(a)?.mailbox == .archive)
+        #expect(s.count(.account(work.id, .archive)) == 1)
+        #expect(s.selection == [a])
+    }
 }

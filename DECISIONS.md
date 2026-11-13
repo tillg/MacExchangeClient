@@ -497,3 +497,10 @@ edited: 2026-11-13
 - **Context:** BUG-072. `merge` protected messages with queued changes only while they were in memory. A Trash page or the newest lookup fetched before a queued erase reached the server appended the erased message again, under a new local ID.
 - **Decision:** `merge` skips an upsert whose remote ID has a queued change and no message here. Once the change is done (or refused, which re-adds an erased message), later pages behave as before.
 - **Why:** README: erasing removes the message; the server page is older than the user's action.
+
+## 02:11 — A move's new ID that the sync already brought merges into the moved message {#d-bug-073}
+
+- **Status:** decided
+- **Context:** BUG-073. While a move is on its way, the destination's sync can merge the moved item under its new ID as a new message. `renameRemote` then gave the original the same ID: two messages, one of them a stale duplicate forever.
+- **Decision:** `renameRemote` first drops any message of the account that already has one of the new IDs (and isn't itself being renamed); the renamed message keeps its local ID, loaded body and selection (a selected copy is replaced by it in the selection). The dropped copy is removed from disk with the next save.
+- **Why:** One server item is one message. The original carries what the user has (body, selection); the copy has nothing the next sync of the destination won't bring again.

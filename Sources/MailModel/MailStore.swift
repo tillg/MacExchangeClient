@@ -935,6 +935,22 @@ public final class MailStore {
 
     /// Exchange gives moved items new IDs. Updates the messages and the changes still queued.
     public func renameRemote(_ map: [String: String], account: UUID) {
+        // The destination's sync may already have brought a moved message under its new ID. That copy goes; the
+        // renamed message keeps its local ID, body and selection.
+        var original: [String: Message.ID] = [:]  // new ID → the message renamed to it
+        for m in messages where m.accountID == account {
+            if let rid = m.remoteID, let new = map[rid] { original[new] = m.id }
+        }
+        var copies = Set<Message.ID>()
+        for m in messages where m.accountID == account {
+            guard let rid = m.remoteID, map[rid] == nil, let keep = original[rid] else { continue }
+            copies.insert(m.id)
+            if selection.remove(m.id) != nil { selection.insert(keep) }
+        }
+        if !copies.isEmpty {
+            messages.removeAll { copies.contains($0.id) }
+            forget(copies)
+        }
         for i in messages.indices where messages[i].accountID == account {
             if let rid = messages[i].remoteID, let new = map[rid] { messages[i].remoteID = new; changedIDs.insert(messages[i].id) }
         }

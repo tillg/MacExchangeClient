@@ -14,6 +14,7 @@ public enum WhatsNew {
         ChangeLogDay(date: "2026-11-13", features: [
             "Invoices and newsletters with an unusual layout show to their last line instead of being cut off.",
             "Emails with a form to fill in, such as surveys, show in full instead of only a thin strip at the end.",
+            "A message you move no longer shows up twice in its new mailbox.",
             "Emails with untidy formatting are no longer cut off partway: you can read them to the end.",
             "A message you erased from Trash no longer comes back for a moment while the server is still deleting it.",
             "An email can no longer blank out its own text when you open it.",
