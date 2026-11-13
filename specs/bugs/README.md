@@ -63,7 +63,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [211](BUG-211-colon-in-attachment-name-shows-as-slash.md) | P4 | attachments | ⚠️ An attachment with ":" in its name (attached message "Re: Budget") is saved as "Re/ Budget.eml" in the Finder |
 | [212](BUG-212-attachment-named-original-cant-be-saved.md) | P4 | attachments | An attachment named "Original" can't be saved once an app has changed the opened copy |
 | [213](BUG-213-invisible-characters-kept-in-address.md) | P4 | compose / recipients | An address pasted with a BOM or word joiner around it keeps the invisible character and goes to an address that doesn't exist |
-| [214](BUG-214-erase-does-not-suppress-read-receipts.md) | P3 | ews | Erasing a message from Trash doesn't suppress read receipts (DeleteItem without SuppressReadReceipts) |
 | [215](BUG-215-empty-address-recipient-fails-whole-send.md) | P3 | ews | A recipient typed as "Name <>" makes the whole send fail (empty EmailAddress is schema-invalid) |
 | [217](BUG-217-flag-or-read-on-deleted-appointment-refused.md) | P3 | ews | Flagging or marking read a deleted appointment in Trash is refused and undone (UpdateItem lacks SendMeetingInvitationsOrCancellations) |
 | [220](BUG-220-list-date-weekday-for-future-and-week-old.md) | P3 | MessageListView | Message list shows only a weekday for a date in the future, and for last week's same weekday after the current time |

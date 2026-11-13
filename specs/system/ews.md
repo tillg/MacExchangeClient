@@ -64,7 +64,7 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
 | `setRead` | `UpdateItem` `SetItemField message:IsRead`, `SaveOnly`, `AlwaysOverwrite` (no change key), `SuppressReadReceipts` |
 | `setFlagged` | The same with `item:Flag` / `FlagStatus` `Flagged` or `NotFlagged` |
 | `move` | `MoveItem` with `ReturnNewItemIds`; new IDs are paired with old ones by response order |
-| `delete` | `DeleteItem DeleteType="SoftDelete" SendMeetingCancellations="SendToNone" AffectedTaskOccurrences="AllOccurrences"` (into Recoverable Items; the two attributes let deleted appointments and tasks be erased too, BUG-216) |
+| `delete` | `DeleteItem DeleteType="SoftDelete" SendMeetingCancellations="SendToNone" AffectedTaskOccurrences="AllOccurrences" SuppressReadReceipts="true"` (into Recoverable Items; no "not read" receipt, BUG-214; the two attributes let deleted appointments and tasks be erased too, BUG-216) |
 
 - `setRead`, `setFlagged`, `move` and `delete` are judged per item (`checkBatch`, not strict): one response message
   per item, in request order, is required, else the batch fails as a whole. Items with a code other than `NoError`
