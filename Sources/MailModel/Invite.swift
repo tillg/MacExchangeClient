@@ -24,6 +24,17 @@ public struct Invite: Hashable, Codable, Sendable {
         self.organizer = organizer; self.required = required; self.optional = optional; self.response = response
     }
 
+    /// An all-day invite's days here: Exchange sends the organizer's midnights in UTC, so the start is taken to the
+    /// nearest local midnight and the length rounded to whole days. Right for organizers up to 12 hours away (BUG-200).
+    /// Returns the first day's midnight and the midnight after the last day.
+    public func allDayDays(calendar: Calendar = .current) -> (Date, Date) {
+        let day0 = calendar.startOfDay(for: start)
+        let next = calendar.date(byAdding: .day, value: 1, to: day0) ?? day0.addingTimeInterval(86400)
+        let first = start.timeIntervalSince(day0) < next.timeIntervalSince(start) ? day0 : next
+        let days = max(1, Int((end.timeIntervalSince(start) / 86400).rounded()))
+        return (first, calendar.date(byAdding: .day, value: days, to: first) ?? first.addingTimeInterval(Double(days) * 86400))
+    }
+
     /// The invite card's "when" line: the day and times, and the end's day too when the meeting ends on a later day
     /// (an offsite, an overnight window), as Outlook writes it. An all-day invite ends at the midnight after its
     /// last day, so that midnight isn't counted as a day of its own.
@@ -31,9 +42,10 @@ public struct Invite: Hashable, Codable, Sendable {
         let day = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).weekday(.wide).day().month(.wide).year()
         let time = Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: calendar, timeZone: calendar.timeZone)
         if isAllDay {
-            let last = end > start ? end.addingTimeInterval(-1) : start
-            if calendar.isDate(last, inSameDayAs: start) { return "\(start.formatted(day)), all day" }
-            return "\(start.formatted(day)) – \(last.formatted(day)), all day"
+            let (first, after) = allDayDays(calendar: calendar)
+            let last = after.addingTimeInterval(-1)
+            if calendar.isDate(last, inSameDayAs: first) { return "\(first.formatted(day)), all day" }
+            return "\(first.formatted(day)) – \(last.formatted(day)), all day"
         }
         if end > start, !calendar.isDate(end, inSameDayAs: start) {
             return "\(start.formatted(day)) at \(start.formatted(time)) – \(end.formatted(day)) at \(end.formatted(time))"

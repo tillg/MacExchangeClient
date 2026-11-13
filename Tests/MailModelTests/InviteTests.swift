@@ -127,3 +127,23 @@ struct InviteTests {
     let day = Invite(start: start.addingTimeInterval(-10 * 3600), end: start.addingTimeInterval(-9 * 3600))
     #expect(MailStore.calendarRange(of: day, calendar: cal).1 == cal.date(from: DateComponents(year: 2026, month: 11, day: 21)))
 }
+
+/// BUG-200: Exchange sends an all-day meeting as the organizer's midnights in UTC. Whatever the organizer's zone
+/// (London, New York, Tokyo), a one-day all-day invite is that one day here.
+@Test func allDayInviteFromAnotherZoneIsOneDay() {
+    var berlin = Calendar(identifier: .gregorian)
+    berlin.timeZone = TimeZone(identifier: "Europe/Berlin")!
+    let en = Locale(identifier: "en_GB")
+    let iso = ISO8601DateFormatter()
+    for (start, end) in [("2026-11-20T00:00:00Z", "2026-11-21T00:00:00Z"),   // London
+                         ("2026-11-20T05:00:00Z", "2026-11-21T05:00:00Z"),   // New York
+                         ("2026-11-19T15:00:00Z", "2026-11-20T15:00:00Z")] { // Tokyo
+        let invite = Invite(start: iso.date(from: start)!, end: iso.date(from: end)!, isAllDay: true)
+        #expect(invite.when(calendar: berlin, locale: en) == "Friday, 20 November 2026, all day", "\(start)")
+        let (from, to) = invite.allDayDays(calendar: berlin)
+        #expect(from == berlin.date(from: DateComponents(year: 2026, month: 11, day: 20)))
+        #expect(to == berlin.date(from: DateComponents(year: 2026, month: 11, day: 21)))
+    }
+    let two = Invite(start: iso.date(from: "2026-11-20T00:00:00Z")!, end: iso.date(from: "2026-11-22T00:00:00Z")!, isAllDay: true)
+    #expect(two.when(calendar: berlin, locale: en) == "Friday, 20 November 2026 – Saturday, 21 November 2026, all day")
+}

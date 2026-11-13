@@ -1591,6 +1591,7 @@ public final class MailStore {
     /// The calendar read for an invite: its day, and on to its end when it runs past midnight, so conflicts after
     /// midnight show too (BUG-192).
     static func calendarRange(of invite: Invite, calendar: Calendar = .current) -> (Date, Date) {
+        if invite.isAllDay { return invite.allDayDays(calendar: calendar) }  // BUG-200
         let from = calendar.startOfDay(for: invite.start)
         let dayEnd = calendar.date(byAdding: .day, value: 1, to: from) ?? from.addingTimeInterval(86400)
         return (from, max(dayEnd, invite.end))
