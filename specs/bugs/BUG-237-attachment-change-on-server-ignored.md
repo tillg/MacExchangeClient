@@ -2,7 +2,7 @@
 title: "A file added to or removed from a message on the server (a draft edited in Outlook) never shows: the old attachment list and paperclip stay"
 priority: P3
 area: Sync / attachments
-status: open
+status: deferred
 found: 2026-11-13
 ---
 
@@ -26,3 +26,9 @@ Expectation failed: m?.hasAttachments == true || m?.needsBody == true
 
 ## Fix idea
 In `MailStore.merge`, keep the loaded body only when `m.hasAttachments == old.hasAttachments` too (better: compare the server's ChangeKey, which every edit changes).
+
+## Deferred (2026-11-13)
+Comparing the summary's HasAttachments with the loaded body's list isn't safe: the summary counts inline pictures
+(signature logos), the body's list leaves them out, so every sync would mark such mail for a refetch. The right signal
+is the item's ChangeKey (every edit changes it), which the store doesn't keep yet: a model and storage change. See
+DECISIONS.md run-2026-11-13-1235-12.

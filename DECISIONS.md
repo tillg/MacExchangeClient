@@ -1029,3 +1029,4 @@ edited: 2026-11-13
 - **Why:** each needs the user's choice or real data; a guess could make behaviour worse.
 - **Alternatives:** fix them on assumptions (risk of wrong behaviour on the real server).
 - **Consequences:** they stay in the list, marked deferred, for the user's review.
+- 16:02: BUG-237 deferred as well (a draft's files changed on the server): the safe signal is the item's ChangeKey, which the store doesn't keep yet.

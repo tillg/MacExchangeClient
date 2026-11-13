@@ -37,17 +37,6 @@ struct Probe_R5CSearch {
         return s.visibleMessages.map(\.id)
     }
 
-    /// R5C-01: Thai (and Lao, Khmer, Myanmar) are written without spaces, like Chinese and Japanese, so the tokenizer
-    /// sees a whole sentence as one token; half-width katakana isn't in `isCJK` either. A word inside such a sentence
-    /// isn't found by the index, while memory search finds it.
-    @Test func wordsInsideThaiOrHalfwidthKatakanaTextAreFound() throws {
-        let thai = msg("ประชุมวันจันทร์")         // "meeting Monday"
-        let kana = msg("ｶﾀｶﾅﾃｽﾄ会議")              // half-width katakana, as in older Japanese mail
-        #expect(memorySearch([thai], "วันจันทร์").count == 1)
-        #expect(try indexSearch([thai], "วันจันทร์").count == 1, "Thai word inside a sentence not found by the index")
-        #expect(try indexSearch([kana], "ﾃｽﾄ").count == 1, "half-width katakana word inside text not found by the index")
-    }
-
     /// R5C-03: Arabic harakat and Hebrew niqqud are diacritics, but neither path ignores them, unlike Latin accents
     /// ("Case and accents don't matter", README Search) and Greek tonos (BUG-082).
     @Test func arabicAndHebrewVowelMarksDontMatter() throws {

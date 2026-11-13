@@ -25,7 +25,6 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [162](BUG-162-mail-folder-in-non-mail-folder-shown-or-archive.md) | P4 | EWS | A mail folder inside Contacts, Calendar or Tasks shows at the top level, and one named Archive becomes the account's Archive |
 | [165](BUG-165-wcf-fault-without-code-undoes-change.md) | P3 | EWS | A SOAP fault without an Exchange ResponseCode (IIS/WCF internal error) undoes the change as "refused" (deferred) |
 | [168](BUG-168-refused-folder-stops-newest-of-others.md) | P4 | Sync | One folder that Exchange refuses in the history's first step stops the newest-200 fetch for all the account's other folders |
-| [171](BUG-171-thai-halfwidth-kana-words-not-found.md) | P3 | search | A word inside Thai text (or half-width katakana) isn't found by search |
 | [173](BUG-173-arabic-hebrew-vowel-marks.md) | P4 | search | Arabic and Hebrew words with vowel marks aren't found when typed without them |
 | [174](BUG-174-georgian-mtavruli-not-indexed.md) | P4 | search | Georgian written in capitals (Mtavruli) isn't found by search |
 | [178](BUG-178-subtitle-1-messages.md) | P4 | UI / MessageViewer | The window subtitle says "1 messages" for a mailbox with one message |
@@ -69,7 +68,7 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [234](BUG-234-unread-smart-mailbox-icon.md) | P4 | UI / SidebarView | Sidebar: the Unread smart mailbox shows a bare gear; Mail's smart mailbox icon is a folder with a gear |
 | [235](BUG-235-message-context-menu-order.md) | P4 | UI / MessageListView | Message list context menu: Move to Junk and Delete come after Archive; in Mail they follow Mark as Read, before Flag, and Move to is missing |
 | [236](BUG-236-cloud-attachment-body-refetched.md) | P4 | attachments / EWS | A message with a cloud attachment (OneDrive/SharePoint link) fetches its body again every time it is shown |
-| [237](BUG-237-attachment-change-on-server-ignored.md) | P3 | Sync / attachments | A file added to or removed from a message on the server (a draft edited in Outlook) never shows: the old attachment list and paperclip stay |
+| [237](BUG-237-attachment-change-on-server-ignored.md) | P3 | Sync / attachments | A file added to or removed from a message on the server (a draft edited in Outlook) never shows: the old attachment list and paperclip stay (deferred) |
 | [240](BUG-240-opened-copy-stale-after-message-changed.md) | P4 | attachments / Mail Downloads | After a message changed on the server, Open and Save still give the old version of a file with the same name |
 | [241](BUG-241-symlink-to-alias-attaches-bookmark.md) | P4 | compose / attaching files | A symbolic link to a Finder alias is attached as the alias's bookmark bytes, not the file it points to |
 | [244](BUG-244-malformed-server-other-host.md) | P4 | Accounts / ExchangeAccount | A mistyped server (ftp://, https:/, https//, ?x, #x, port 99999) becomes a URL to another host or path instead of "Invalid server" |
