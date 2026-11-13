@@ -1452,6 +1452,8 @@ public final class MailStore {
     @ObservationIgnored private var localAttachments: [Message.ID: [Data]] = [:]
     /// What Quick Look shows: every attachment of a message, and the one in front.
     public var previewItems: [URL] = []
+    /// Counts Quick Look requests, so only the latest sets what is shown.
+    @ObservationIgnored private var quickLookRequest = 0
     public var previewItem: URL?
 
     /// For sample data and tests: the content of a local message's attachments, in order.
@@ -1555,14 +1557,18 @@ public final class MailStore {
     }
 
     /// Quick Look over all of the message's attachments, starting at `index` (nil: the first that loads). When the
-    /// chosen one can't be had, no other file is shown in its place; the status says why.
+    /// chosen one can't be had, no other file is shown in its place; the status says why. A Quick Look asked for
+    /// later wins: an earlier one whose files arrive after it changes nothing.
     public func quickLookAttachments(of id: Message.ID, at index: Int? = nil) async {
+        quickLookRequest &+= 1
+        let request = quickLookRequest
         var files: [URL] = [], front: URL?
         for i in message(id)?.attachments.indices ?? 0..<0 {
             guard let url = await attachmentFile(i, of: id) else { continue }
             files.append(url)
             if i == index { front = url }
         }
+        guard request == quickLookRequest else { return }
         previewItems = files
         previewItem = index == nil ? files.first : front
     }

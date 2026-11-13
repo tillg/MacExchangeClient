@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Quick Look no longer jumps back to an earlier message's attachment when its download finishes after you looked at another one.",
             "Quick Look on an attachment that can't be loaded no longer shows a different attachment instead.",
             "A picture attachment that can't be loaded shows as a file icon instead of a spinner that never stops, so you can still try to open or save it.",
             "While a search is still looking, the list keeps the results it showed, and no longer says \"No Results\" before the first answer is in.",
