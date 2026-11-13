@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Forwarding or saving an attachment you opened and changed (for example a form filled in with Preview) uses the file as it came in the email, not your changed copy.",
             "With pictures from the internet blocked, opening an email no longer lets its sender find out through a hidden connection to their server.",
             "When one account's server can't be reached, your other accounts still send your messages and changes right away.",
             "If the app quits while a message is being sent, it is never sent a second time: it waits in Drafts and the app asks you to check Sent.",

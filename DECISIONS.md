@@ -400,3 +400,11 @@ edited: 2026-11-13
   - Two performance findings (a server deletion and the Delete key over budget) were dropped: they pass at current HEAD after the batch-4 fixes.
   - The UI findings (BUG-*-UI) are proven by screenshot pairs in `specs/bugs/png/`, not by unit tests: the test target can't import the app.
 - **Count:** Rounds 2–4 found 101 new bugs (41 + 39 + 21).
+
+## 01:46 — Save and Forward never use an edited Mail Downloads copy {#d-bug-133}
+
+- **Status:** decided
+- **Context:** BUG-133. Opening an attachment writes it to Mail Downloads, where apps edit it in place (Preview autosaves filled-in forms). Save Attachment, Save to Downloads, Save Attachments…, the save panel, drag-out and Forward all read that file, so private edits went out or were saved as "the attachment".
+- **Decision:** The store notes size and modification date of every attachment file it writes. New `originalAttachmentFile` returns the opened file only while both are unchanged; otherwise it fetches the content again (local data or the server) into an `Original` folder beside it, checked the same way. Save, save panel, drag-out and Forward use it. Opening and Quick Look keep using the opened file, so the user's edits stay visible and aren't overwritten. A file from an earlier session (not noted) counts as changed and is fetched again.
+- **Why:** What's attached is the message's content, as on the server. Overwriting the opened copy would throw away the user's work.
+- **Alternatives:** Hash of the original (rejected: size and date catch every in-place save and need no extra read). Refetch on every save (rejected: an extra server round trip for the common unedited case).

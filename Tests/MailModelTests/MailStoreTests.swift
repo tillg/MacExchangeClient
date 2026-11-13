@@ -1069,6 +1069,24 @@ struct MailStoreTests {
         #expect(await s.attachmentFile(3, of: id) == nil)
     }
 
+    /// The user opens a file and edits it in Mail Downloads (Preview fills in a form in place). A forward and Save
+    /// Attachment still carry the attachment as it came in the mail; opening again shows the edited copy.
+    @Test func editedOpenedCopyIsNotForwardedOrSaved() async throws {
+        let original = Data("%PDF original form".utf8), edited = Data("%PDF filled in with my bank details".utf8)
+        let (s, id, dir) = attachmentStore(["form.pdf"], data: [original])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let opened = try #require(await s.attachmentFile(0, of: id))
+        try edited.write(to: opened)
+        var d = s.draft(.forward, to: id)
+        await s.includeOriginalAttachments(in: &d)
+        #expect(d.attachments.first?.data == original)
+        let saved = await s.saveAttachment(0, of: id, to: dir.appendingPathComponent("Saved"))
+        #expect(saved.flatMap { try? Data(contentsOf: $0) } == original)
+        #expect(try Data(contentsOf: try #require(await s.originalAttachmentFile(0, of: id))) == original)
+        #expect(await s.attachmentFile(0, of: id) == opened)
+        #expect(try Data(contentsOf: opened) == edited)
+    }
+
     /// Picked or dropped files are read into the draft with their type; a missing file is left out.
     @Test func filesAreAttachedToADraft() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("AttachTests-\(UUID())")

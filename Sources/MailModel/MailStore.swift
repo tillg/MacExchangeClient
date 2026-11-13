@@ -1193,14 +1193,42 @@ public final class MailStore {
         if isStored(m.accountID) { filesChanged.insert(m.id) }
     }
 
+    /// Size and modification date of each attachment file this store wrote, to tell whether an app changed it since.
+    @ObservationIgnored private var writtenFiles: [URL: FileStamp] = [:]
+
+    struct FileStamp: Equatable {
+        let size: Int?, modified: Date?
+        init?(_ url: URL) {
+            guard let a = try? FileManager.default.attributesOfItem(atPath: url.path) else { return nil }
+            size = (a[.size] as? NSNumber)?.intValue
+            modified = a[.modificationDate] as? Date
+        }
+    }
+
     /// The attachment as a file, fetched from the server the first time. nil (and a status) if that fails.
+    /// Opening again gives the same file, with any edits the user made to it.
     public func attachmentFile(_ index: Int, of id: Message.ID) async -> URL? {
+        await attachmentFile(index, of: id, original: false)
+    }
+
+    /// The attachment exactly as it came in the mail, for Save and Forward. The opened file is used only while no
+    /// app has changed it (Preview saves a filled-in form in place); otherwise the content is fetched again, into
+    /// a folder of its own beside it.
+    public func originalAttachmentFile(_ index: Int, of id: Message.ID) async -> URL? {
+        await attachmentFile(index, of: id, original: true)
+    }
+
+    private func attachmentFile(_ index: Int, of id: Message.ID, original: Bool) async -> URL? {
         guard let m = message(id), m.attachments.indices.contains(index) else { return nil }
         let a = m.attachments[index]
         // A folder per position: two attachments may have the same name.
-        let url = downloadsFolder.appendingPathComponent(id.uuidString).appendingPathComponent("\(index)")
-            .appendingPathComponent(a.fileName)
-        if FileManager.default.fileExists(atPath: url.path) { return url }
+        let folder = downloadsFolder.appendingPathComponent(id.uuidString).appendingPathComponent("\(index)")
+        var url = folder.appendingPathComponent(a.fileName)
+        if FileManager.default.fileExists(atPath: url.path) {
+            if !original || isUnchanged(url) { return url }
+            url = folder.appendingPathComponent("Original").appendingPathComponent(a.fileName)
+            if isUnchanged(url) { return url }
+        }
         do {
             let data: Data
             if let local = localAttachments[id], local.indices.contains(index) {
@@ -1217,6 +1245,7 @@ public final class MailStore {
             try (url as NSURL).setResourceValue([kLSQuarantineTypeKey as String: kLSQuarantineTypeEmailAttachment as String,
                                                  kLSQuarantineAgentNameKey as String: "Mail Replica"],
                                                 forKey: .quarantinePropertiesKey)
+            writtenFiles[url] = FileStamp(url)
             return url
         } catch {
             if !pauseIfSignInFailed(error, account: m.accountID) {
@@ -1226,9 +1255,15 @@ public final class MailStore {
         }
     }
 
+    /// Whether `url` is a file this store wrote and nothing has changed since.
+    private func isUnchanged(_ url: URL) -> Bool {
+        guard let written = writtenFiles[url] else { return false }
+        return FileStamp(url) == written
+    }
+
     /// Copies the attachment into `folder` without replacing anything there ("name 2.pdf", as in the Finder).
     public func saveAttachment(_ index: Int, of id: Message.ID, to folder: URL) async -> URL? {
-        guard let file = await attachmentFile(index, of: id) else { return nil }
+        guard let file = await originalAttachmentFile(index, of: id) else { return nil }
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             let target = Self.freeURL(for: file.lastPathComponent, in: folder)
@@ -1555,7 +1590,7 @@ public final class MailStore {
         guard let id = draft.loadingOriginal, let m = message(id) else { draft.loadingOriginal = nil; return }
         if m.needsBody { await loadBody(id) }
         for (i, a) in (message(id)?.attachments ?? []).enumerated() {
-            guard let url = await attachmentFile(i, of: id), let data = try? Data(contentsOf: url) else { continue }
+            guard let url = await originalAttachmentFile(i, of: id), let data = try? Data(contentsOf: url) else { continue }
             draft.attachments.append(DraftAttachment(
                 name: a.name, contentType: a.contentType ?? UTType(filenameExtension: url.pathExtension)?.preferredMIMEType,
                 data: data, fromOriginal: true))

@@ -186,7 +186,7 @@ private struct AttachmentActions: ViewModifier {
         provider.registerFileRepresentation(forTypeIdentifier: (attachment.type ?? .data).identifier,
                                             fileOptions: [], visibility: .all) { done in
             Task { @MainActor in
-                if let url = await store.attachmentFile(index, of: id) { done(url, false, nil) } else {
+                if let url = await store.originalAttachmentFile(index, of: id) { done(url, false, nil) } else {
                     done(nil, false, CocoaError(.fileReadUnknown))
                 }
             }
@@ -208,7 +208,7 @@ enum AttachmentPanels {
         panel.directoryURL = downloads
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task {
-            guard let file = await store.attachmentFile(index, of: message.id) else { return }
+            guard let file = await store.originalAttachmentFile(index, of: message.id) else { return }
             try? FileManager.default.removeItem(at: url)  // the panel already asked about replacing it
             do { try FileManager.default.copyItem(at: file, to: url) } catch {
                 store.status = "Couldn't save “\(url.lastPathComponent)”: \(error.localizedDescription)"
