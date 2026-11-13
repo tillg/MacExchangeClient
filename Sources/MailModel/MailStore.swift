@@ -44,6 +44,8 @@ public final class MailStore {
     @ObservationIgnored private var hitsGeneration = 0
     /// A query the index couldn't answer: memory is scanned for it instead.
     private var fallbackQuery: String?
+    /// The query of the memory scan last shown (its results stay while the index's next answer is on its way).
+    @ObservationIgnored private var memoryQuery: String?
     @ObservationIgnored private(set) var searchTask: Task<Void, Never>?
     /// Wait after a keystroke before asking the index.
     @ObservationIgnored var searchDebounce: Duration = .milliseconds(150)
@@ -265,7 +267,8 @@ public final class MailStore {
         // Keyed by the answer's query, not the typed text, so keystrokes before the next answer cost nothing.
         let useIndex = !typed.isEmpty && searcher != nil && fallbackQuery != typed
         let hits = useIndex ? searchHits : nil
-        let q = useIndex ? hits?.query ?? "" : typed
+        // Results that came from memory stay the same way until the index's first answer is in.
+        let q = useIndex ? hits?.query ?? memoryQuery ?? "" : typed
         let opened = openedUnread
         let key = ListKey(mailbox: selectedMailbox, query: q, filterUnread: filterUnread, hits: hits == nil ? -1 : hitsGeneration,
                           openedUnread: opened)
@@ -276,6 +279,7 @@ public final class MailStore {
             listCache = (revision, key, list)
             return list
         }
+        if !q.isEmpty { memoryQuery = q }
         let words = Self.searchWords(q)
         let list = messages.filter { m in
             if !q.isEmpty {
@@ -294,6 +298,13 @@ public final class MailStore {
         .sorted(by: Self.newestFirst)
         listCache = (revision, key, list)
         return list
+    }
+
+    /// A search whose first answer is on its way, with no earlier results to keep: the list shows the mailbox meanwhile,
+    /// and an empty one isn't "No Results" yet.
+    public var awaitingSearchResults: Bool {
+        let typed = normalizedSearch
+        return !typed.isEmpty && searcher != nil && fallbackQuery != typed && searchHits == nil && memoryQuery == nil
     }
 
     /// The index's hits as they are in memory now: in scope, not in Trash (or a folder inside it) or Junk, newest first.
@@ -357,7 +368,7 @@ public final class MailStore {
         searchTask?.cancel()
         let q = normalizedSearch
         guard !q.isEmpty else {
-            searchTask = nil; searchHits = nil; fallbackQuery = nil
+            searchTask = nil; searchHits = nil; fallbackQuery = nil; memoryQuery = nil
             if statusIsAboutSearch { status = nil }
             return
         }
@@ -405,6 +416,7 @@ public final class MailStore {
         } catch {
             guard !Task.isCancelled, normalizedSearch == q else { return }
             fallbackQuery = q
+            searchHits = nil  // memory answers now: its results, not older hits, stay while the next query is pending
             status = Self.searchFailed + error.localizedDescription
         }
     }

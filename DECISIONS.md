@@ -770,3 +770,11 @@ edited: 2026-11-13
 - **Decision:** From, Subject, Date, To, then Cc (only when there is one); recipients as `Contact.formatted`, comma-separated. The date uses the long date and long time styles (seconds and zone, e.g. "13 November 2026 at 10:15:23 CET"). The reply attribution is unchanged.
 - **Why:** the order and the seconds-and-zone time are Mail's as recalled (⚠️ not read from Mail's bundle); the recipient lines are the information that was lost.
 - **Alternatives:** Reply-To line (left out: `Message` has no Reply-To).
+
+## 04:25 — Pending search: memory results stay; no "No Results" before the first answer {#d-bug-132}
+
+- **Status:** decided
+- **Context:** BUG-132. While the index's answer for the next query was pending, the list kept only earlier *index* results; results that came from memory (index not ready, or a query it failed on) gave way to the plain mailbox. Before a search's first answer, an empty mailbox showed "No Results".
+- **Decision:** `MailStore` remembers the query of the memory scan last shown (`memoryQuery`) and keeps showing it while the next index answer is pending; a failed index query clears `searchHits`, so the newer memory results win over older hits. For the first answer of a search there is nothing to keep: the list still shows the mailbox (as documented), and `awaitingSearchResults` tells the list not to show "No Results" over an empty one meanwhile.
+- **Why:** fast-search spec §4 ("don't flash an empty list or No Results"). Scanning memory for the first pending query (what the third probe asked for, a non-empty list) would cost the per-keystroke scan of BUG-146 on 180,000 messages.
+- **Alternatives:** Memory scan of the typed text until the first answer (rejected: freezes per keystroke with all mail in memory).

@@ -1670,6 +1670,73 @@ struct MailStoreTests {
         #expect(s.visibleMessages.map(\.subject) == ["Report one"])
     }
 
+    /// Results that came from memory (before the index was ready) also stay while the index's answer is on its way.
+    @Test func memoryResultsStayWhileTheIndexAnswerIsPending() async throws {
+        let hit = msg(work, subject: "Report Q3", minutesAgo: 5), other = msg(work, subject: "Lunch", minutesAgo: 1)
+        let (db, url) = try searchDB([hit, other])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let s = store([hit, other])
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.searchText = "report"
+        #expect(s.visibleMessages.map(\.subject) == ["Report Q3"])  // memory
+        let gate = Gate(slow: ["report", "report q"])
+        var started = gate.entered.makeAsyncIterator()
+        searching(s, db, gate: gate)
+        _ = await started.next()
+        #expect(s.visibleMessages.map(\.subject) == ["Report Q3"])
+        s.searchText = "report q"
+        _ = await started.next()
+        #expect(s.visibleMessages.map(\.subject) == ["Report Q3"])
+        #expect(!s.awaitingSearchResults)
+        gate.release("report"); gate.release("report q")
+        await s.searchTask?.value
+    }
+
+    /// After a query the index couldn't answer (memory answered it), the next pending query keeps those results.
+    @Test func memoryResultsOfAFailedQueryStayWhileTheNextIsPending() async throws {
+        let hit = msg(work, subject: "Report Q3", minutesAgo: 5), other = msg(work, subject: "Lunch", minutesAgo: 1)
+        let s = store([hit, other])
+        s.selectedMailbox = .account(work.id, .inbox)
+        let gate = Gate(slow: ["report q"])
+        final class Flag: @unchecked Sendable { var fail = true }
+        let flag = Flag()
+        s.searchDebounce = .zero
+        s.searcher = { q, _ in
+            if flag.fail { throw DatabaseError(errorDescription: "busy") }
+            await gate.pass(q)
+            return [hit.id]
+        }
+        s.searchText = "report"
+        await s.searchTask?.value
+        #expect(s.visibleMessages.map(\.subject) == ["Report Q3"])  // memory fallback
+        flag.fail = false
+        var started = gate.entered.makeAsyncIterator()
+        s.searchText = "report q"
+        _ = await started.next()
+        #expect(s.visibleMessages.map(\.subject) == ["Report Q3"])
+        gate.release("report q")
+        await s.searchTask?.value
+    }
+
+    /// Before the first answer of a search there are no results to keep: the store says so, so the list doesn't
+    /// claim "No Results" meanwhile.
+    @Test func theFirstPendingAnswerIsNotNoResults() async throws {
+        let archived = msg(work, .archive, subject: "Report archived")
+        let (db, url) = try searchDB([archived])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let s = store([archived])
+        let gate = Gate(slow: ["report"])
+        searching(s, db, gate: gate)
+        s.selectedMailbox = .account(work.id, .inbox)  // empty
+        var started = gate.entered.makeAsyncIterator()
+        s.searchText = "report"
+        _ = await started.next()
+        #expect(s.awaitingSearchResults)
+        gate.release("report")
+        await s.searchTask?.value
+        #expect(!s.awaitingSearchResults && s.visibleMessages.map(\.subject) == ["Report archived"])
+    }
+
     /// Mail that changes while a search runs is shown as it is now, not as it was when the search began.
     @Test func changesDuringASearchShowInItsResults() async throws {
         let one = msg(work, subject: "Report one", minutesAgo: 2), two = msg(work, subject: "Report two", minutesAgo: 1)

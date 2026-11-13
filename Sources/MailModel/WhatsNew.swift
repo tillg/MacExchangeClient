@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "While a search is still looking, the list keeps the results it showed, and no longer says \"No Results\" before the first answer is in.",
             "Messages received at the same time keep their order in the list after you restart the app.",
             "A forwarded message now says who the original went to (To and Cc), and its date includes the time zone.",
             "Replies, forwards and invitation answers write a sender who has no name, such as a no-reply address, once instead of twice.",

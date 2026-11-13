@@ -57,7 +57,7 @@ struct MessageListView: View {
                     if store.searchText.isEmpty {
                         ContentUnavailableView(store.filterUnread ? "No Unread Messages" : "No Messages",
                                                systemImage: "tray")
-                    } else {
+                    } else if !store.awaitingSearchResults {
                         ContentUnavailableView.search(text: store.searchText)
                     }
                 }
