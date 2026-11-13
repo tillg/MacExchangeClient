@@ -568,7 +568,7 @@ edited: 2026-11-13
 - **Why:** README syncs "your own mail folders"; a folder that doesn't exist on the server has no mail. Folders moved into Deleted Items keep their ID and stay (BUG-025).
 - **Alternatives:** Select All Inboxes (rejected: the Inbox of the same account is closer to where the user was). Keep the mail until the user acts (rejected: it can't be reached in the sidebar).
 
-## 02:52 — A half message left in Exchange's Drafts is erased later {#d-bug-105}
+## 02:41 — A half message left in Exchange's Drafts is erased later {#d-bug-105}
 
 - **Status:** decided
 - **Context:** BUG-105. With files, send and Save Draft create the item first; when a later step failed, the clean-up delete was a `try?`, so a failed clean-up left a copy without files in Exchange's Drafts for good.
