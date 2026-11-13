@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "A message that couldn't be sent is kept in Drafts with its pictures where you placed them in the text.",
             "When a draft can't be saved on the server, the message says so instead of claiming it couldn't be sent, and a message without a subject is named \"(No Subject)\".",
             "Dropping or pasting a Finder alias attaches the file or folder it points to, not the alias itself.",
             "Saving an attachment next to a broken alias with the same name no longer fails: the copy gets a number, as in the Finder.",

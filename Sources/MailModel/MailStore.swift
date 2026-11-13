@@ -1126,11 +1126,17 @@ public final class MailStore {
     /// A message that didn't reach the server, or may not have: kept as a local message in Drafts, with its files.
     private func keepInDrafts(_ d: Draft) {
         let acct = account(d.accountID)
-        let m = Message(accountID: d.accountID, mailbox: .drafts,
+        var m = Message(accountID: d.accountID, mailbox: .drafts,
                         from: Contact(name: acct?.name ?? "", email: acct?.address ?? ""),
                         to: Contact.parseList(d.to), cc: Contact.parseList(d.cc),
                         subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
                         body: d.text, date: .now, isRead: true, attachments: d.attachments.map(\.attachment))
+        // Pictures placed in the text stay in their place: an HTML body referring to the kept files.
+        let placed = Set(d.placedPictures)
+        if !placed.isEmpty {
+            m.html = d.html { placed.contains($0) ? Self.localContentID($0) : nil }
+            m.htmlChecked = true
+        }
         add(m)
         if !d.attachments.isEmpty { keepFiles(d.attachments.map(\.data), for: m) }
     }
@@ -1380,13 +1386,31 @@ public final class MailStore {
 
     /// Fetches the images the shown HTML body refers to with `cid:`. A failure leaves the body as it is.
     public func loadInlineImages(for id: Message.ID) async {
-        guard inline[id] == nil, let m = message(id), let html = m.html, let rid = m.remoteID,
-              let backend = backends[m.accountID], !paused.contains(m.accountID) else { return }
+        guard inline[id] == nil, let m = message(id), let html = m.html else { return }
         let ids = HTMLPage.contentIDs(in: html)
         guard !ids.isEmpty else { return }
+        // A message kept only here (a draft whose send failed) refers to its own files.
+        if m.remoteID == nil, let files = localAttachments[id] {
+            var images: [String: InlineImage] = [:]
+            for cid in ids {
+                guard let k = Self.localFileIndex(cid), files.indices.contains(k), m.attachments.indices.contains(k) else { continue }
+                images[cid] = InlineImage(contentType: m.attachments[k].contentType ?? "application/octet-stream", data: files[k])
+            }
+            if !images.isEmpty { addInlineImages(images, for: id) }
+            return
+        }
+        guard let rid = m.remoteID, let backend = backends[m.accountID], !paused.contains(m.accountID) else { return }
         do { addInlineImages(try await backend.inlineImages(remoteID: rid, contentIDs: ids), for: id) } catch {
             if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load images: \(error.localizedDescription)" }
         }
+    }
+
+    /// The content ID by which a local message's HTML refers to its k-th file.
+    static func localContentID(_ k: Int) -> String { "file\(k)@local" }
+
+    static func localFileIndex(_ cid: String) -> Int? {
+        guard cid.hasPrefix("file"), cid.hasSuffix("@local") else { return nil }
+        return Int(cid.dropFirst(4).dropLast(6))
     }
 
     // MARK: Attachments

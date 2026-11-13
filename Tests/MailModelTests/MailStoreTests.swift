@@ -299,6 +299,22 @@ struct MailStoreTests {
         #expect(s.status?.hasPrefix("Couldn't send “(No Subject)”") == true, "status: \(s.status ?? "nil")")
     }
 
+    /// The draft kept after a failed send shows a picture placed in the text where it was placed.
+    @Test func failedSendKeepsPlacedPictureInItsPlace() async {
+        let s = store([])
+        s.merge([(.inbox, [])], account: work.id)
+        var d = Draft(accountID: work.id, to: "a@x.com", subject: "S", body: "Look:\n\u{FFFC}\nnice")
+        d.attachments = [DraftAttachment(name: "p.png", contentType: "image/png", data: Data([1, 2]))]
+        s.failed(PendingChange(account: work.id, change: .send(d), previous: []), "busy")
+        let kept = s.messages.first { $0.mailbox == .drafts }
+        let html = kept?.html ?? ""
+        #expect(kept?.body == "Look:\n\nnice")
+        let cid = try? #require(HTMLPage.contentIDs(in: html).first, "html: \(html)")
+        #expect(html.range(of: "Look:</div>\n<div><img src=\"cid:") != nil, "html: \(html)")
+        await s.loadInlineImages(for: kept!.id)
+        #expect(s.inlineImages(for: kept!.id)[cid ?? ""] == InlineImage(contentType: "image/png", data: Data([1, 2])))
+    }
+
     @Test func replyDraftQuotesOriginal() {
         let m = msg(work, subject: "Plans", from: "Ann")
         let s = store([m])

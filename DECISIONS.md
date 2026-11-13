@@ -754,3 +754,11 @@ edited: 2026-11-13
 - **Why:** existing tests (`exchangeAccountWithoutPasswordIsAServerAccount`, `signingInAgainConnectsTheSameAccount`) and the code's documented design say an account without a password keeps its changes queued until it is signed in again. Moving the send to Drafts would change those tests, which this run may not do.
 - **Not covered:** the queued message still goes out when the password is entered, maybe much later; the status line is the only notice.
 - **Alternatives:** keep it in Drafts like a failed send (rejected here: needs the two tests above changed; a product call for the user).
+
+## 04:11 — A kept draft shows its placed pictures from its own files {#d-bug-090}
+
+- **Status:** decided
+- **Context:** BUG-090. The local Drafts copy of a message whose send failed had only the plain text (`Draft.text`, marks removed), so its placed pictures moved to the end.
+- **Decision:** `keepInDrafts` also stores `Draft.html` with the placed pictures as `cid:file<k>@local` (k = index in its files); `loadInlineImages` answers such references of a message without `remoteID` from its kept files. `body` stays plain text for list, search and replies. No storage change: `html` and the files are already stored columns.
+- **Not covered:** local Send and Save Draft without a server (sample data) still store only the text; the picture also stays in the attachment list.
+- **Alternatives:** keep the U+FFFC marks in `body` (rejected: they would show as boxes in the list preview, search and quotes).
