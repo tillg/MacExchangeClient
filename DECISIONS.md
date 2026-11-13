@@ -649,3 +649,12 @@ edited: 2026-11-13
 - **Decision:** After the answer (or removal) went out, `moveToTrash` reads the folder list if it isn't known, as `.move` does, then moves the item. If the server can't be reached, is busy (its back-off is kept) or sign-in fails, the move is queued as an ordinary `.move(…, to: .trash)` with nothing to undo, so it goes with the next drain and the queued move keeps the item in Trash meanwhile. Any other failure means the server moved it already, as before: nothing happens.
 - **Why:** The folder list is read after the answer, not before: a failure before the answer would make `drain` undo an answer the user gave (`.reply` is never retried), while a failure after it must not undo an answer that went out.
 - **Not covered:** a queued follow-up move that Exchange later refuses shows "Exchange refused a change" (nothing is undone).
+
+## 03:15 — Greek accents are handled in the query, not the index {#d-bug-082}
+
+- **Status:** decided
+- **Context:** BUG-082. `unicode61 remove_diacritics 2` removes Latin diacritics only; "καλημερα" didn't find "Καλημέρα". Folding Greek in the index would need a custom tokenizer or a rebuild of the 180k-row index.
+- **Decision:** `matchExpression` turns a word with a Greek vowel into an OR group: the word without tonos, and with the tonos on each vowel in turn (a Greek word carries at most one). The index and on-disk data are unchanged.
+- **Why:** no migration, works on existing databases at once; at most a dozen prefix terms per Greek word.
+- **Not covered:** dialytika (ϊ, ϋ) in the indexed text aren't matched by a word typed without them.
+- **Alternatives:** A tokenizer that folds Greek (rejected: index rebuild, custom C tokenizer).

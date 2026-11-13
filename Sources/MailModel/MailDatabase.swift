@@ -233,7 +233,25 @@ public final class MailDatabase: @unchecked Sendable {
     static func matchExpression(_ text: String) -> String? {
         let terms = text.replacingOccurrences(of: "\u{0}", with: " ").split(whereSeparator: \.isWhitespace).filter { $0.contains { $0.isLetter || $0.isNumber } }
         guard !terms.isEmpty else { return nil }
-        return terms.map { "\"" + $0.replacingOccurrences(of: "\"", with: "\"\"") + "\"*" }.joined(separator: " ")
+        let quoted = { (s: String) in "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\"*" }
+        return terms.map { term in
+            let variants = greekVariants(String(term))
+            return variants.count == 1 ? quoted(variants[0]) : "(" + variants.map(quoted).joined(separator: " OR ") + ")"
+        }.joined(separator: " ")
+    }
+
+    private static let tonos: [Character: Character] = ["α": "ά", "ε": "έ", "η": "ή", "ι": "ί", "ο": "ό", "υ": "ύ", "ω": "ώ"]
+    private static let withoutTonos = Dictionary(uniqueKeysWithValues: tonos.map { ($1, $0) }).merging(["ΐ": "ι", "ΰ": "υ"]) { a, _ in a }
+
+    /// The index keeps Greek accents (the tokenizer removes Latin ones only). So a Greek word is looked for without
+    /// its tonos, and with the tonos on each of its vowels in turn: a Greek word carries at most one. Other words
+    /// are left as they are.
+    static func greekVariants(_ word: String) -> [String] {
+        let plain = word.lowercased().map { withoutTonos[$0] ?? $0 }
+        guard plain.contains(where: { tonos[$0] != nil }) else { return [word] }
+        return [String(plain)] + plain.indices.compactMap { i in
+            tonos[plain[i]].map { a in var v = plain; v[i] = a; return String(v) }
+        }
     }
 
     /// For tests: holds a write transaction open on the write connection while `body` runs.

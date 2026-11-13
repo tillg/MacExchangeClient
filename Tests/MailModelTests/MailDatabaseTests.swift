@@ -422,6 +422,17 @@ struct MailDatabaseTests {
         }
     }
 
+    /// Accents don't matter in Greek either, typed with or without the tonos; Latin keeps working.
+    @Test(arguments: [("καλημερα", "Καλημέρα σας"), ("αθηνα", "Ταξίδι στην Αθήνα"), ("ελληνικα", "ΕΛΛΗΝΙΚΆ"),
+                      ("ελληνικά", "ΕΛΛΗΝΙΚΑ"), ("καλημ", "Καλημέρα"), ("cafe", "Café"), ("zurich", "Zürich"),
+                      ("sao", "São Paulo")])
+    func searchIgnoresAccentsOfGreekToo(query: String, subject: String) throws {
+        let m = mail(subject)
+        let (db, url) = try searchable([m, mail("Other")])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        #expect(try db.search(query, accounts: nil) == [m.id], "\(query) → \(subject)")
+    }
+
     @Test func searchMatchesWordPrefixesNotFragments() throws {
         let m = mail("Rechnung März")
         let (db, url) = try searchable([m])
