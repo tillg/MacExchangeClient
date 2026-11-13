@@ -517,14 +517,16 @@ public struct ConversationRow: Equatable, Sendable {
     /// First names, newest first, each once: "Jan & Sergio", "Jan, Sergio & Till". "Gartner, Till" is Till; a sender
     /// without a name shows the address. A single sender shows the full name, as on a single message.
     static func senders<C: Collection>(_ contacts: C) -> String where C.Element == Contact {
-        var names: [String] = [], fullName: String?
+        // Senders are told apart by address (by name when there is none): two Jans are two senders (BUG-157).
+        var names: [String] = [], seen: Set<String> = [], fullName: String?
         for c in contacts {
             // A name of only commas and blanks ("Last, First" with both empty) counts as no name (BUG-156).
             let full = c.name.trimmingCharacters(in: .whitespaces.union(CharacterSet(charactersIn: ",")))
-            let first = full.isEmpty ? c.email
-                : full.contains(",") ? String(full.split(separator: ",").last!).trimmingCharacters(in: .whitespaces)
-                : String(full.split(separator: " ").first!)
-            if !names.contains(first) { names.append(first) }
+            // The first word, after the last comma of "Last, First (Org)"; any blank splits words (BUG-160).
+            let given = full.split(separator: ",").last.map(String.init) ?? full
+            let first = full.isEmpty ? c.email : given.split(whereSeparator: \.isWhitespace).first.map(String.init) ?? full
+            let person = c.email.isEmpty ? full.lowercased() : c.email.lowercased()
+            if seen.insert(person).inserted { names.append(first) }
             if fullName == nil { fullName = full.isEmpty ? c.email : full }
         }
         guard names.count > 1 else { return fullName ?? "" }

@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Conversation rows show first names also for names like \"Jikeli, Jan (mgm-tp)\", and two people with the same first name show as two (\"Jan & Jan\").",
             "A sender can no longer disguise an attachment's type with hidden characters in its name (a program shown as \"…pdf\").",
             "An email address entered with a blank before or after it no longer makes your own invitations show Accept and Decline.",
             "Erasing an unread message from Trash no longer lets its sender know that it was deleted unread.",

@@ -179,4 +179,19 @@ struct MailStoreConversationTests {
         #expect(s.listSelection == [row])
     }
 
+
+    /// BUG-157: two different people who share a first name are shown as one sender's full name, as for a single-sender row.
+    @Test func twoSendersWithTheSameFirstNameAreNotShownAsOne() {
+        let names = [Contact(name: "Jan Jikeli", email: "jan.j@x.com"), Contact(name: "Jan Müller", email: "jan.m@x.com")]
+        #expect(ConversationRow.senders(names) == "Jan & Jan")
+    }
+
+    /// BUG-160: The row shows senders' first names. Corporate display names "Last, First (Org)" and names with a no-break
+    /// space (which `Contact.initials` already handles) don't give the first name.
+    @Test func conversationSendersAreFirstNamesForCorporateAndNoBreakSpaceNames() {
+        let corp = [Contact(name: "Jikeli, Jan (mgm-tp)", email: "j@x.com"), Contact(name: "Lerena, Sergio Luis", email: "s@x.com")]
+        #expect(ConversationRow.senders(corp) == "Jan & Sergio")
+        let nbsp = [Contact(name: "Jan\u{00A0}Jikeli", email: "j@x.com"), Contact(name: "Bob Ray", email: "b@x.com")]
+        #expect(ConversationRow.senders(nbsp) == "Jan & Bob")
+    }
 }
