@@ -147,6 +147,17 @@ public struct SyncTokenRejected: Error, LocalizedError {
     public var errorDescription: String? { "The server no longer accepts this folder's sync position" }
 }
 
+/// The server refused some items of a batch and changed the others (e.g. one was deleted there meanwhile).
+/// The store then undoes only the refused items.
+public struct PartlyRefused: Error, LocalizedError {
+    /// The refused items' IDs, with the server's reason.
+    public var refused: [String: String]
+    /// For a move: the new IDs (old → new) of the items that did move.
+    public var moved: [String: String]
+    public init(refused: [String: String], moved: [String: String] = [:]) { self.refused = refused; self.moved = moved }
+    public var errorDescription: String? { refused.values.sorted().first }
+}
+
 /// The server rejected the credentials. Backends throw this so the store stops retrying: repeated
 /// wrong passwords lock domain accounts.
 public struct AuthenticationError: Error, LocalizedError {

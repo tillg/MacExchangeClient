@@ -70,7 +70,7 @@ Open Settings (⌘,) ▸ Accounts and sign in. The server can be a host name (`m
 
 Changes to Exchange mail show at once and are then written to the server in order: read state (without sending read receipts), flags, moves (Archive, Junk, Trash, drag & drop), deleting from Trash (recoverable on the server, like Outlook), Send and Save Draft.
 - Exchange knows only *flagged*, so flag colours stay on this Mac.
-- If the server refuses a change, it is undone and the reason shows under the window title.
+- If the server refuses a change, it is undone and the reason shows under the window title. When it refuses only some of the messages in a change (one was deleted there meanwhile), only those are undone; erasing a message that is already gone counts as done.
 - Offline, changes wait until the next refresh. When only one account's server can't be reached, only that account's changes wait; the others go out. A message that fails to send is never resent automatically. It is kept in Drafts on this Mac instead, with its attachments, also after a relaunch. A send that was on its way when the app quit or crashed isn't sent again either: at the next launch it is kept in Drafts, and the status asks you to check Sent.
 - Exchange messages can't be dragged to another account yet.
 

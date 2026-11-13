@@ -408,3 +408,17 @@ edited: 2026-11-13
 - **Decision:** The store notes size and modification date of every attachment file it writes. New `originalAttachmentFile` returns the opened file only while both are unchanged; otherwise it fetches the content again (local data or the server) into an `Original` folder beside it, checked the same way. Save, save panel, drag-out and Forward use it. Opening and Quick Look keep using the opened file, so the user's edits stay visible and aren't overwritten. A file from an earlier session (not noted) counts as changed and is fetched again.
 - **Why:** What's attached is the message's content, as on the server. Overwriting the opened copy would throw away the user's work.
 - **Alternatives:** Hash of the original (rejected: size and date catch every in-place save and need no extra read). Refetch on every save (rejected: an extra server round trip for the common unedited case).
+- **Not covered:** If the opened copy was changed and fetching the original fails (offline, paused account), Forward leaves that file out without a word, as for any file that can't be fetched (BUG-071).
+
+## 01:53 — A batch is judged per item {#d-bug-059}
+
+- **Status:** decided
+- **Context:** BUG-059. Read, flag, move and erase go to Exchange in batches of up to 100. Exchange changes each item on its own and answers with one response message per item, but one `ErrorItemNotFound` made the whole batch throw, so the store undid the change for all of them and lost the new IDs of moved items.
+- **Decision:**
+  - `EWSBackend` calls these operations non-strict and checks the answer per item (`checkBatch`). It requires one response message per item; an answer with fewer is an error for the whole batch, never a success.
+  - Refused items are thrown as the new MailModel error `PartlyRefused` (refused IDs with their reason, plus the new IDs of the items that moved). Protocol signatures stay as they are.
+  - `drain` applies the new IDs, then undoes only the refused items through `failed()`. It matches the change's IDs to `previous` by position, because an earlier move renames the IDs in the change but not in `previous`.
+  - On erase, `ErrorItemNotFound` counts as done: the item is gone either way.
+- **Why:** README: a refused change is undone. Here the server refused one item, not the other 99.
+- **Alternatives:** Return the refused items from each method (rejected: it changes every signature, and `move` already returns the new IDs). Treat items missing from a move's ID map as refused (rejected: a successful move may come back without a new ID).
+- **Not covered:** A transient per-item code (`ErrorServerBusy` inside one response message rather than as a fault) counts as a refusal of that item.

@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "When you mark, flag, move or erase several messages and one of them was already deleted on the server, the others keep your change.",
             "Forwarding or saving an attachment you opened and changed (for example a form filled in with Preview) uses the file as it came in the email, not your changed copy.",
             "With pictures from the internet blocked, opening an email no longer lets its sender find out through a hidden connection to their server.",
             "When one account's server can't be reached, your other accounts still send your messages and changes right away.",

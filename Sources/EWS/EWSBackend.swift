@@ -263,18 +263,43 @@ public struct EWSBackend: MailBackend {
     }
 
     public func setRead(_ ids: [String], _ read: Bool) async throws {
-        _ = try await client.call(Self.updateRequest(ids, field: "message:IsRead", value: "<t:IsRead>\(read)</t:IsRead>"))
+        _ = try Self.checkBatch(await client.call(Self.updateRequest(ids, field: "message:IsRead", value: "<t:IsRead>\(read)</t:IsRead>"),
+                                                  strict: false), ids: ids)
     }
 
     public func setFlagged(_ ids: [String], _ flagged: Bool) async throws {
-        _ = try await client.call(Self.flagRequest(ids, flagged: flagged))
+        _ = try Self.checkBatch(await client.call(Self.flagRequest(ids, flagged: flagged), strict: false), ids: ids)
     }
 
     public func move(_ ids: [String], to folder: RemoteFolder) async throws -> [String: String] {
-        Self.parseMove(try await client.call(Self.moveRequest(ids, to: folder.id)), ids: ids)
+        try Self.checkBatch(await client.call(Self.moveRequest(ids, to: folder.id), strict: false), ids: ids)
     }
 
-    public func delete(_ ids: [String]) async throws { _ = try await client.call(Self.deleteRequest(ids)) }
+    /// An item that is already gone counts as erased.
+    public func delete(_ ids: [String]) async throws {
+        _ = try Self.checkBatch(await client.call(Self.deleteRequest(ids), strict: false), ids: ids, done: ["ErrorItemNotFound"])
+    }
+
+    /// Exchange answers a batch with one response message per item, in request order, and changes each item on its
+    /// own. Returns the new IDs of moved items (old → new). Refused items are thrown as `PartlyRefused`, together
+    /// with the new IDs of those that moved. Codes in `done` count as success.
+    static func checkBatch(_ doc: XMLDocument, ids: [String], done: Set<String> = []) throws -> [String: String] {
+        let replies = doc.first("ResponseMessages")?.elementChildren ?? []
+        guard replies.count == ids.count else {
+            throw EWSError(code: "ErrorInvalidResponse", message: "Exchange answered \(replies.count) of \(ids.count) items")
+        }
+        var moved: [String: String] = [:], refused: [String: String] = [:]
+        for (id, reply) in zip(ids, replies) {
+            let code = reply.child("ResponseCode")?.stringValue ?? ""
+            if code == "NoError" || done.contains(code) {
+                if let new = reply.first("ItemId")?.attr("Id") { moved[id] = new }
+            } else {
+                refused[id] = "\(reply.child("MessageText")?.stringValue ?? "Request failed") (\(code))"
+            }
+        }
+        if !refused.isEmpty { throw PartlyRefused(refused: refused, moved: moved) }
+        return moved
+    }
 
     public func send(_ draft: Draft) async throws {
         guard !draft.attachments.isEmpty else { return _ = try await client.call(Self.createRequest(draft, send: true)) }

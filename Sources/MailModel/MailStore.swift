@@ -1019,6 +1019,14 @@ public final class MailStore {
                 if case .reply = p.change { failed(p, e.localizedDescription); continue }
                 status = "Offline – changes will be sent to Exchange later"
                 unreachable.insert(p.account)
+            } catch let e as PartlyRefused {
+                // The other items changed on the server: they keep the change (and moved ones their new IDs).
+                renameRemote(e.moved, account: p.account)
+                var refused = p
+                // `previous` follows the change's IDs in order; matched by position, as an earlier move renames the IDs.
+                refused.previous = zip(p.change.remoteIDs, p.previous.filter { $0.remoteID != nil })
+                    .filter { e.refused[$0.0] != nil }.map(\.1)
+                failed(refused, e.localizedDescription)
             } catch {
                 failed(p, error.localizedDescription)
             }

@@ -498,4 +498,83 @@ struct MailStoreSyncTests {
         #expect(s.outbox.map(\.change) == [.setRead(["A1"], true), .setFlagged(["A2"], true)], "A's changes wait in order")
         #expect(s.message(a1)?.isRead == true, "A's change isn't undone")
     }
+
+    // MARK: Batches with one refused item (BUG-059)
+
+    func ok(_ op: String, _ inner: String = "") -> String {  // file:// fixture
+        "<m:\(op)ResponseMessage ResponseClass=\"Success\"><m:ResponseCode>NoError</m:ResponseCode>\(inner)</m:\(op)ResponseMessage>"
+    }
+
+    func err(_ op: String, _ code: String) -> String {  // file:// fixture
+        "<m:\(op)ResponseMessage ResponseClass=\"Error\"><m:MessageText>\(code) text</m:MessageText><m:ResponseCode>\(code)</m:ResponseCode>"
+            + "<m:DescriptiveLinkKey>0</m:DescriptiveLinkKey></m:\(op)ResponseMessage>"
+    }
+
+    func response(_ op: String, _ messages: String) -> String {  // file:// fixture
+        envelope("<m:\(op)Response><m:ResponseMessages>\(messages)</m:ResponseMessages></m:\(op)Response>")
+    }
+
+    func movedItem(_ id: String) -> String { ok("MoveItem", "<m:Items><t:Message><t:ItemId Id=\"\(id)\" ChangeKey=\"CK\"/></t:Message></m:Items>") }
+
+    /// A store with one Exchange account whose server answers every request with `xml`.
+    func batchStore(_ xml: String, _ rids: [String], in box: MailboxKind = .inbox) throws -> MailStore {
+        let s = try store(answering: xml)
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .trash, id: "DEL"),
+                            RemoteFolder(role: .archive, id: "ARCH")], account: work.id)
+        s.apply(SyncResult(upserts: rids.map { var m = remote($0); m.mailbox = box; return m }, deletedRemoteIDs: [],
+                           token: "T1", more: false), account: work.id, mailbox: box)
+        return s
+    }
+
+    func waitForOutbox(_ s: MailStore) async throws {
+        for _ in 0..<250 where !s.outbox.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+    }
+
+    /// Exchange moved A and C and reports B as gone: the new IDs of A and C come back with the refusal of B.
+    @Test func moveKeepsTheNewIDsWhenOneItemIsRefused() async throws {
+        let b = backend(try responseFile(response("MoveItem", movedItem("N1") + err("MoveItem", "ErrorItemNotFound") + movedItem("N3"))))
+        do {
+            _ = try await b.move(["A", "B", "C"], to: RemoteFolder(role: .archive, id: "ARCH"))
+            Issue.record("B's refusal was not reported")
+        } catch let e as PartlyRefused {
+            #expect(e.moved == ["A": "N1", "C": "N3"])
+            #expect(Array(e.refused.keys) == ["B"])
+        }
+    }
+
+    /// Mark three as read; the server marks A and C and reports B as gone. Only B is undone here.
+    @Test func readBatchWithOneRefusedItemKeepsTheOthers() async throws {
+        let item = { (id: String) in self.ok("UpdateItem", "<m:Items><t:Message><t:ItemId Id=\"\(id)\" ChangeKey=\"K\"/></t:Message></m:Items>") }
+        let s = try batchStore(response("UpdateItem", item("A") + err("UpdateItem", "ErrorItemNotFound") + item("C")), ["A", "B", "C"])
+        s.toggleRead(Set(s.messages.map(\.id)))
+        try await waitForOutbox(s)
+        let read = Dictionary(uniqueKeysWithValues: s.messages.map { ($0.remoteID!, $0.isRead) })
+        #expect(read == ["A": true, "B": false, "C": true], "status: \(s.status ?? "")")
+        #expect(s.status?.contains("ErrorItemNotFound") == true)
+    }
+
+    /// Move three to the Archive; B is refused. A and C stay in the Archive with their new IDs, B goes back.
+    @Test func moveBatchWithOneRefusedItemKeepsTheOthersMoved() async throws {
+        let s = try batchStore(response("MoveItem", movedItem("N1") + err("MoveItem", "ErrorItemNotFound") + movedItem("N3")), ["A", "B", "C"])
+        s.move(Set(s.messages.map(\.id)), to: .archive)
+        try await waitForOutbox(s)
+        let where_ = Dictionary(uniqueKeysWithValues: s.messages.map { ($0.remoteID!, $0.mailbox) })
+        #expect(where_ == ["N1": .archive, "B": .inbox, "N3": .archive], "status: \(s.status ?? "")")
+    }
+
+    /// Erase three from Trash; the server reports one as already gone. All three are gone, nothing comes back.
+    @Test func eraseBatchWithOneItemAlreadyGoneErasesAll() async throws {
+        let s = try batchStore(response("DeleteItem", ok("DeleteItem") + err("DeleteItem", "ErrorItemNotFound") + ok("DeleteItem")),
+                               ["A", "B", "C"], in: .trash)
+        s.delete(Set(s.messages.map(\.id)))
+        try await waitForOutbox(s)
+        #expect(s.messages.isEmpty, "status: \(s.status ?? "")")
+        #expect(s.status == nil)
+    }
+
+    /// An answer with fewer response messages than items doesn't count the unanswered ones as changed.
+    @Test func batchAnswerMissingItemsIsNotSuccess() async throws {
+        let b = backend(try responseFile(response("UpdateItem", ok("UpdateItem"))))
+        await #expect(throws: (any Error).self) { try await b.setRead(["A", "B"], true) }
+    }
 }
