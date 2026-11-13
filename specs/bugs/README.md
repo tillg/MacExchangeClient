@@ -82,7 +82,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [242](BUG-242-sign-in-again-duplicates-account.md) | P3 | Accounts / AccountsSettings | Signing in again with the server or username written differently (capitals, :443, domain\me) adds a second copy of the account |
 | [243](BUG-243-ews-folder-url-doubled.md) | P3 | Accounts / ExchangeAccount | A server pasted as the EWS folder (https://host/EWS/ or host/ews) becomes https://host/EWS/EWS/Exchange.asmx |
 | [244](BUG-244-malformed-server-other-host.md) | P4 | Accounts / ExchangeAccount | A mistyped server (ftp://, https:/, https//, ?x, #x, port 99999) becomes a URL to another host or path instead of "Invalid server" |
-| [245](BUG-245-password-in-server-field-kept.md) | P3 | Accounts / ExchangeAccount, AccountsSettings | A password pasted inside the server URL (https://me:pw@host) is kept, saved in plain text in the preferences and shown in Settings |
 | [246](BUG-246-bare-ipv6-invalid.md) | P4 | Accounts / ExchangeAccount | An IPv6 address typed without brackets (2001:db8::1) is "Invalid server" |
 | [247](BUG-247-organisation-domain-spelling.md) | P4 | Privacy / RemoteImages | "My organisation" treats the same domain as foreign when it is spelled differently (bücher.de vs xn--bcher-kva.de, or work.com.) |
 | [248](BUG-248-search-notice-erases-other-notice.md) | P3 | MailStore / search | A search's notice ("Showing the newest 2,000 results", "Search failed") replaces a "Couldn't send" or sign-in notice, and clearing the search erases it for good |
