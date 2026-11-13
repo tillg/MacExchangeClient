@@ -641,3 +641,11 @@ edited: 2026-11-13
 - **Why:** the smallest change that round-trips every value and keeps the column format. Exchange can't deliver these characters (XML 1.0), so only pasted local text ever carries them.
 - **Not covered:** an old row whose value held a raw U+001D followed by 0, 1 or 2 reads with that pair decoded (it could only come from pasted text, which these characters already corrupted).
 - **Alternatives:** JSON columns (rejected: a migration of every row). Dropping the characters on write (rejected: loses text).
+
+## 03:12 — The move after an unsent answer reads the folder list and is queued when it can't go {#d-bug-136}
+
+- **Status:** decided
+- **Context:** BUG-136. After Do Not Send a Response or Remove from Calendar, `perform` moved the item to Deleted Items only if the folder list was already read, and ignored every failure. At launch and on the first check, waiting changes go out before the folder list is read, so the item stayed in Exchange's Inbox and came back here.
+- **Decision:** After the answer (or removal) went out, `moveToTrash` reads the folder list if it isn't known, as `.move` does, then moves the item. If the server can't be reached, is busy (its back-off is kept) or sign-in fails, the move is queued as an ordinary `.move(…, to: .trash)` with nothing to undo, so it goes with the next drain and the queued move keeps the item in Trash meanwhile. Any other failure means the server moved it already, as before: nothing happens.
+- **Why:** The folder list is read after the answer, not before: a failure before the answer would make `drain` undo an answer the user gave (`.reply` is never retried), while a failure after it must not undo an answer that went out.
+- **Not covered:** a queued follow-up move that Exchange later refuses shows "Exchange refused a change" (nothing is undone).

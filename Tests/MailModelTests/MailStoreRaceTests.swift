@@ -78,6 +78,27 @@ enum RX {
     static func updated(_ ids: [String]) -> String {
         resp("UpdateItem", ids.map { ok("UpdateItem", "<m:Items><t:Message><t:ItemId Id=\"\($0)\" ChangeKey=\"CK\"/></t:Message></m:Items>") }.joined())
     }
+    /// Throttling, as Exchange sends it: ErrorServerBusy with a back-off.
+    static let busy = """
+        <?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>\
+        <s:Fault><faultcode xmlns:a="http://schemas.microsoft.com/exchange/services/2006/types">a:ErrorServerBusy</faultcode>\
+        <faultstring xml:lang="en-US">The server cannot service this request right now. Try again later.</faultstring>\
+        <detail><e:ResponseCode xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">ErrorServerBusy</e:ResponseCode>\
+        <t:MessageXml xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"><t:Value Name="BackOffMilliseconds">60000</t:Value></t:MessageXml>\
+        </detail></s:Fault></s:Body></s:Envelope>
+        """
+    /// The answer to AcceptItem/DeclineItem (CreateItem) or RemoveItem.
+    static let answered = resp("CreateItem", ok("CreateItem", "<m:Items/>"))
+    static func movedInvite(_ new: String) -> String {
+        resp("MoveItem", ok("MoveItem", "<m:Items><t:MeetingRequest><t:ItemId Id=\"\(new)\" ChangeKey=\"CK\"/></t:MeetingRequest></m:Items>"))
+    }
+    static let standardFolders = resp("GetFolder", [("INBOX", "Inbox"), ("DRAFTS", "Drafts"), ("SENT", "Sent Items"),
+                                                    ("JUNK", "Junk Email"), ("DEL", "Deleted Items"), ("OUTBOX", "Outbox")].map { id, name in
+        ok("GetFolder", "<m:Folders><t:Folder><t:FolderId Id=\"\(id)\" ChangeKey=\"AQ\"/><t:DisplayName>\(name)</t:DisplayName>"
+            + "<t:TotalCount>0</t:TotalCount></t:Folder></m:Folders>")
+    }.joined())
+    static let noFolders = resp("FindFolder", ok("FindFolder", "<m:RootFolder IndexedPagingOffset=\"0\" TotalItemsInView=\"0\" "
+        + "IncludesLastItemInRange=\"true\"><t:Folders/></m:RootFolder>"))
     static func textMessage(_ id: String, subject: String, body: String) -> String {
         "<t:Message><t:ItemId Id=\"\(id)\" ChangeKey=\"CK\"/><t:Subject>\(subject)</t:Subject>"
             + "<t:Body BodyType=\"Text\">\(body)</t:Body><t:Attachments/>"
@@ -209,5 +230,76 @@ struct MailStoreRaceTests {
         try #require(s.status == nil, "the body request failed: \(s.status ?? "")")
         let m = try #require(s.message(id))
         #expect(m.body == "new text" && !m.needsBody, "subject \(m.subject), body \(m.body), needsBody \(m.needsBody)")
+    }
+
+    // MARK: The move to Trash after an unsent answer or a removal (BUG-136)
+
+    func invite(cancel: Bool = false) -> Invite {
+        Invite(start: Date(timeIntervalSince1970: 1_795_428_000), end: Date(timeIntervalSince1970: 1_795_431_600),
+               location: "Room 1", organizer: Contact(name: "Org", email: "org@work.com"), isCancellation: cancel)
+    }
+
+    func inviteMessage(_ rid: String, cancel: Bool = false) -> Message {
+        var m = Message(accountID: acct.id, mailbox: .inbox, from: Contact(name: "Org", email: "org@work.com"),
+                        to: [Contact(name: "Me", email: "me@work.com")], subject: cancel ? "Canceled: Sync" : "Sync",
+                        body: "Let's meet", date: Date(timeIntervalSince1970: 1_000_000), remoteID: rid, bodyLoaded: true,
+                        invite: invite(cancel: cancel))
+        m.htmlChecked = true
+        return m
+    }
+
+    /// A store whose folder list hasn't been read yet, as right after launch.
+    func storeWithoutFolders(_ server: RaceServer) -> MailStore {
+        let s = MailStore(accounts: [], messages: [])
+        s.add(acct, backend: EWSBackend(client: EWSClient(url: server.url, username: "u", password: "p")))
+        return s
+    }
+
+    /// Do Not Send a Response before the folder list is read: it is read, and the invite moves to Deleted Items.
+    @Test func doNotSendBeforeTheFolderListStillMovesTheInvite() async throws {
+        let server = RaceServer([RX.answered, RX.standardFolders, RX.noFolders, RX.movedInvite("M-T")])
+        defer { server.stop() }
+        let s = storeWithoutFolders(server)
+        s.merge([inviteMessage("M")], account: acct.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        s.respond(InviteReply(response: .decline, send: false), to: id)
+        try await waitFor(.seconds(10)) { s.message(id)?.remoteID == "M-T" && s.outbox.isEmpty }
+        #expect(s.message(id)?.remoteID == "M-T", "rid \(s.message(id)?.remoteID ?? ""), requests \(server.served), status \(s.status ?? "nil")")
+        #expect(s.message(id)?.mailbox == .trash)
+    }
+
+    /// Remove from Calendar queued offline last session, sent at launch before any folder list is read.
+    @Test func removeFromCalendarSentAtLaunchMovesTheCancellation() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("race-db-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dbURL = dir.appendingPathComponent("Mail.sqlite")
+        let s1 = MailStore(accounts: [acct], messages: [])  // no backend: the change stays queued
+        s1.merge([inviteMessage("C", cancel: true)], account: acct.id, mailbox: .inbox)
+        s1.removeFromCalendar(s1.messages[0].id)
+        try MailDatabase(url: dbURL).write(s1.takeChanges().resolved())
+        let server = RaceServer([RX.answered, RX.standardFolders, RX.noFolders, RX.movedInvite("C-T")])
+        defer { server.stop() }
+        let db = try MailDatabase(url: dbURL)
+        let s = storeWithoutFolders(server)
+        s.restore(try db.meta())
+        s.finishLoading(try db.messages())
+        try await waitFor(.seconds(10)) { s.messages.first?.remoteID == "C-T" && s.outbox.isEmpty }
+        let m = try #require(s.messages.first)
+        #expect(m.remoteID == "C-T", "rid \(m.remoteID ?? ""), requests \(server.served), status \(s.status ?? "nil")")
+        #expect(m.mailbox == .trash)
+    }
+
+    /// Exchange is busy when the follow-up move goes out: the move stays queued (the answer itself went out).
+    @Test func aBusyServerKeepsTheMoveAfterAnUnsentAnswerQueued() async throws {
+        let server = RaceServer([RX.answered, RX.busy])
+        defer { server.stop() }
+        let s = store(server)
+        s.merge([inviteMessage("M")], account: acct.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        s.respond(InviteReply(response: .accept, send: false), to: id)
+        try await waitFor(.seconds(10)) { server.served == 2 && s.outbox.allSatisfy { if case .move = $0.change { true } else { false } } }
+        #expect(s.outbox.map(\.change) == [.move(["M"], to: .trash)], "outbox \(s.outbox.map(\.change)), status \(s.status ?? "nil")")
+        #expect(s.message(id)?.mailbox == .trash && s.message(id)?.invite?.reply?.response == .accept)
     }
 }

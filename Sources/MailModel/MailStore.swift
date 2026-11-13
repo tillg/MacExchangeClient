@@ -1188,6 +1188,20 @@ public final class MailStore {
         prune()
     }
 
+    /// Moves an answered invite (or a removed cancellation) to Deleted Items after its answer went out, reading the
+    /// folder list first if it isn't known yet. If the server already moved it, the move fails and nothing else
+    /// happens. If the server can't be reached or is busy, the move is queued as an ordinary change and goes later.
+    private func moveToTrash(_ id: String, account: UUID, _ b: any MailBackend) async {
+        do {
+            if remoteFolders[account] == nil { setRemoteFolders(try await b.folders(), account: account) }
+            guard let trash = remoteFolders[account]?.first(where: { $0.role == .trash }) else { return }
+            renameRemote(try await b.move([id], to: trash), account: account)
+        } catch where error is URLError || error is ServerBusy || error is AuthenticationError {
+            if let wait = (error as? ServerBusy)?.retryAfter { busyUntil[account] = Date.now.addingTimeInterval(wait) }
+            outbox.append(PendingChange(account: account, change: .move([id], to: .trash), previous: []))
+        } catch {}
+    }
+
     /// A change reached the server: answers requested before now don't undo it (`written`).
     private func noteWritten(_ c: ServerChange, _ ids: [String], account: UUID) {
         let g = Guarded(c)
@@ -1242,18 +1256,11 @@ public final class MailStore {
         case let .reply(id, r):
             try await b.respond(id, r)
             // Without a sent answer Exchange may leave the invite in the Inbox; move it like the others.
-            // If the server already moved it, that fails harmlessly.
-            if !r.send, let trash = remoteFolders[p.account]?.first(where: { $0.role == .trash }),
-               let map = try? await b.move([id], to: trash) {
-                renameRemote(map, account: p.account)
-            }
+            if !r.send { await moveToTrash(id, account: p.account, b) }
         case let .removeFromCalendar(id):
             try await b.removeFromCalendar(id)
-            // Like an unsent answer: if Exchange leaves the cancellation in the Inbox, move it; if not, this fails harmlessly.
-            if let trash = remoteFolders[p.account]?.first(where: { $0.role == .trash }),
-               let map = try? await b.move([id], to: trash) {
-                renameRemote(map, account: p.account)
-            }
+            // Like an unsent answer: if Exchange leaves the cancellation in the Inbox, move it.
+            await moveToTrash(id, account: p.account, b)
         }
     }
 

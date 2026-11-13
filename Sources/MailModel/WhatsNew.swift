@@ -15,6 +15,7 @@ public enum WhatsNew {
             "Moving your mail into the new storage no longer fails when a copy of the old mail file from an earlier move is still there.",
             "Names and file names with unusual hidden characters no longer split into several recipients or attachments after you restart the app.",
             "Text pasted with a hidden control character is no longer cut off at that point when it is saved, and searching for it no longer fails.",
+            "An invitation you answer without sending a response, or a cancelled meeting you remove from your calendar, now also leaves the Inbox on the server, also right after the app starts or when the server is busy, so it doesn't come back.",
             "A reply to a meeting invitation, such as \"Accepted: …\", no longer shows Accept and Decline buttons as if it were an invitation.",
             "Mail brought over from the app's old storage now learns which conversation it belongs to, so opening it shows its replies.",
             "A folder no longer shows twice in the sidebar when folders change on the server while the list is read.",
