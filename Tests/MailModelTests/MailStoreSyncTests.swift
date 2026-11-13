@@ -956,4 +956,39 @@ struct MailStoreSyncTests {
         s.apply(SyncResult(upserts: [t1], deletedRemoteIDs: [], token: "d1", more: false), account: work.id, mailbox: .trash)
         #expect(s.count(.account(work.id, .trash)) == 1, "trash \(s.messages.filter { $0.mailbox == .trash }.compactMap(\.remoteID))")
     }
+
+    // MARK: A message changed on the server drops its loaded body (BUG-103)
+
+    /// A draft opened here and then edited elsewhere: the Drafts sync brings another subject and preview; the old
+    /// body isn't kept, so the new text is fetched when it is shown, also after a relaunch.
+    @Test func draftEditedOnTheServerShowsItsNewText() throws {
+        let url = tempURL(); defer { cleanup(url) }
+        let s = MailStore(accounts: [work], messages: [])
+        var v1 = remote("D1"); v1.subject = "Offer v1"; v1.serverPreview = "Price 100"
+        s.apply(SyncResult(upserts: [v1], deletedRemoteIDs: [], token: "d1", more: false), account: work.id, mailbox: .drafts)
+        let id = s.messages[0].id
+        s.setBody(MessageBody(text: "Price 100", attachments: [Attachment(name: "v1.pdf", size: 1000, contentType: "application/pdf")]), for: id)
+        var v2 = remote("D1"); v2.subject = "Offer v2"; v2.serverPreview = "Price 250"; v2.hasAttachments = true
+        s.apply(SyncResult(upserts: [v2], deletedRemoteIDs: [], token: "d2", more: false), account: work.id, mailbox: .drafts)
+        try MailDatabase(url: url).write(s.takeChanges())
+        let m = try #require(try launch([work], from: url).message(id))
+        #expect(m.subject == "Offer v2")
+        #expect(m.needsBody, "subject 'Offer v2' with body '\(m.body)'")
+    }
+
+    /// Only the text changed (same subject): the preview tells.
+    @Test func editedTextWithTheSameSubjectDropsTheLoadedBody() {
+        let s = MailStore(accounts: [work], messages: [])
+        s.apply(page(["A"], token: "t0"), account: work.id, mailbox: .inbox)
+        let a = id(s, "A")
+        s.setBody(MessageBody(text: "Old text", attachments: []), for: a)
+        var v2 = remote("A"); v2.serverPreview = "New text"
+        s.apply(SyncResult(upserts: [v2], deletedRemoteIDs: [], token: "t1", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.needsBody == true)
+        // Control: an unchanged summary (read on the phone) keeps the body.
+        s.setBody(MessageBody(text: "New text", attachments: []), for: a)
+        var read = v2; read.isRead = true
+        s.apply(SyncResult(upserts: [read], deletedRemoteIDs: [], token: "t2", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.needsBody == false && s.message(a)?.body == "New text")
+    }
 }

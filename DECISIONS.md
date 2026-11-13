@@ -612,7 +612,15 @@ edited: 2026-11-13
 
 - **Status:** decided
 - **Context:** BUG-140. `loadBody` stored whatever `GetItem` returned, also when a sync had meanwhile brought a new version of the item (a draft edited elsewhere keeps its ItemId): old text under the new subject, marked loaded for good.
-- **Decision:** `loadBody` notes the summary's subject and preview when it asks; if either changed by the time the answer is in, the answer is dropped and the body is asked for again, up to three times in all (then it stays to be fetched, as before it was shown). A change of the server ID alone (a move's rename) doesn't count: the content is the same.
+- **Decision:** `loadBody` notes the summary's preview (the start of the text) when it asks; if it changed by the time the answer is in, the answer is dropped and the body is asked for again, up to three times in all (then it stays to be fetched, as before it was shown). A change of the server ID alone (a move's rename) doesn't count: the content is the same.
 - **Why:** The view loads the body once per selection (`task(id:)`); dropping the answer without asking again would leave the message without text until it is selected again.
-- **Not covered:** an edit that changes neither subject nor the first 255 characters (Exchange's `Preview`) isn't seen; the summaries carry no change key (see d-bug-103).
+- **Not covered:** an edit past the first 255 characters (Exchange's `Preview`) isn't seen; the summaries carry no change key (see d-bug-103).
 - **Test:** the race tests of BUG-139 use a static response file instead of the probe's FIFO (only the order of local calls matters there); with three FIFO tests running beside `EWSFlowTests`' FIFO server, one of either suite timed out in about every second full run.
+
+## 03:03 — A summary with another preview drops the loaded body {#d-bug-103}
+
+- **Status:** decided
+- **Context:** BUG-103. `merge` kept a loaded body for every later summary, so a draft edited in Outlook (same ItemId) showed its old text and files for good. d-bug-057 already drops the body when the summary names other people; otherwise it keeps the body and the addresses only the body knows.
+- **Decision:** The body is also dropped (and fetched again when shown) when the summary's preview (Exchange's `Preview`, the first 255 characters of the text) differs from the one the message had. A message without a known preview (older caches) keeps its body. A changed subject alone doesn't count: the existing test `applyUpdatePreservesLocalIDSelectionAndLoadedBody` pins that an update with a new subject keeps the body, and the body's text is still right then. The same signal is used for a body on its way (d-bug-140).
+- **Why:** ChangeKey or LastModifiedTime aren't in the summaries or the stored message (a new stored field and a migration), and they change on any update, including this app's own Mark as Read: every opened message would lose its body at the next check, BUG-057's symptom again. The preview changes only when the text does.
+- **Not covered:** an edit past the first 255 characters, or of the attachments only, with the same start of text, keeps the old body.

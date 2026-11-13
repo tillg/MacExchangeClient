@@ -803,9 +803,11 @@ public final class MailStore {
                     m.id = old.id
                     if old.flag != nil && m.flag != nil { m.flag = old.flag }  // the server has no colours
                     // What only the body knows is kept: addresses (summaries may carry names only) and the
-                    // attachment list with its paperclip. Unless the summary names other people: then the message
-                    // changed on the server (a draft edited elsewhere), and its body is fetched again when shown.
-                    if old.bodyLoaded && !m.bodyLoaded, let from = Self.keeping([m.from], old: [old.from])?.first,
+                    // attachment list with its paperclip. Unless the summary names other people or has another preview
+                    // (the start of the text): then the message changed on the server (a draft edited elsewhere), and
+                    // its body is fetched again when shown.
+                    if old.bodyLoaded && !m.bodyLoaded, old.serverPreview == nil || m.serverPreview == old.serverPreview,
+                       let from = Self.keeping([m.from], old: [old.from])?.first,
                        let to = Self.keeping(m.to, old: old.to), let cc = Self.keeping(m.cc, old: old.cc) {
                         m.body = old.body; m.attachments = old.attachments; m.invite = old.invite; m.bodyLoaded = true
                         m.html = old.html; m.htmlChecked = old.htmlChecked
@@ -1487,15 +1489,15 @@ public final class MailStore {
     public func setDayEvents(_ events: [CalendarEvent], for id: Message.ID) { dayEvents[id] = events }
 
     /// Fetches the body of a server message the first time it is shown. If the server's version of the message changed
-    /// while the body was on its way (another subject or preview: a draft edited elsewhere), that body is the old
-    /// version's: it is asked for again, up to three times.
+    /// while the body was on its way (another preview: a draft edited elsewhere), that body is the old version's: it is
+    /// asked for again, up to three times.
     public func loadBody(_ id: Message.ID) async {
         for _ in 0..<3 {
             guard let m = message(id), m.needsBody, let rid = m.remoteID, let backend = backends[m.accountID],
                   !paused.contains(m.accountID) else { return }
             do {
                 let b = try await backend.body(remoteID: rid)
-                guard let now = message(id), now.subject == m.subject, now.serverPreview == m.serverPreview else { continue }
+                guard let now = message(id), now.serverPreview == m.serverPreview else { continue }
                 setBody(b, for: id)
                 return
             } catch {

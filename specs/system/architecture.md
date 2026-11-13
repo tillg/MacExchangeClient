@@ -110,7 +110,7 @@ flowchart LR
   and the rule above removes what is gone. Once per folder and session: a second rejection puts the folder on the
   history's failed list with a status instead.
 - Bodies, inline images, calendar days, attachment content and MailTips are fetched on demand by the views. A body
-  whose message got another subject or preview from the server while it was on its way (`loadBody`) is the old
+  whose message got another preview from the server while it was on its way (`loadBody`) is the old
   version's: it is dropped and asked for again, up to three requests in all.
 
 ## Writing to the server: the outbox
