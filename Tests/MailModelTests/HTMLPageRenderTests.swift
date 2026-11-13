@@ -78,6 +78,34 @@ struct HTMLPageRenderTests {
         #expect(r == "560|600", "picture width|page scroll width = \(r)")
     }
 
+    /// A mail that refreshes or links to `about:blank` must not replace itself with an empty page; the app's own
+    /// loads (a second one when remote content is allowed) still show.
+    @Test func mailCannotNavigateToAnEmptyPage() async {
+        let config = WKWebViewConfiguration()
+        config.defaultWebpagePreferences.allowsContentJavaScript = false
+        config.websiteDataStore = .nonPersistent()
+        let v = WKWebView(frame: NSRect(x: 0, y: 0, width: 600, height: 1), configuration: config)
+        let delegate = NavigationDelegate()
+        v.navigationDelegate = delegate
+        func load(_ mail: String) async {
+            delegate.navigation.willLoad()
+            v.loadHTMLString(HTMLPage.document(mail, allowRemote: false), baseURL: nil)
+            try? await Task.sleep(for: .milliseconds(200))
+            while v.isLoading { try? await Task.sleep(for: .milliseconds(50)) }
+            try? await Task.sleep(for: .milliseconds(600))
+        }
+        func text() async -> String { (try? await v.evaluateJavaScript("document.body ? document.body.innerText.trim() : ''")) as? String ?? "nil" }
+        await load(#"<p>Your invoice 4711</p><meta http-equiv="refresh" content="0;url=about:blank">"#)
+        #expect(await text() == "Your invoice 4711")
+        await load(#"<p>Second load</p><a id="a" href="about:blank">x</a>"#)
+        #expect(await text().hasPrefix("Second load"))
+        _ = try? await v.evaluateJavaScript("document.getElementById('a').click(); 1")
+        try? await Task.sleep(for: .milliseconds(600))
+        #expect(await text().hasPrefix("Second load"))
+        #expect(delegate.navigation.decide(url: URL(string: "https://x.example/a"), linkActivated: true) == .open(URL(string: "https://x.example/a")!))
+        #expect(delegate.navigation.decide(url: URL(string: "file:///etc/passwd"), linkActivated: true) == .cancel)
+    }
+
     nonisolated static let blockedVectors: [String] = [
         #"<link rel="preconnect" href="BASE/preconnect">"#,
         "<link/\u{301} rel=preconnect href=BASE/preconnect-mark>",
@@ -106,6 +134,20 @@ struct HTMLPageRenderTests {
         try? await Task.sleep(for: .milliseconds(1200))
         #expect(server.connections == 0, "\(vector): connections \(server.connections), requests \(server.requests)")
         _ = view
+    }
+}
+
+/// Hands WebKit's navigation questions to `BodyNavigation`, as `MailWebView`'s coordinator does.
+@MainActor
+final class NavigationDelegate: NSObject, WKNavigationDelegate {
+    let navigation = BodyNavigation()
+
+    func webView(_ v: WKWebView, didCommit navigation: WKNavigation!) { self.navigation.didCommit() }
+
+    func webView(_ v: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
+        let d = navigation.decide(url: action.request.url, linkActivated: action.navigationType == .linkActivated)
+        decisionHandler(d == .allow ? .allow : .cancel)
     }
 }
 

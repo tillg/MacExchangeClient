@@ -49,12 +49,14 @@ private struct MailWebView: NSViewRepresentable {
         // updateNSView runs on every store change; reloading would flicker and reset the page.
         guard context.coordinator.loaded != inputs else { return }
         context.coordinator.loaded = inputs
+        context.coordinator.navigation.willLoad()
         v.loadHTMLString(HTMLPage.document(html, allowRemote: allowRemote, inline: inline), baseURL: nil)
     }
 
     @MainActor final class Coordinator: NSObject, WKNavigationDelegate {
         var parent: MailWebView
         var loaded: Inputs?
+        let navigation = BodyNavigation()
         init(_ parent: MailWebView) { self.parent = parent }
 
         func measure(_ v: WKWebView) {
@@ -71,13 +73,15 @@ private struct MailWebView: NSViewRepresentable {
 
         func webView(_ v: WKWebView, didFinish navigation: WKNavigation!) { measure(v) }
 
+        func webView(_ v: WKWebView, didCommit navigation: WKNavigation!) { self.navigation.didCommit() }
+
         func webView(_ v: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
-            if action.request.url?.absoluteString == "about:blank" { return decisionHandler(.allow) }
-            if action.navigationType == .linkActivated, let url = action.request.url, HTMLPage.opensLink(url.absoluteString) {
-                NSWorkspace.shared.open(url)
+            switch navigation.decide(url: action.request.url, linkActivated: action.navigationType == .linkActivated) {
+            case .allow: decisionHandler(.allow)
+            case .open(let url): NSWorkspace.shared.open(url); decisionHandler(.cancel)
+            case .cancel: decisionHandler(.cancel)
             }
-            decisionHandler(.cancel)  // links, redirects, meta refresh, frames
         }
     }
 }

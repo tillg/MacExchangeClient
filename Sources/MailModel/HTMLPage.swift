@@ -103,6 +103,31 @@ public enum HTMLPage {
     }
 }
 
+/// What the body's web view lets happen: only the page the app loads, never a navigation the mail starts. A load
+/// from a string arrives as `about:blank`, so that URL is allowed only between `willLoad()` and the load's commit;
+/// afterwards a meta refresh or link to `about:blank` would replace the message with an empty page.
+@MainActor public final class BodyNavigation {
+    public enum Decision: Equatable { case allow, cancel, open(URL) }
+
+    private var loading = false
+
+    public init() {}
+
+    /// Call right before each load of a page.
+    public func willLoad() { loading = true }
+
+    /// Call when a load commits: from then on everything is the mail's doing.
+    public func didCommit() { loading = false }
+
+    /// Clicked links open in the default app if `HTMLPage.opensLink`; links, redirects, meta refresh and frames
+    /// are cancelled.
+    public func decide(url: URL?, linkActivated: Bool) -> Decision {
+        if loading, url?.absoluteString == "about:blank" { return .allow }
+        if linkActivated, let url, HTMLPage.opensLink(url.absoluteString) { return .open(url) }
+        return .cancel
+    }
+}
+
 /// Outlook's "Download external images" setting. Images load straight from the sender's server, which tells
 /// the sender the mail was opened and from where. There is no relay like Mail Privacy Protection.
 public enum RemoteImages: String, CaseIterable, Sendable {

@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "An email can no longer blank out its own text when you open it.",
             "Photos sent from Apple Mail or an iPhone fit the window instead of showing only a corner of a huge picture.",
             "A note that a message couldn't be sent, or that one account couldn't be checked, stays under the window title instead of vanishing at the next check of another account.",
             "Quoted text in replies from Apple Mail and iPhone shows with Mail's coloured bar on the left, so you can tell it from the new text.",
