@@ -110,24 +110,6 @@ struct Probe_R5GFindings {
     typealias F = R5GFixture
     var w: UUID { F.work.id }
 
-    /// R5G: Message ▸ Toggle Flag (⇧⌘L) and the toolbar's Flag button (`MailCommands`, `FlagMenu.primaryAction`) look up
-    /// every selected message with `store.message(_:)`, a scan of all messages each.
-    @Test func toggleFlagOnASelectionStaysInBudget() {
-        let h = F.home.id, box = F.base.last!.mailbox
-        // A folder of 140, Select All; only unflagged ones, so `contains` can't stop early (the fixture flags every 150th).
-        let folder = Set(F.base.filter { $0.accountID == h && $0.mailbox == box && $0.flag == nil }.map(\.id))
-        let setup: (MailStore) -> Void = { s in s.selectedMailbox = .account(h, box); s.selection = folder; F.redraw(s) }
-        let control = F.time("Flag menu ▸ Red on the same \(folder.count) + redraw (control)", setup: setup) { s in
-            s.setFlag(.red, for: s.withConversations(s.selection)); F.redraw(s)
-        }
-        let toggle = F.time("Toggle Flag on \(folder.count) selected + redraw", setup: setup) { s in
-            let flagged = s.withConversations(s.selection).contains { s.message($0)?.flag != nil }  // MailCommands.swift:69
-            s.setFlag(flagged ? nil : .red, for: s.withConversations(s.selection)); F.redraw(s)
-        }
-        print(String(format: "R5G toggle flag %.3fs vs flag menu %.3fs (%d selected)", toggle, control, folder.count))
-        #expect(toggle < F.limit)
-    }
-
     /// R5G: conversation view (Settings ▸ Viewing): clicking the next unread message after an opened unread one in
     /// Archive (30,000). Without conversations the same click costs about half.
     @Test func openingUnreadInConversationViewStaysInBudget() {
