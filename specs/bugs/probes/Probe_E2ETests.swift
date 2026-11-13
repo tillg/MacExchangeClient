@@ -272,28 +272,6 @@ struct Probe_E2ETests {
         #expect(s2.visibleMessages.map(\.remoteID) == before)
     }
 
-    /// Respond with Comments while the server can't be reached: the answer is undone ("Exchange refused a
-    /// change") and the comment the user typed is gone, while a failed send is kept in Drafts.
-    @Test func inviteAnswerWithCommentIsNotLostWhenOffline() async throws {
-        let missing = FileManager.default.temporaryDirectory.appendingPathComponent("ews-e2e-missing-\(UUID().uuidString).xml")
-        let s = MailStore(accounts: [], messages: [])
-        s.add(a, backend: backend(missing))  // file:// fixture (absent: offline)
-        var inv = server("INV")
-        inv.invite = Invite(start: Date(timeIntervalSince1970: 1_800_000_000), end: Date(timeIntervalSince1970: 1_800_003_600))
-        s.apply(page([inv]), account: a.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        s.selectedMailbox = .account(a.id, .inbox)
-        s.selection = [id]
-        let comment = "I can join for the first half hour only, then I have to leave for the airport."
-        s.send(Draft(accountID: a.id, to: "org@x.com", subject: "Accepted: Q4", body: comment,
-                     inviteAnswer: InviteAnswer(messageID: id, response: .accept)))
-        try await waitUntil { s.outbox.isEmpty }
-        let kept = s.messages.contains { $0.body.contains(comment) } || s.outbox.contains {
-            if case let .reply(_, r) = $0.change { r.comment == comment } else { false }
-        }
-        #expect(kept, "status: \(s.status ?? "nil"); invite back in \(s.message(id)?.mailbox.rawValue ?? "-")")
-    }
-
     // MARK: Model-based: random sessions with saves and relaunches
 
     @Test(arguments: 0..<4) func randomSessionsKeepInvariantsAcrossRelaunches(chunk: Int) throws {

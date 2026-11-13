@@ -157,6 +157,9 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
   If the invite has left the store before Send (deleted by a sync, erased), `send` returns false: the status says
   "Couldn't send “…”: the invitation is no longer in your mailbox.", the window stays open with the comment and
   shows it in an alert.
+- An answer that fails (refused, or a network error: it may have gone out, so it isn't repeated) is undone. If it had
+  a comment, the comment is kept in Drafts on this Mac, to the organizer with the answer's subject, and the status
+  says "Couldn't send your answer to “…”: … Your comment is in Drafts on this Mac."
 - Any answer or Remove from Calendar moves the message to Trash locally at once. An invite answered while it is one
   of several selected messages leaves the selection (`keepingSelectionVisible`), so Delete can't erase it unseen.
 
