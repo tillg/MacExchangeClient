@@ -132,7 +132,7 @@ struct ViewOptionsMenu: View {
         Menu {
             Toggle("Show Contact Photo", isOn: $showPhoto)
         } label: {
-            Label("View Options", systemImage: "line.3.horizontal")
+            Label("View Options", systemImage: "ellipsis.circle")  // MainWindow.toolbar (BUG-231)
         }
         .help("View Options")
     }
@@ -193,7 +193,7 @@ struct FlagMenu: View {
         } primaryAction: {
             store.toggleFlag(store.withConversations(store.selection))
         }
-        .help("Flag selected messages")
+        .help("Flag selected messages as Red")  // Mail's SetFlaggedStatusToolTipFormat; a click flags red (BUG-231)
     }
 }
 
