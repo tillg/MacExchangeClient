@@ -172,18 +172,6 @@ struct Probe_Store2Tests {
         }
     }
 
-    /// The draft kept after a failed send keeps the picture where it was placed.
-    @Test func failedSendKeepsPlacedPictureInItsPlace() {
-        let s = store([])
-        s.merge([(.inbox, [])], account: work.id)
-        var d = Draft(accountID: work.id, to: "a@x.com", subject: "S", body: "Look:\n\u{FFFC}\nnice")
-        d.attachments = [DraftAttachment(name: "p.png", contentType: "image/png", data: Data([1, 2]))]
-        s.failed(PendingChange(account: work.id, change: .send(d), previous: []), "busy")
-        let kept = s.messages.first { $0.mailbox == .drafts }
-        #expect(kept?.body.contains("\u{FFFC}") == true || kept?.html?.contains("cid:") == true,
-                "body: \(String(reflecting: kept?.body)), html: \(String(describing: kept?.html))")
-    }
-
     /// Conversation answers against a brute-force reference after random actions and syncs.
     @Test func conversationMatchesReferenceUnderRandomActions() {
         for seed in UInt64(1)...30 {

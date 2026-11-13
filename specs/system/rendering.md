@@ -94,6 +94,8 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
   references decoded (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, numeric), percent-decoded, then `<` and `>` trimmed.
 - `MailStore.loadInlineImages` asks the backend for those IDs once per message and keeps them in memory only, for
   the messages of the conversation on screen.
+  A message kept only on this Mac (the Drafts copy of a failed send) refers to its own files as `cid:file<k>@local`
+  (k = position in its attachments); those come from its stored files, not the backend.
 - `document(_:allowRemote:inline:)` replaces each reference with a known image by
   `data:<type>;base64,<data>` (followed by a space when `/>` comes next, so the tag still closes). `<type>` is `HTMLPage.safeType(contentType)`: parameters after `;` dropped, trimmed,
   lowercased, and kept only if it is `token/token` (`a-z 0-9 ! # $ & ^ _ . + -`), else `application/octet-stream`. Unknown references stay `cid:` and
