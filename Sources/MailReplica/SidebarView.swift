@@ -43,7 +43,7 @@ struct SidebarView: View {
                 row(.smart(.flagged), "Flagged", "flag")
             }
             Section("Smart Mailboxes") {
-                row(.smart(.unread), "Unread", "gearshape")
+                row(.smart(.unread), "Unread", "folder.badge.gearshape")  // Mail's SidebarSmartFolder (BUG-234)
             }
             ForEach(store.accounts) { acct in
                 Section(acct.name) {
