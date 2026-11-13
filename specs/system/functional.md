@@ -106,7 +106,8 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
   - Subject gets "Re: " or "Fwd: ". A leading prefix of the same kind — `Re:`/`AW:` for replies, `Fwd:`/`Fw:`/`WG:`
     for forwards, any case, with or without one space after the colon — is replaced by it, not stacked. A prefix of
     the other kind stays (`FW: x` → `Re: FW: x`).
-  - Body: an attribution line ("On <date>, Name <addr> wrote:"; just "Name" when the address isn't known) or a "Begin forwarded message:" block, then every
+  - Body: an attribution line ("On <date>, Name <addr> wrote:"; just "Name" when the address isn't known, just the address when the
+    sender has no name of its own, `Contact.formatted`, as for the forward header and an invite answer's To) or a "Begin forwarded message:" block, then every
     line of the plain-text body (split on any line ending: `\r\n`, `\n`, `\r`) prefixed with "> ", joined with `\n`.
   - Reply: To = the sender's address; when the sender is the account's own address (compared without case), the
     original To addresses instead (each once, mine left out; if none is left, the sender's address). Reply All: To = sender and To addresses, Cc = the original Cc, both minus
