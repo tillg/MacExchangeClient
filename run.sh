@@ -11,6 +11,9 @@ if [ "$1" = test ]; then
     -Xswiftc -load-plugin-library -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing/libTestingMacros.dylib
   exec swift test --scratch-path .build/tests --skip-build
 fi
+# `./run.sh release` builds optimized, several times faster on a large mailbox (for daily use); otherwise debug.
+CONF=debug
+[ "$1" = release ] && CONF=release
 export SDKROOT="${SDKROOT:-$(xcrun --show-sdk-path --sdk macosx26.5 2>/dev/null || echo /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk)}"
 # Signing identity: an Apple Development certificate first. It has a Team ID, so the Keychain recognises every
 # new build and stops asking for the password item. Otherwise the self-signed one from make-signing-identity.sh,
@@ -19,7 +22,7 @@ IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*\(
 if [ -z "$IDENTITY" ] && security find-certificate -c "MailReplica Dev" >/dev/null 2>&1; then IDENTITY="MailReplica Dev"; fi
 sign() {
   if [ -n "$IDENTITY" ]; then
-    codesign -f -s "$IDENTITY" -i MailReplica .build/debug/MailReplica 2>/dev/null
+    codesign -f -s "$IDENTITY" -i MailReplica .build/$CONF/MailReplica 2>/dev/null
   fi
 }
 # Wrap the binary in MailReplica.app, so Activity Monitor, the Dock and Keychain dialogs show the app's icon.
@@ -27,12 +30,12 @@ sign() {
 APP=.build/MailReplica.app
 bundle() {
   mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-  cp .build/debug/MailReplica "$APP/Contents/MacOS/MailReplica"
+  cp .build/$CONF/MailReplica "$APP/Contents/MacOS/MailReplica"
   # The icon is drawn in code (AppIcon.swift): export it again whenever that file changes.
   if [ ! -f "$APP/Contents/Resources/AppIcon.icns" ] || [ Sources/MailReplica/AppIcon.swift -nt "$APP/Contents/Resources/AppIcon.icns" ]; then
     set_dir=.build/AppIcon.iconset
     rm -rf "$set_dir" && mkdir -p "$set_dir"
-    MAIL_SAMPLE_DATA=1 MAIL_ICON_EXPORT="$PWD/.build/icon-1024.png" .build/debug/MailReplica
+    MAIL_SAMPLE_DATA=1 MAIL_ICON_EXPORT="$PWD/.build/icon-1024.png" .build/$CONF/MailReplica
     for s in 16 32 128 256 512; do
       sips -z $s $s .build/icon-1024.png --out "$set_dir/icon_${s}x${s}.png" >/dev/null
       sips -z $((s * 2)) $((s * 2)) .build/icon-1024.png --out "$set_dir/icon_${s}x${s}@2x.png" >/dev/null
@@ -74,5 +77,6 @@ PLIST
 }
 case "$1" in
   build) swift build && sign && bundle ;;
+  release) swift build -c release && sign && bundle && exec "$APP/Contents/MacOS/MailReplica" ;;
   *) swift build && sign && bundle && exec "$APP/Contents/MacOS/MailReplica" ;;
 esac

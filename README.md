@@ -53,6 +53,7 @@ git clone https://github.com/tillg/MacExchangeClient.git
 cd MacExchangeClient
 ./run.sh          # build and launch .build/MailReplica.app
 ./run.sh build    # build only (the bare binary and the .app)
+./run.sh release  # optimized build and launch: several times faster on a large mailbox, for daily use
 ./run.sh test     # run the model tests
 ```
 

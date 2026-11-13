@@ -4,7 +4,7 @@ This is a SwiftUI copy of the macOS Mail main window, built with SwiftPM. The da
 
 ## Build and test (Command Line Tools only, no Xcode)
 
-- **App:** `./run.sh` builds and launches, and `./run.sh build` only builds. It uses the macOS 26.5 SDK, because in the 27 SDK `@State` is a macro whose plugin ships only with Xcode.
+- **App:** `./run.sh` builds and launches, and `./run.sh build` only builds. `./run.sh release` builds optimized and launches (the user's daily app); any `./run.sh` build replaces the binary in `.build/MailReplica.app`. It uses the macOS 26.5 SDK, because in the 27 SDK `@State` is a macro whose plugin ships only with Xcode.
 - **Tests:** these need the default SDK and their own build folder:
   ```sh
   swift build --package-path . --scratch-path .build/tests --target MailModelTests \
