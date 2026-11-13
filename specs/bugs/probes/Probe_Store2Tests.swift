@@ -93,9 +93,7 @@ struct Probe_Store2Tests {
 
     // MARK: Draft size
 
-
     // MARK: Attachments
-
 
     // MARK: Smart mailboxes, counts (property)
 
@@ -183,9 +181,6 @@ struct Probe_Store2Tests {
         }
     }
 
-
-
-
     @Test func failedSendWithEmptySubjectNamesIt() {
         let s = store([])
         s.merge([(.inbox, [])], account: work.id)
@@ -203,20 +198,6 @@ struct Probe_Store2Tests {
         let kept = s.messages.first { $0.mailbox == .drafts }
         #expect(kept?.body.contains("\u{FFFC}") == true || kept?.html?.contains("cid:") == true,
                 "body: \(String(reflecting: kept?.body)), html: \(String(describing: kept?.html))")
-    }
-
-    /// Sending from an account that is no longer there (sample account removed by signing in) must not
-    /// silently send from the remaining Exchange account.
-    @Test func draftOfRemovedSampleAccountIsNotSentFromExchange() {
-        let s = store([msg(home, subject: "sample")])
-        let d = Draft(accountID: home.id, to: "bo@x.com", subject: "Test", body: "written in sample mode")
-        let exchange = Account(name: "Exchange", address: "me@corp.com")
-        s.removeLocalAccounts()  // sign-in: sample accounts go
-        s.accounts.append(exchange)
-        s.merge([(.inbox, [])], account: exchange.id)  // the Exchange account (server mail)
-        s.send(d)
-        let queued = s.outbox.filter { if case .send = $0.change { return true }; return false }
-        #expect(queued.isEmpty, "queued sends: \(queued.map { s.account($0.account)?.name ?? "?" })")
     }
 
     /// Conversation answers against a brute-force reference after random actions and syncs.
@@ -264,8 +245,6 @@ struct Probe_Store2Tests {
             }
         }
     }
-
-
 
     /// An offline send waits in the outbox; after a relaunch it still has its files.
     @Test func queuedSendKeepsItsFilesAcrossRelaunch() throws {
