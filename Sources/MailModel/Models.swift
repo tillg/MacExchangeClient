@@ -469,17 +469,22 @@ public struct Attachment: Hashable, Codable, Sendable, ExpressibleByStringLitera
                   contentType: try c.decodeIfPresent(String.self, forKey: .contentType))
     }
 
-    /// The name as a file name: the sender's name can't point into another folder.
-    /// A "/" becomes ":", which the Finder shows as "/" again. A name over 255 bytes is shortened, keeping its extension.
-    /// Bidi controls go (they could show "x\u{202E}fdp.app" as "xppa.pdf"), other control characters become a blank
-    /// (BUG-193).
-    public var fileName: String {
+    /// The name as shown in the app: without bidi controls (they could show "x\u{202E}fdp.app" as "xppa.pdf"), other
+    /// control characters as a blank (BUG-193).
+    public var displayName: String {
         let bidi = Set<UInt32>([0x200E, 0x200F, 0x061C]).union(0x202A...0x202E).union(0x2066...0x2069)
         var scalars = String.UnicodeScalarView()
         for u in name.unicodeScalars where u != "\0" && !bidi.contains(u.value) {
             scalars.append(u.properties.generalCategory == .control ? " " : u)
         }
-        let n = String(scalars).replacingOccurrences(of: "/", with: ":")
+        return String(scalars)
+    }
+
+    /// The name as a file name: the sender's name can't point into another folder.
+    /// A "/" becomes ":", which the Finder shows as "/" again. A name over 255 bytes is shortened, keeping its extension.
+    /// Built on `displayName` (BUG-193).
+    public var fileName: String {
+        let n = displayName.replacingOccurrences(of: "/", with: ":")
         guard !(n.isEmpty || n == "." || n == "..") else { return "Attachment" }
         let ext = (n as NSString).pathExtension
         guard !ext.isEmpty, ext.utf8.count <= 32 else { return Self.fileName(n, ending: "") }

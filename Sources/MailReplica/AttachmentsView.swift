@@ -60,8 +60,8 @@ extension Attachment {
 
     /// "Report.pdf (1.2 MB)", Mail's AttachmentNameAndSizeFormat.
     var nameAndSize: String {
-        guard let size else { return name }
-        return "\(name) (\(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)))"
+        guard let size else { return displayName }
+        return "\(displayName) (\(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)))"
     }
 }
 
@@ -76,7 +76,7 @@ struct AttachmentIcon: View {
                 .resizable().frame(width: 48, height: 48)
                 .padding(4)
                 .background(RoundedRectangle(cornerRadius: 5).fill(selected ? Color.secondary.opacity(0.2) : .clear))
-            Text(attachment.name)
+            Text(attachment.displayName)
                 .font(.system(size: 11)).lineLimit(2).multilineTextAlignment(.center)
                 .padding(.horizontal, 3)
                 .background(RoundedRectangle(cornerRadius: 3).fill(selected ? Color.accentColor : .clear))

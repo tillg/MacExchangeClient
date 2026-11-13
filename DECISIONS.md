@@ -977,6 +977,8 @@ edited: 2026-11-13
 - **Consequences:** a full-suite rerun at low load is owed; its result goes into the report. Applies to every commit made while hunters run.
 - 14:02: full suite 470/470 green at normal load (after BUG-218).
 - 14:12: BUG-219 committed with `droppingTheSelectionStaysFastAt210kMessages` over budget at load 51 (wave-4 hunters); the change doesn't touch drops.
+- Correction 14:40: that drop failure was not only load. The BUG-155 fix (13:40) rebuilt the conversation rows after every action (0.216 s vs 0.135 s at the same load); fixed in the perf commit after BUG-252, drop back to 0.11–0.13 s.
+- From 14:56 the suite runs in two parts, `MailStorePerformanceTests` alone and the rest, both counted; 15:16 the displayName change went in with drop at 0.193 s at load 26 (a review agent building in parallel).
 
 ## 14:40 — BUG-194 deferred: its fix contradicts an existing test {#run-2026-11-13-1235-8}
 

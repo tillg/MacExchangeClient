@@ -93,6 +93,7 @@ struct MessageTests {
         #expect(Attachment(name: "a\u{2066}b\u{2069}\u{200F}.pdf").fileName == "ab.pdf")
         #expect(Attachment(name: "a\nb\tc\u{7}.pdf").fileName == "a b c .pdf")
         #expect(Attachment(name: "\u{202E}").fileName == "Attachment")
+        #expect(Attachment(name: "invoice\u{202E}fdp.app").displayName == "invoicefdp.app")  // also as shown in the app
     }
 
     /// Draft HTML has a line per `<div>`, whatever the line ending (quoted Exchange text uses CRLF).
