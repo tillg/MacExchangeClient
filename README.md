@@ -187,4 +187,6 @@ The details come from Mail.app's own resources in `/System/Applications/Mail.app
 - [x] Custom folders and subfolders, as a tree
 - [ ] Microsoft Graph backend, once the mailbox is reachable there
 
+[docs/feature-map.md](docs/feature-map.md) lists 121 features Apple Mail and Outlook have and this app doesn't, by priority.
+
 **Not planned for now:** mail categories (removed: not used here), rules, rich-text compose, Remind Me, Follow Up, Mute, and the separate message window on double-click.

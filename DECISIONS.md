@@ -4,6 +4,16 @@ created: 2026-11-12
 edited: 2026-11-13
 ---
 
+**Contents**
+
+- [2026-11-12 23:16 — Unattended bug-fix run](#run-2026-11-12-2316)
+- [2026-11-13 12:35 — Feature map, then a 100-bug test-and-fix round](#run-2026-11-13-1235)
+  - [12:58 — Sketches instead of screenshots; links only to pages actually read](#run-2026-11-13-1235-1)
+  - [12:58 — Priority by daily use on on-prem Exchange; "not planned" items not ranked HIGH](#run-2026-11-13-1235-2)
+  - [12:58 — The map lives in docs/feature-map.md, linked from the README](#run-2026-11-13-1235-3)
+  - [12:58 — Contents list added to DECISIONS.md, older run listed without its decisions](#run-2026-11-13-1235-4)
+  - [12:58 — Commit and push straight to main](#run-2026-11-13-1235-5)
+
 # 2026-11-12 23:16 — Unattended bug-fix run {#run-2026-11-12-2316}
 
 - **Started by:** user, unattended
@@ -880,3 +890,62 @@ edited: 2026-11-13
 - **Decision:** `MailStore.canAnswer` is false for an invite or cancellation in Sent or whose sender is the account's address; the card then shows no answer buttons and no "Please respond.", and `respond` / `removeFromCalendar` do nothing. A refused move to Trash after the answer sets a status ("Couldn't move “…” to Trash on the server: …"); "item not found" (the server moved it already) stays silent.
 - **Why:** Outlook offers Accept/Tentative/Decline/Propose and Remove from Calendar only on received items. The organizer cancels a meeting by sending the cancellation; there is nothing to remove.
 - **Alternatives:** keep the button and treat the refusal as normal (rejected: a button that always fails); queue the refused trash move again (rejected: a refusal won't change on retry).
+
+# 2026-11-13 12:35 — Feature map, then a 100-bug test-and-fix round {#run-2026-11-13-1235}
+
+- **Started by:** `/autonomous feature-map`
+- **Task, as given:**
+
+  > feature-map
+  > Make a feature mapü: A list of at least 100 features that Apple Mail and/or Outlook have that we don't have.
+  > - One .md file
+  > - A chapter per feature, a TOC at the top
+  > - Per feature a description, if possible explanatory screenshots. Always ELI5 so everybody understand it
+  > - The features get a prioority, sorted from HIGH to LOW
+
+  Follow-up during the run: "Ifr u are done with this, run tests until u have at least 100 bugs. Describe them in /specs/bugs and then start fixing them from HIGH to LOW prio"
+
+## 12:58 — Sketches instead of screenshots; links only to pages actually read {#run-2026-11-13-1235-1}
+
+- **Status:** open
+- **Context:** `docs/feature-map.md`; the task asks for screenshots "if possible". `screencapture` has no permission here, and the features don't exist in our app, so our snapshot hook can't show them.
+- **Question:** what pictures to use?
+- **Decision:** Text sketches (labelled as sketches) for 12 features where a picture helps; Microsoft support links only for the 14 pages a research agent actually fetched; no Apple or Microsoft images copied.
+- **Why:** the repo has a public GitHub remote, so copying vendor screenshots into it is a copyright problem; hot-linked images break.
+- **Alternatives:** hot-link images from support sites (fragile, still someone else's images); ask the user for screenshots (nobody to ask).
+- **Consequences:** the user can add real screenshots later (e.g. `docs/feature-map/*.png`) next to the sketches.
+
+## 12:58 — Priority by daily use on on-prem Exchange; "not planned" items not ranked HIGH {#run-2026-11-13-1235-2}
+
+- **Status:** open
+- **Context:** the task asks for priorities but gives no criteria.
+- **Question:** how to rank 121 features?
+- **Decision:** HIGH = missed every day or risks losing mail/time; MEDIUM = weekly or a big shortcut; LOW = rare, or needs iCloud / Microsoft 365. Features the README marks "not planned" (rules, rich text, Remind Me, Mute, categories, separate message window) are listed with that label; rich text stays HIGH because replies lose the original's look without it, the rest are MEDIUM/LOW.
+- **Why:** the app's stated goal is daily work against mgm-tp's on-prem Exchange.
+- **Alternatives:** rank by how many clients have it (ignores this user's use).
+- **Consequences:** rich text at HIGH contradicts the README's "not planned"; the chapter says so. Revisit when the user reviews.
+
+## 12:58 — The map lives in docs/feature-map.md, linked from the README {#run-2026-11-13-1235-3}
+
+- **Status:** open
+- **Context:** no location named. `docs/` holds the README images; `specs/` holds system specs and bugs.
+- **Decision:** `docs/feature-map.md` with a one-line link under the README's Roadmap. No What's New line: nothing changes in the app.
+- **Alternatives:** `specs/system/` (that describes what exists, not what's missing).
+- **Consequences:** none.
+
+## 12:58 — Contents list added to DECISIONS.md, older run listed without its decisions {#run-2026-11-13-1235-4}
+
+- **Status:** open
+- **Context:** the format asks for a Contents list; this file had none, and the older run uses free-form ids (`d-…`).
+- **Decision:** add Contents now with both runs; only this run's decisions are listed. Old entries aren't rewritten.
+- **Alternatives:** list every old decision too (a big rewrite of someone else's run).
+- **Consequences:** the older run's decisions are reachable by scrolling only.
+
+## 12:58 — Commit and push straight to main {#run-2026-11-13-1235-5}
+
+- **Status:** open
+- **Overrides:** system prompt — "Commit or push only when the user asks. If on the default branch, branch first"; global CLAUDE.md — never create or switch branches without permission
+- **Context:** the repo works on `main` only (every earlier run pushed there); `/autonomous` allows commit and push of green units.
+- **Decision:** commit each green unit on `main` and push it.
+- **Why:** the user's earlier runs pushed to `main`, and branching is forbidden without permission.
+- **Consequences:** every later commit of this run goes to `main` as well.
