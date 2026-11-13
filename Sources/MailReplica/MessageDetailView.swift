@@ -92,7 +92,8 @@ struct MessageContent: View {
                 HStack(alignment: .top, spacing: 0) {
                     text
                     Divider()
-                    DayColumn(invite: invite, subject: message.subject, events: store.dayEvents[message.id])
+                    DayColumn(invite: invite, subject: message.subject, events: store.dayEvents[message.id],
+                              unavailable: store.unavailableDays.contains(message.id))
                         .frame(width: 300)
                 }
             } else {

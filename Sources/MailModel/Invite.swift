@@ -86,8 +86,13 @@ public enum DayLayout {
         public let of: Int
     }
 
+    /// The time an entry takes in the column at least: the view draws a 0-minute entry (or one that ends before it
+    /// starts) as tall as a short one, so it takes that room and nothing starting with it is drawn on top.
+    public static let shortest: TimeInterval = 20 * 60
+
     public static func columns(_ events: [CalendarEvent]) -> [Placed] {
         let timed = events.filter { !$0.isAllDay }.sorted { ($0.start, $0.end) < ($1.start, $1.end) }
+        func end(_ e: CalendarEvent) -> Date { max(e.end, e.start.addingTimeInterval(shortest)) }
         var result: [Placed] = []
         var group: [(CalendarEvent, Int)] = [], columnEnds: [Date] = [], groupEnd = Date.distantPast
         func flush() {
@@ -97,12 +102,26 @@ public enum DayLayout {
         for e in timed {
             if e.start >= groupEnd { flush() }
             let col = columnEnds.firstIndex { $0 <= e.start } ?? columnEnds.count
-            if col == columnEnds.count { columnEnds.append(e.end) } else { columnEnds[col] = e.end }
+            if col == columnEnds.count { columnEnds.append(end(e)) } else { columnEnds[col] = end(e) }
             group.append((e, col))
-            groupEnd = max(groupEnd, e.end)
+            groupEnd = max(groupEnd, end(e))
         }
         flush()
         return result
+    }
+
+    /// The hours the invite's day column shows: 8–18, widened to the invite and the day's timed entries. A time on
+    /// an earlier day counts as 0 h, on a later day as 24 h; an all-day invite goes in the all-day row instead.
+    public static func hours(for invite: Invite, events: [CalendarEvent], calendar cal: Calendar = .current) -> ClosedRange<Int> {
+        let times = (invite.isAllDay ? [] : [invite.start, invite.end]) + events.filter { !$0.isAllDay }.flatMap { [$0.start, $0.end] }
+        func hour(_ d: Date, roundingUp: Bool) -> Int {
+            guard cal.isDate(d, inSameDayAs: invite.start) else { return d < invite.start ? 0 : 24 }
+            let c = cal.dateComponents([.hour, .minute], from: d)
+            return (c.hour ?? 0) + (roundingUp && (c.minute ?? 0) > 0 ? 1 : 0)
+        }
+        let first = times.map { hour($0, roundingUp: false) }.min() ?? 8
+        let last = times.map { hour($0, roundingUp: true) }.max() ?? 18
+        return min(8, first)...max(18, min(24, last))
     }
 }
 

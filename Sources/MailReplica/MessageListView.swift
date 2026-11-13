@@ -108,16 +108,23 @@ struct MessageRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 6) {
-            Circle()
-                .fill(message.isRead ? Color.clear : Color.accentColor)
-                .frame(width: 8, height: 8)
-                .padding(.top, 5)
+            // Mail's status column: the unread dot, or for a VIP sender a star (accent-coloured while unread), so the
+            // sender stays in line with the subject and preview.
+            Group {
+                if message.isVIP {
+                    Image(systemName: "star.fill").font(.system(size: 9))
+                        .foregroundStyle(message.isRead ? Color.secondary : Color.accentColor)
+                } else {
+                    Circle().fill(message.isRead ? Color.clear : Color.accentColor)
+                }
+            }
+            .frame(width: 8, height: 8)
+            .padding(.top, 5)
             if showPhoto {
                 Avatar(contact: message.from, size: 32)
             }
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline) {
-                    if message.isVIP { Image(systemName: "star.fill").font(.caption2).foregroundStyle(.secondary) }
                     Text(senderLabel).font(.system(size: 13, weight: .semibold)).lineLimit(1)
                     Spacer(minLength: 4)
                     Text(Self.listDate(message.date)).font(.system(size: 12)).foregroundStyle(.secondary)

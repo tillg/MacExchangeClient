@@ -1283,14 +1283,20 @@ public final class MailStore {
 
     /// The calendar day of each invite on screen, keyed by message. Not cached: the calendar changes.
     public private(set) var dayEvents: [Message.ID: [CalendarEvent]] = [:]
+    /// Invites whose day couldn't be read (no server, paused, an error) and has none shown: no longer waited for.
+    public private(set) var unavailableDays: Set<Message.ID> = []
 
     /// Fetches the local calendar day around an invite, for its day column and conflict note.
     public func loadDay(for id: Message.ID) async {
-        guard let m = message(id), let invite = m.invite, let backend = backends[m.accountID], !paused.contains(m.accountID)
-        else { return }
+        guard let m = message(id), let invite = m.invite else { return }
+        guard let backend = backends[m.accountID], !paused.contains(m.accountID) else {
+            if dayEvents[id] == nil { unavailableDays.insert(id) }
+            return
+        }
         let from = Calendar.current.startOfDay(for: invite.start)
         let to = Calendar.current.date(byAdding: .day, value: 1, to: from) ?? from.addingTimeInterval(86400)
-        do { dayEvents[id] = try await backend.events(from: from, to: to) } catch {
+        do { setDayEvents(try await backend.events(from: from, to: to), for: id) } catch {
+            if dayEvents[id] == nil { unavailableDays.insert(id) }
             if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load the calendar: \(error.localizedDescription)" }
         }
     }
@@ -1499,7 +1505,7 @@ public final class MailStore {
     }
 
     /// For sample data and tests: a day of made-up calendar entries next to an invite.
-    public func setDayEvents(_ events: [CalendarEvent], for id: Message.ID) { dayEvents[id] = events }
+    public func setDayEvents(_ events: [CalendarEvent], for id: Message.ID) { dayEvents[id] = events; unavailableDays.remove(id) }
 
     /// Fetches the body of a server message the first time it is shown. If the server's version of the message changed
     /// while the body was on its way (another preview: a draft edited elsewhere), that body is the old version's: it is

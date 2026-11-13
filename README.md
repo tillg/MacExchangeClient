@@ -21,7 +21,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
   - Propose New Time, together with Tentative or Decline, in the same message window with a new start and end;
   - an answered invite moves to Trash right away, as Exchange will do, and the next message is selected;
   - "Please respond" until you have answered, and a yellow note when the meeting overlaps other events;
-  - the invite's day from your Exchange calendar next to the text, with overlapping events side by side and the invite's slot hatched;
+  - the invite's day from your Exchange calendar next to the text, with overlapping events side by side and the invite's slot hatched (an all-day invite in the all-day row; "Calendar not available" when the calendar can't be read);
   - a cancellation ("Canceled:" / "Abgesagt:") offers only Remove from Calendar, as in Outlook: the meeting leaves the calendar (nobody is told) and the message moves to Trash.
 
   Attendee answer icons are missing: your copy of an invite reports every attendee's answer as unknown.
@@ -165,7 +165,7 @@ The details come from Mail.app's own resources in `/System/Applications/Mail.app
 | Compose attachment layout | Files in the text where dropped (Mail's Edit ▸ Attachments ▸ Insert Attachments at End is in `MainMenu.nib`; off by default, from memory); forward includes attachments | ✅ menu item; ⚠️ Attach inserting at the insertion point and the original's files at the end, icon look; the sent HTML (`<div>` per line, body style) from memory of Mail's output; non-picture files not placed in the sent mail |
 | Replies and size | Include Attachments With Replies (Never/Ask/When Adding Recipients/Always), Include/Exclude Attachments button, "Message Size:", "%@ (maximum %@)", the Try Sending in Email button | ✅ `MainMenu.nib`, `ComposeWindow.toolbar`, `ComposeViewControllerWK2.loctable`, `Compose.loctable` · ⚠️ default Never, the Ask dialog's wording, the over-limit alert's title and text, folders as zip, the size estimate |
 | Attachment layout | Pictures in place, other files as icons below the text; the header paperclip with count and its menu; Space, drag-out and double-click; the "name 2" rule for duplicates | ⚠️ Apple's Mail User Guide and memory of Mail, not read from the bundle |
-| List row | Unread dot, bold sender, relative date, subject, 2-line preview, flag, paperclip, optional contact photo | ⚠️ drawn in code · ✅ fonts 13pt / 11pt |
+| List row | Unread dot (a star for VIPs, in the same column), bold sender, relative date, subject, 2-line preview, flag, paperclip, optional contact photo | ⚠️ drawn in code · ⚠️ fonts 13 pt sender, 12 pt subject, preview and date (not checked against Mail) |
 | Behaviour | Marked read when shown (with the unread filter or in Unread it stays in the list until the selection moves on); Delete goes to the account's Trash and deleting from Trash erases; Junk toggles; next message selected after an action; drag & drop as described above | ⚠️ tested in `MailStoreTests` |
 
 ## Roadmap

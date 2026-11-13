@@ -84,9 +84,11 @@ struct InviteCard: View {
             .textSelection(.enabled)
     }
 
-    /// Outlook's answer button: a menu with the three ways to answer.
+    /// Outlook's answer button: a menu with the three ways to answer. The answer given is outlined and filled in
+    /// the accent colour around the button (a bordered menu button ignores `tint` and prominent styles on macOS).
     private func answer(_ r: InviteResponse, _ title: String, _ symbol: String) -> some View {
-        Menu {
+        let chosen = invite.response == r
+        return Menu {
             Button("Respond with Comments…") { write(r) }
             Button("Respond without Comments") { store.respond(r, to: message.id) }
             Button("Do Not Send a Response") { store.respond(InviteReply(response: r, send: false), to: message.id) }
@@ -94,7 +96,8 @@ struct InviteCard: View {
             Label(title, systemImage: symbol).font(.system(size: 12))
         }
         .fixedSize()
-        .tint(invite.response == r ? .accentColor : nil)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(chosen ? 0.25 : 0)).padding(-2))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: chosen ? 1.5 : 0).padding(-2))
     }
 
     /// Like Outlook: the answer opens as a message to the organizer, sent when you press Send.
@@ -140,6 +143,8 @@ struct DayColumn: View {
     let invite: Invite
     let subject: String
     let events: [CalendarEvent]?
+    /// The calendar couldn't be read: no spinner, a note instead.
+    var unavailable = false
 
     static let hourHeight: CGFloat = 44
     private let cal = Calendar.current
@@ -151,6 +156,14 @@ struct DayColumn: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
                 .background(Color.accentColor.opacity(0.12))
+            // An all-day invite is marked in the all-day row, hatched, not as a 24-hour block in the grid.
+            if invite.isAllDay {
+                Text(subject).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(Hatch().stroke(Color.accentColor.opacity(0.5), lineWidth: 1).background(Color.accentColor.opacity(0.08)))
+                    .overlay(Rectangle().strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+            }
             ForEach(allDay, id: \.self) { e in
                 Text(e.subject).font(.system(size: 11)).lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -158,21 +171,23 @@ struct DayColumn: View {
                     .background(Color.accentColor.opacity(0.18))
             }
             if events == nil {
-                ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding()
+                if unavailable {
+                    Text("Calendar not available").font(.system(size: 11)).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity).padding(.vertical, 6)
+                } else {
+                    ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding()
+                }
             }
             grid
         }
     }
 
-    private var allDay: [CalendarEvent] { (events ?? []).filter(\.isAllDay) }
-
-    /// 8–18 h, widened to include the invite and the day's entries.
-    private var hours: ClosedRange<Int> {
-        let times = [invite.start, invite.end] + (events ?? []).filter { !$0.isAllDay }.flatMap { [$0.start, $0.end] }
-        let first = times.map { cal.component(.hour, from: $0) }.min() ?? 8
-        let last = times.map { d in cal.component(.hour, from: d) + (cal.component(.minute, from: d) > 0 ? 1 : 0) }.max() ?? 18
-        return min(8, first)...max(18, min(24, last))
+    /// The day's all-day entries, without the all-day invite's own (it has its hatched row).
+    private var allDay: [CalendarEvent] {
+        (events ?? []).filter { $0.isAllDay && !(invite.isAllDay && invite.isOwnEntry($0, subject: subject)) }
     }
+
+    private var hours: ClosedRange<Int> { DayLayout.hours(for: invite, events: events ?? [], calendar: cal) }
 
     private func y(_ d: Date) -> CGFloat {
         let c = cal.dateComponents([.hour, .minute], from: d)
@@ -195,12 +210,14 @@ struct DayColumn: View {
                         .offset(x: gutter, y: top)
                 }
                 // The invite's slot, hatched, under the entries.
-                Hatch()
-                    .stroke(Color.accentColor.opacity(0.5), lineWidth: 1)
-                    .background(Color.accentColor.opacity(0.08))
-                    .overlay(Rectangle().strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
-                    .frame(width: w, height: max(12, y(invite.end) - y(invite.start)))
-                    .offset(x: gutter, y: y(invite.start))
+                if !invite.isAllDay {
+                    Hatch()
+                        .stroke(Color.accentColor.opacity(0.5), lineWidth: 1)
+                        .background(Color.accentColor.opacity(0.08))
+                        .overlay(Rectangle().strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                        .frame(width: w, height: max(12, y(invite.end) - y(invite.start)))
+                        .offset(x: gutter, y: y(invite.start))
+                }
                 ForEach(DayLayout.columns(events ?? []), id: \.self) { p in
                     let own = invite.isOwnEntry(p.event, subject: subject)
                     let colW = w / CGFloat(p.of)

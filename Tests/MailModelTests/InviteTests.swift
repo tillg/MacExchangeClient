@@ -32,6 +32,57 @@ struct InviteTests {
         #expect(cols.map(\.event.subject) == ["A"])
     }
 
+    /// A 0-minute entry is drawn as tall as a short one: it takes room, so it never sits on top of an entry
+    /// starting at the same time, and identical entries are distinct in the column.
+    @Test func zeroLengthEventAndMeetingAtTheSameTimeAreSideBySide() {
+        let cols = DayLayout.columns([ev("Reminder", 9, 9), ev("Meeting", 9, 10)])
+        #expect(Set(cols.map(\.column)).count == 2)
+        var problems: [String] = []
+        for seed in UInt64(0)..<2000 {
+            var rng = SplitMix(state: seed)
+            var evs: [CalendarEvent] = []
+            for _ in 0..<Int.random(in: 2...8, using: &rng) {
+                let s = Double(Int.random(in: 32..<40, using: &rng)) / 4
+                evs.append(ev("Busy", s, s + Double(Int.random(in: -2...4, using: &rng)) / 4))
+            }
+            let placed = DayLayout.columns(evs)
+            if placed.count != evs.count { problems.append("seed \(seed): count"); continue }
+            if Set(placed).count != placed.count { problems.append("seed \(seed): duplicate Placed values") }
+            for (i, a) in placed.enumerated() {
+                for b in placed[(i + 1)...] where a.event.start == b.event.start && a.column == b.column {
+                    problems.append("seed \(seed): two events at \(a.event.start) in column \(a.column)")
+                }
+                if a.column >= a.of { problems.append("seed \(seed): column \(a.column) of \(a.of)") }
+            }
+        }
+        #expect(problems.isEmpty, "\(problems.count) problems, e.g. \(problems.prefix(3))")
+    }
+
+    var utc: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c }
+
+    /// The column's hours: 8–18, widened to the invite and the day's entries; times on another day count as the
+    /// day's start or end; an all-day invite doesn't widen it.
+    @Test func dayColumnHours() {
+        #expect(DayLayout.hours(for: invite, events: [], calendar: utc) == 8...18)
+        #expect(DayLayout.hours(for: Invite(start: at(7.5), end: at(19.25)), events: [], calendar: utc) == 7...20)
+        #expect(DayLayout.hours(for: Invite(start: at(22), end: at(26)), events: [], calendar: utc) == 8...24)
+        #expect(DayLayout.hours(for: invite, events: [ev("Night", -2, 1)], calendar: utc) == 0...18)
+        #expect(DayLayout.hours(for: Invite(start: at(0), end: at(24), isAllDay: true), events: [ev("A", 9, 10)], calendar: utc) == 8...18)
+    }
+
+    /// When the calendar can't be read (no server, paused, an error), the day column stops waiting for it.
+    @MainActor @Test func dayThatCantBeLoadedIsMarkedUnavailable() async {
+        let acct = Account(name: "Work", address: "me@work.com")
+        var m = Message(accountID: acct.id, from: Contact(name: "A", email: "a@x.com"), to: [], subject: "Meet", body: "B", date: .now)
+        m.invite = invite
+        let s = MailStore(accounts: [acct], messages: [m])
+        #expect(!s.unavailableDays.contains(m.id))
+        await s.loadDay(for: m.id)
+        #expect(s.unavailableDays.contains(m.id) && s.dayEvents[m.id] == nil)
+        s.setDayEvents([], for: m.id)
+        #expect(!s.unavailableDays.contains(m.id))
+    }
+
     @Test func oldCachesWithoutInviteFieldsStillLoad() throws {
         let m = Message(accountID: UUID(), from: Contact(name: "A", email: "a@x.com"), to: [], subject: "S", body: "B",
                         date: .now, remoteID: "R")

@@ -12,6 +12,12 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "In an invitation's day view, a 0-minute appointment no longer hides a meeting that starts at the same time.",
+            "The day view of an invitation that runs past midnight starts in the morning and shows the meeting up to midnight.",
+            "An all-day invitation is shown at the top of its day view instead of covering every hour.",
+            "When your calendar can't be read, an invitation's day view says so instead of loading forever.",
+            "The answer you gave to an invitation is outlined, so you can see your choice at a glance.",
+            "The star of a VIP sender sits where the unread dot goes, so names line up with the subject below.",
             "Avatars show both initials for names separated by a tab or a special space, and never more than two letters.",
             "The preview under each message in the list no longer has gaps from lines that only hold spaces.",
             "Moving a picture to another place in a message you're writing counts as a change, so closing the window asks whether to save it.",
