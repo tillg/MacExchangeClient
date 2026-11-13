@@ -224,10 +224,11 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
     public var hasRemoteContent: Bool {
         guard let html else { return false }
         // src, background, poster; any candidate of srcset; <link href> (stylesheets, fonts); url() quoted
-        // directly or with an entity (`&quot;`, `&#39;`, as Outlook writes inside style attributes); @import.
+        // directly or with an entity (`&quot;`, `&#39;`, as Outlook writes inside style attributes); `@import` of a
+        // quoted web address (`@import url(…)` is a url()). Text that merely mentions `@import` loads nothing.
         let quote = #"(?:["']|&quot;|&apos;|&#0*3[49];|&#x0*2[27];)?"#
         return html.range(of: #"(src|background|poster)\s*=\s*["']?\s*https?:|srcset\s*=\s*["']?[^"'>]*https?:"#
-                          + #"|<link\b[^>]*\bhref\s*=\s*["']?\s*https?:|url\(\s*"# + quote + #"\s*https?:|@import"#,
+                          + #"|<link\b[^>]*\bhref\s*=\s*["']?\s*https?:|url\(\s*"# + quote + #"\s*https?:|@import\s*"# + quote + #"\s*https?:"#,
                           options: [.regularExpression, .caseInsensitive]) != nil
     }
 

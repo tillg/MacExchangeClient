@@ -42,6 +42,14 @@ struct MessageTests {
         #expect(!html(#"<a href="https://x.example">link</a><img srcset="cid:a 1x">"#).hasRemoteContent)
     }
 
+    /// Text that talks about CSS `@import` loads nothing; an `@import` of a web address does.
+    @Test func importInTextIsNotRemoteContent() {
+        func html(_ h: String) -> Message { var m = message(""); m.html = h; return m }
+        #expect(!html("<p>Tip: write @import at the top of your stylesheet.</p>").hasRemoteContent)
+        #expect(html(#"<style>@import "https://t.example/s.css";</style>"#).hasRemoteContent)
+        #expect(html("<style>@import url(https://t.example/s.css);</style>").hasRemoteContent)
+    }
+
     /// File names may be 255 bytes: longer names are cut, at a whole character, keeping the extension.
     @Test func longAttachmentNamesAreShortenedToAFileName() throws {
         let name = String(repeating: "Überweisungsbestätigung ", count: 12) + ".pdf"
