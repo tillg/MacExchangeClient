@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "⌘⌫ while typing a message or a search now deletes text, as it should, instead of deleting the selected mail.",
             "Flagging or marking a conversation you are reading after a new reply came in keeps it open, and deleting it by swipe selects the next one.",
             "A message waiting to be sent is no longer sent twice when you quit while \"Updating Mail Storage…\" is shown.",
             "Reply and Reply All now go to the address the sender asked answers to go to (Reply-To), for example a shop's support address instead of its no-reply address.",

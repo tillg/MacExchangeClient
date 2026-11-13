@@ -1,3 +1,4 @@
+import AppKit
 import MailModel
 import SwiftUI
 
@@ -81,7 +82,15 @@ struct MailCommands: Commands {
                 .keyboardShortcut("a", modifiers: [.command, .control]).disabled(!hasSelection)
             Button("Move to Junk") { store.junkSelection() }
                 .keyboardShortcut("j", modifiers: [.command, .shift]).disabled(!hasSelection)
-            Button("Delete") { store.deleteSelection() }
+            Button("Delete") {
+                // ⌘⌫ is also the text system's "delete to the start of the line". In Mail, Delete goes to the first
+                // responder, so typing in a compose window or the search field never deletes mail (BUG-218).
+                if let text = (NSApp.keyWindow ?? NSApp.orderedWindows.first)?.firstResponder as? NSTextView {
+                    text.deleteToBeginningOfLine(nil)
+                } else {
+                    store.deleteSelection()
+                }
+            }
                 .keyboardShortcut(.delete).disabled(!hasSelection)
         }
     }
