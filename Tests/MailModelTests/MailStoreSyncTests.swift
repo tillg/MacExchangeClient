@@ -199,6 +199,19 @@ struct MailStoreSyncTests {
         #expect(s.syncToken(work.id, .sent) == nil && !s.isComplete(work.id, .sent))
     }
 
+    /// Dropping a rejected token happens once per folder and session: if the server rejects the new token too, the
+    /// folder is reported and kept as it is instead of being downloaded again on every check.
+    @Test func rejectedSyncStateIsDroppedOnlyOnce() async throws {
+        let s = try store(answering: syncError("ErrorInvalidSyncStateData"))
+        s.apply(page(["A"], token: "OLD"), account: work.id, mailbox: .inbox)
+        await s.refresh(history: false)
+        #expect(s.syncToken(work.id, .inbox) == nil)
+        s.apply(page(["A"], token: "NEW"), account: work.id, mailbox: .inbox)  // the new pass, complete
+        await s.refresh(history: false)
+        #expect(s.syncToken(work.id, .inbox) == "NEW" && s.isComplete(work.id, .inbox))
+        #expect(s.status?.contains("sync position") == true, "status: \(s.status ?? "nil")")
+    }
+
     // MARK: A message kept in Drafts after a failed send keeps its files (BUG-055)
 
     func keptDraft(_ s: MailStore, files: [DraftAttachment]) throws -> Message.ID {
@@ -416,8 +429,9 @@ struct MailStoreSyncTests {
         let db = try MailDatabase(url: url)
         s.apply(page(["A1"], token: "T1"), account: work.id, mailbox: .inbox)
         s.send(Draft(accountID: work.id, to: "boss@x.com", subject: "Resignation", body: "Once only"))
-        await Task.yield()  // the drain has started: the request is on its way
-        try #require(s.outbox.contains(where: isSend))
+        // Until the drain has started: the request is on its way.
+        for _ in 0..<1000 where s.outbox.first?.inFlight != true { await Task.yield() }
+        try #require(s.outbox.contains { isSend($0) && $0.inFlight == true })
         try db.write(s.takeChanges())  // the save on quit while the request is on its way
         await s.refresh(history: false)  // the server accepted it
         try #require(!s.outbox.contains(where: isSend))

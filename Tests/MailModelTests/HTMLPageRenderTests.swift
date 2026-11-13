@@ -24,6 +24,8 @@ struct HTMLPageRenderTests {
 
     nonisolated static let blockedVectors: [String] = [
         #"<link rel="preconnect" href="BASE/preconnect">"#,
+        "<link/\u{301} rel=preconnect href=BASE/preconnect-mark>",
+        "<link \u{200D}rel=preconnect href=BASE/preconnect-zwj>",
         #"<link rel="dns-prefetch" href="BASE/dnsprefetch">"#,
         #"<link rel="prefetch" href="BASE/prefetch">"#,
         #"<link rel="preload" as="image" href="BASE/preload.png">"#,

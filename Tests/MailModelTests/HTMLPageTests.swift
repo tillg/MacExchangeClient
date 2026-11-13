@@ -126,10 +126,15 @@ struct HTMLPageTests {
         "<link\nrel=\"preconnect\"\nhref=\"https://t.example/\">",
         #"<link/rel="preconnect" href="https://t.example/"/>"#,
         "<link\trel=preconnect href=https://t.example/>",
+        "<link/\u{301} rel=preconnect href=https://t.example/>",
+        "<link \u{200D}rel=preconnect href=https://t.example/>",
+        "<link\u{200D} rel=preconnect href=https://t.example/>",
     ])
     func blockedMailKeepsNoLinkElement(_ link: String) {
         let page = HTMLPage.document("<p>Hi</p>" + link + "<p>Bye</p>", allowRemote: false)
-        #expect(page.range(of: #"<link[\s/>]"#, options: [.regularExpression, .caseInsensitive]) == nil, "\(page)")
+        // By scalar, as the HTML parser reads it: a combining mark after "/" doesn't hide the tag from it.
+        let linkTag = try! NSRegularExpression(pattern: #"<link[\s/>]"#, options: .caseInsensitive)
+        #expect(linkTag.firstMatch(in: page, range: NSRange(page.startIndex..., in: page)) == nil, "\(page)")
         #expect(page.contains("<p>Hi</p>") && page.contains("<p>Bye</p>"))
     }
 

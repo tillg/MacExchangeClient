@@ -38,9 +38,10 @@ public enum HTMLPage {
     /// The mail's `<link>` elements, renamed to an element that does nothing. WebKit opens connections for resource
     /// hints (`preconnect`, `dns-prefetch`, `prefetch`, `preload`, `prerender`) without asking the policy, which tells
     /// the sender the mail was opened. Everything else a link loads is blocked anyway while remote content is.
-    /// Renaming needs only the tag's start, so no way of writing its attributes gets past it.
+    /// Renaming needs only the tag's start, so no way of writing its attributes gets past it. Matched by scalar, as
+    /// the HTML parser reads: by character, a combining mark after the `/` would hide the tag start.
     static func withoutLinks(_ html: String) -> String {
-        html.replacing(/<(link)(?=[\s\/>])/.ignoresCase(), with: { _ in "<x-blocked-link" })
+        html.replacing(/<(link)(?=[\s\/>])/.ignoresCase().matchingSemantics(.unicodeScalar), with: { _ in "<x-blocked-link" })
     }
 
     /// The sender's content type, reduced to a lowercased `type/subtype` of token characters (parameters dropped),

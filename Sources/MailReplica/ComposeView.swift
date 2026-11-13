@@ -221,7 +221,7 @@ struct ComposeView: View {
                     store.status = "The message is saved and closed once its attachments have loaded."
                 }
             case .alertThirdButtonReturn: window.close()
-            default: break
+            default: closeWhenLoaded = nil  // Cancel: the window stays open, also once the files are in
             }
         }
         return false

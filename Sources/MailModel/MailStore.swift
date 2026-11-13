@@ -76,6 +76,8 @@ public final class MailStore {
     private var historyTask: Task<Void, Never>?
     /// Folders whose history sync failed this session; retried after a relaunch.
     private var historyFailed: Set<String> = []
+    /// Folders whose rejected sync token was already dropped this session (`resetSync`).
+    @ObservationIgnored private var tokensReset: Set<String> = []
     /// Accounts whose sign-in failed. Nothing is sent for them until the app is relaunched.
     private var paused: Set<UUID> = []
     private var historyError: String?
@@ -651,11 +653,19 @@ public final class MailStore {
         if complete { prune() }
     }
 
-    /// The server rejected the folder's token: it is forgotten and the folder syncs again from the start. That
-    /// happens once: a sync without a token can't be rejected for it. The complete pass then removes what is gone.
+    /// The server rejected the folder's token: it is forgotten and the folder syncs again from the start; the
+    /// complete pass then removes what is gone. Once per folder and session: if the new token is rejected too, the
+    /// folder is reported and left as it is (the history skips it) rather than downloaded again on every check.
     private func resetSync(_ account: UUID, _ mailbox: MailboxKind) {
-        syncTokens[key(account, mailbox)] = nil
-        complete.remove(key(account, mailbox))
+        let k = key(account, mailbox)
+        guard tokensReset.insert(k).inserted else {
+            historyFailed.insert(k)
+            historyError = "\(name(of: mailbox, in: account)): \(SyncTokenRejected().localizedDescription)"
+            status = historyError
+            return
+        }
+        syncTokens[k] = nil
+        complete.remove(k)
     }
 
     /// Removes what a completed from-scratch pass didn't list: deleted or moved away on the server meanwhile.

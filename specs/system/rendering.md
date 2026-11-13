@@ -28,7 +28,7 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
   `<div id="mail-replica-body">` around the HTML.
 - CSP without remote content: `default-src 'none'; style-src 'unsafe-inline'; img-src data:`. With remote content:
   `default-src 'none'; style-src * 'unsafe-inline'; img-src * data:; font-src * data:`. No scripts, frames or fetches in either case.
-- Without remote content, every `<link` tag start of the mail (any case) is renamed `<x-blocked-link`
+- Without remote content, every `<link` tag start of the mail (any case, matched by Unicode scalar) is renamed `<x-blocked-link`
   (`HTMLPage.withoutLinks`): WebKit opens connections for resource hints (`preconnect`, …) regardless of the CSP.
 - `img[src^="cid:"]` is hidden (only exact lowercase `cid:`). Without remote content, every image whose `src` doesn't
   start with `data:` is `visibility: hidden` (keeps its space, as Mail does).
