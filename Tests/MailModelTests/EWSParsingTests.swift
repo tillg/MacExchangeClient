@@ -632,6 +632,12 @@ struct EWSParsingTests {
         #expect(d.attr("SuppressReadReceipts") == "true")
     }
 
+    /// BUG-215: a recipient without an address ("Bob <>") is left out; an empty EmailAddress is invalid and fails the send.
+    @Test func recipientWithoutAddressIsLeftOut() throws {
+        let d = try request(EWSBackend.createRequest(Draft(accountID: UUID(), to: "Ann <ann@x.com>, Bob <>", subject: "Hi", body: "T"), send: true))
+        #expect(d.all("EmailAddress").map { $0.stringValue ?? "" } == ["ann@x.com"])
+    }
+
     @Test func createRequestSendsOrSavesInSchemaOrder() throws {
         let draft = Draft(accountID: UUID(), to: "Ann <ann@x.com>, bob@x.com", cc: "c@x.com", subject: "S <1>", body: "B & C")
         let sent = try request(EWSBackend.createRequest(draft, send: true))

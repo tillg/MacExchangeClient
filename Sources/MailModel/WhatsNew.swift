@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "A recipient written with an empty address, like \"Bob <>\", is left out instead of making the whole message fail to send.",
             "After signing in again with the right password, the \"Sign-in failed\" notice goes away once mail has been checked.",
             "Mark All Messages as Read while only unread mail is shown no longer leaves the now hidden messages selected.",
             "Conversation rows show first names also for names like \"Jikeli, Jan (mgm-tp)\", and two people with the same first name show as two (\"Jan & Jan\").",

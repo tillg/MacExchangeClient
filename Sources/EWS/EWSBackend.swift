@@ -474,7 +474,8 @@ public struct EWSBackend: MailBackend {
     /// With content IDs (pictures placed in the text) the body goes as HTML that shows them in their place.
     static func createRequest(_ d: Draft, send: Bool, contentIDs: [Int: String] = [:]) -> String {
         func recipients(_ tag: String, _ list: String) -> String {
-            let boxes = Contact.parseList(list).map {
+            // A recipient without an address ("Bob <>") is left out: an empty EmailAddress fails the send (BUG-215).
+            let boxes = Contact.parseList(list).filter { !$0.email.trimmingCharacters(in: .whitespaces).isEmpty }.map {
                 "<t:Mailbox><t:Name>\(xmlEscape($0.name))</t:Name><t:EmailAddress>\(xmlEscape($0.email))</t:EmailAddress></t:Mailbox>"
             }
             return boxes.isEmpty ? "" : "<t:\(tag)>\(boxes.joined())</t:\(tag)>"
