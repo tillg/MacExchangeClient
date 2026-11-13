@@ -71,14 +71,6 @@ struct Probe_R5A {
         #expect(s.listSelection == [row])
     }
 
-    // R5A-03
-    /// A sender whose display name is only a comma (", " as "Last, First" with both empty) crashes the list row.
-    @Test func conversationSendersWithCommaOnlyNameDoNotCrash() async {
-        await #expect(processExitsWith: .success) {
-            _ = ConversationRow.senders([Contact(name: ", ", email: "a@x.com"), Contact(name: "Bob Ray", email: "b@x.com")])
-        }
-    }
-
     // R5A-04
     /// Two different people who share a first name are shown as one sender's full name, as for a single-sender row.
     @Test func twoSendersWithTheSameFirstNameAreNotShownAsOne() {

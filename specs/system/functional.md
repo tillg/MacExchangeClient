@@ -38,6 +38,10 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 - Row: unread dot, or for a VIP sender a star in the same column (accent while unread, grey when read), optional
   avatar, sender (13 pt semibold; subject, preview and date 12 pt) (for Sent and Drafts "To: " + first recipient), date (time today,
   "Yesterday", weekday within 7 days, else short date), subject, paperclip, flag, two-line preview.
+- With conversations on, a conversation is one row (`ConversationRow`): its newest message in the list stands for it,
+  with a count badge. Sender (`ConversationRow.senders`): one sender's full name, else first names newest first
+  ("Jan, Sergio & Till"); "Last, First" gives the part after the last comma; a name that is empty or only commas and
+  blanks shows the address.
 - Selecting exactly one message marks it read (one main-loop turn later), and the message view loads it.
 - A message that was unread when opened stays in the list with the unread filter and in Unread while it is selected
   (it is judged as unread there; sidebar counts use the real state). It leaves once the selection moves on, the

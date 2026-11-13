@@ -11,7 +11,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [146](BUG-146-memory-search-per-keystroke-freeze.md) | P4 | MailStore | Search without the index (index build failed or still building, or "Search failed") freezes 0.6-1 s per keystroke on 180,000 messages |
 | [154](BUG-154-mark-all-read-keeps-hidden-selection.md) | P3 | MailStore / selection | Mark All as Read with the unread filter (or in Unread) leaves the selected messages selected after they leave the list |
 | [155](BUG-155-non-row-selection-dropped-by-actions.md) | P2 | MailStore / conversations | After a reply arrives in the open conversation, flagging, marking or swiping its row clears the selection |
-| [156](BUG-156-comma-only-sender-name-crashes-list.md) | P1 | Models / ConversationRow | A sender named "," (or ", ") in a conversation crashes the app |
 | [157](BUG-157-same-first-name-senders-shown-as-one.md) | P3 | Models / ConversationRow | Two different senders with the same first name show as one sender's full name |
 | [158](BUG-158-delete-in-folder-inside-trash-moves-to-trash.md) | P4 | MailStore / actions | Delete in a folder inside Trash moves the mail to Trash instead of erasing it |
 | [159](BUG-159-invite-answer-selection-depends-on-hidden-member.md) | P4 | MailStore / conversations | Answering an invite moves the selection to another conversation, but only when the selection holds the invite rather than its row |
