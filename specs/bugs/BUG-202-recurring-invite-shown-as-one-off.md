@@ -2,7 +2,7 @@
 title: "A recurring meeting's invite is shown as a one-off meeting: nothing says it repeats"
 priority: P3
 area: invites / EWS
-status: open
+status: deferred
 found: 2026-11-13
 ---
 Draft id: R5H-04 (probe suites `Probe_R5*` in `probes/Probe_R5*Tests.swift`).
@@ -27,3 +27,6 @@ invite properties asked: <t:FieldURI FieldURI="calendar:Start"/>…<t:FieldURI F
 
 ## Fix idea
 Add `calendar:IsRecurring` (and `calendar:Recurrence` for the pattern) to `inviteProps`, carry it in `Invite`, and add "repeats …" to the when line.
+
+## Deferred (2026-11-13)
+showing recurrence is closer to a missing feature (read IsRecurring/Recurrence, word the pattern) than a bug. See DECISIONS.md run-2026-11-13-1235-12.

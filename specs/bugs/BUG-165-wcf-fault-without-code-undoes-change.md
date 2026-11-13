@@ -2,7 +2,7 @@
 title: 'A SOAP fault without an Exchange ResponseCode (IIS/WCF internal error) undoes the change as "refused"'
 priority: P3
 area: EWS
-status: open
+status: deferred
 found: 2026-11-13
 ---
 Draft id: R5B-05 (probe suites `Probe_R5*` in `probes/Probe_R5*Tests.swift`).
@@ -31,3 +31,6 @@ s.outbox.map(\.change) → []
 
 ## Fix idea
 In `EWSClient.call`, a `Fault` without an Exchange `ResponseCode` in its detail should throw `ServerBusy` (not refused), like an answer without any `ResponseCode`.
+
+## Deferred (2026-11-13)
+needs a decision on which faults count as "server down" vs "refused"; the WCF fault shape is hand-written (⚠️), not seen from the live server. See DECISIONS.md run-2026-11-13-1235-12.

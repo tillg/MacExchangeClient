@@ -2,7 +2,7 @@
 title: "An account whose server doesn't answer (on-prem Exchange off the VPN) holds up the other accounts' new mail and changes for up to 60 s per check"
 priority: P3
 area: MailStore
-status: open
+status: deferred
 found: 2026-11-13
 ---
 Draft id: R5G-06 (probe suites `Probe_R5*` in `probes/Probe_R5*Tests.swift`).
@@ -28,3 +28,6 @@ B's new mail didn't arrive within 5 s while A's server was silent (B served 1)
 
 ## Fix idea
 Run `drain` per account (one task per account, order kept within an account) and don't make the quick check await other accounts' flushes; check accounts concurrently (a task group over `backends`) in `refresh`.
+
+## Deferred (2026-11-13)
+a design choice: per-account concurrent checks vs. a shorter timeout; touches the sync scheduler. See DECISIONS.md run-2026-11-13-1235-12.

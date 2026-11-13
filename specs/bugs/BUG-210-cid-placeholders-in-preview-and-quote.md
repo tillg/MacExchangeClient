@@ -2,7 +2,7 @@
 title: "⚠️ \"[cid:image001.png@01D…]\" from Exchange's text version shows in the list preview and is quoted in replies"
 priority: P3
 area: ews body / preview / compose
-status: open
+status: deferred
 found: 2026-11-13
 ---
 
@@ -30,3 +30,6 @@ Expectation failed: !quote.contains("[cid:")
 
 ## Fix idea
 In `EWSBackend.parseBody`, drop `[cid:…]` tokens from `TextBody` whose ID is one of the message's attachments' `ContentId` (then drop lines left empty).
+
+## Deferred (2026-11-13)
+rests on ⚠️ (whether Exchange writes "[cid:…]" into its text version); needs a look at real mail first. See DECISIONS.md run-2026-11-13-1235-12.

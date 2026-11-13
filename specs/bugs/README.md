@@ -26,7 +26,7 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [162](BUG-162-mail-folder-in-non-mail-folder-shown-or-archive.md) | P4 | EWS | A mail folder inside Contacts, Calendar or Tasks shows at the top level, and one named Archive becomes the account's Archive |
 | [163](BUG-163-archive-removed-on-server-keeps-mail.md) | P3 | Sync | An Archive folder deleted on the server keeps its mail and sync position in Archive for good |
 | [164](BUG-164-throttled-send-does-not-hold-account.md) | P3 | Outbox | A send that Exchange throttles doesn't hold back the account's other changes: they go out at once, inside the back-off |
-| [165](BUG-165-wcf-fault-without-code-undoes-change.md) | P3 | EWS | A SOAP fault without an Exchange ResponseCode (IIS/WCF internal error) undoes the change as "refused" |
+| [165](BUG-165-wcf-fault-without-code-undoes-change.md) | P3 | EWS | A SOAP fault without an Exchange ResponseCode (IIS/WCF internal error) undoes the change as "refused" (deferred) |
 | [166](BUG-166-folder-list-failure-undoes-queued-move.md) | P3 | Outbox | A queued move is undone as "refused" when reading the folder list fails |
 | [167](BUG-167-two-refused-changes-leave-wrong-state.md) | P3 | Outbox | Two refused changes of the same message leave it in the state of the first change, which the server never had |
 | [168](BUG-168-refused-folder-stops-newest-of-others.md) | P4 | Sync | One folder that Exchange refuses in the history's first step stops the newest-200 fetch for all the account's other folders |
@@ -39,7 +39,7 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [180](BUG-180-header-date-wraps.md) | P4 | UI / MessageDetailView | Message header: the date breaks onto two lines in a narrow message pane |
 | [181](BUG-181-invite-text-squeezed.md) | P4 | UI / InviteView | Invite: the fixed 300 pt day column squeezes the message text to a few words per line |
 | [182](BUG-182-junk-button-label-in-junk.md) | P4 | UI / MessageViewer, MailCommands, MessageListView | Junk button, menu and context menu keep saying "Junk" / "Move to Junk" in the Junk mailbox, where they move mail to the Inbox |
-| [184](BUG-184-new-viewer-window-mirrors.md) | P3 | UI / MessageViewer | File ▸ New Viewer Window opens a second window that always shows the same mailbox and selection as the first |
+| [184](BUG-184-new-viewer-window-mirrors.md) | P3 | UI / MessageViewer | File ▸ New Viewer Window opens a second window that always shows the same mailbox and selection as the first (deferred) |
 | [185](BUG-185-flagged-badge-unread.md) | P4 | UI / SidebarView | Flagged in the sidebar shows no count while flagged messages are read |
 | [187](BUG-187-reply-all-note-to-self-empty-to.md) | P4 | compose | Reply All to a note sent only to myself opens with an empty To |
 | [188](BUG-188-fffc-in-quoted-text-becomes-file-mark.md) | P3 | compose | A U+FFFC character in the original's text is taken for a file mark: the forwarded picture is sent inline there, Exclude Attachments deletes it from the quote |
@@ -52,7 +52,7 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [199](BUG-199-whatsnew-date-day-early-west-of-utc.md) | P4 | UI / WhatsNewView | Help ▸ What's New dates each day one day early on a Mac west of UTC (2026-11-13 shown as Thursday, 12 November) |
 | [200](BUG-200-all-day-invite-other-zone-two-days.md) | P3 | invites / EWS | An all-day invite from a colleague in another time zone (London, New York, Tokyo) is shown as two days, or the wrong day |
 | [201](BUG-201-when-line-runs-backwards-on-clock-change.md) | P4 | invites | On the night the clocks go back, an invite's when line reads "at 2:30 – 2:15", as if it ended before it starts |
-| [202](BUG-202-recurring-invite-shown-as-one-off.md) | P3 | invites / EWS | A recurring meeting's invite is shown as a one-off meeting: nothing says it repeats |
+| [202](BUG-202-recurring-invite-shown-as-one-off.md) | P3 | invites / EWS | A recurring meeting's invite is shown as a one-off meeting: nothing says it repeats (deferred) |
 | [203](BUG-203-reply-stacks-numbered-or-indented-prefix.md) | P4 | compose | Reply to "Re[2]: …" or to a subject with a leading blank (" Re: …") stacks a second "Re:" |
 | [204](BUG-204-html-source-line-breaks-kept.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail keeps the HTML source's line breaks: paragraphs break mid-sentence and every <br> gives a blank line in quotes |
 | [205](BUG-205-block-elements-run-together.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail runs blocks together: "Original textMy answer" after </blockquote>, <hr>, or an unclosed <p> |
@@ -60,13 +60,13 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [207](BUG-207-c1-numeric-references-become-controls.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail loses ’, € and – written as &#146; &#128; &#150; (they become invisible control characters) |
 | [208](BUG-208-non-utf8-byte-fails-whole-response.md) | P4 | ews / transport | A message whose text holds one non-UTF-8 byte or a raw control character never opens ("Unreadable EWS response" on every try) |
 | [209](BUG-209-content-type-parameters-not-stripped.md) | P4 | ews / attachments | An attachment content type with parameters ("application/octet-stream; name=logo.png") hides an inline logo and drops an unnamed file's extension |
-| [210](BUG-210-cid-placeholders-in-preview-and-quote.md) | P3 | ews body / preview / compose | ⚠️ "[cid:image001.png@01D…]" from Exchange's text version shows in the list preview and is quoted in replies |
+| [210](BUG-210-cid-placeholders-in-preview-and-quote.md) | P3 | ews body / preview / compose | ⚠️ "[cid:image001.png@01D…]" from Exchange's text version shows in the list preview and is quoted in replies (deferred) |
 | [211](BUG-211-colon-in-attachment-name-shows-as-slash.md) | P4 | attachments | ⚠️ An attachment with ":" in its name (attached message "Re: Budget") is saved as "Re/ Budget.eml" in the Finder |
 | [212](BUG-212-attachment-named-original-cant-be-saved.md) | P4 | attachments | An attachment named "Original" can't be saved once an app has changed the opened copy |
 | [213](BUG-213-invisible-characters-kept-in-address.md) | P4 | compose / recipients | An address pasted with a BOM or word joiner around it keeps the invisible character and goes to an address that doesn't exist |
 | [222](BUG-222-conversation-view-rebuilds-list-twice-on-open.md) | P3 | MailStore | With conversations on (the default), opening the next unread message in a large mailbox rebuilds the list twice: 0.37-0.94 s per click in Archive (30,000) |
 | [224](BUG-224-check-before-stored-state-read-keeps-deleted-mail.md) | P3 | Launch | Clicking a mailbox while "Loading Mail…" reads the database starts the history sync early; mail deleted on the server while the app was closed then stays forever |
-| [225](BUG-225-silent-server-holds-up-other-accounts.md) | P3 | MailStore | An account whose server doesn't answer (on-prem Exchange off the VPN) holds up the other accounts' new mail and changes for up to 60 s per check |
+| [225](BUG-225-silent-server-holds-up-other-accounts.md) | P3 | MailStore | An account whose server doesn't answer (on-prem Exchange off the VPN) holds up the other accounts' new mail and changes for up to 60 s per check (deferred) |
 | [226](BUG-226-reply-to-message-deleted-while-body-loads.md) | P4 | MailStore | Reply to an unopened message that is deleted on the server while its body loads opens an empty message from the first account |
 | [227](BUG-227-include-attachments-menu-order.md) | P4 | MailModel / IncludeAttachments, MailCommands | Edit ▸ Include Attachments With Replies lists Never, Ask, When Adding Recipients, Always; Mail lists Always, Never, When Adding Recipients, Ask |
 | [228](BUG-228-message-menu-structure.md) | P4 | UI / MailCommands | Message menu differs from MainMenu.nib: "Mark as Read/Unread", Toggle Flag outside the Flag submenu, Move to Junk after Archive, Delete in Message instead of Edit |

@@ -19,6 +19,7 @@ edited: 2026-11-13
   - [14:38 — Keychain items keyed "user@host", old username-only items still read](#run-2026-11-13-1235-9)
   - [14:48 — The compose wishes get their own change spec, in four shippable parts](#run-2026-11-13-1235-10)
   - [15:24 — The daily app bundle holds a debug build; not rebuilt or relaunched by the run](#run-2026-11-13-1235-11)
+  - [15:30 — Five P3 bugs deferred: they need a design choice or a look at real server data](#run-2026-11-13-1235-12)
 
 # 2026-11-12 23:16 — Unattended bug-fix run {#run-2026-11-12-2316}
 
@@ -1019,3 +1020,12 @@ edited: 2026-11-13
 - **Decision:** leave it; no relaunch, no `./run.sh release` by the run (it would also launch the app against the real account). Compile checks since then use `swift build --product MailReplica` only; CLAUDE.md now says so.
 - **Why:** launching the app connects to the user's real Exchange account; that's the user's call.
 - **Consequences:** the user runs `./run.sh release` when back. The first launch adds the `reply_to` column and marks loaded bodies to be fetched once more when opened (BUG-186), and stores new passwords per server (BUG-252; the old item is still read).
+
+## 15:30 — Five P3 bugs deferred: they need a design choice or a look at real server data {#run-2026-11-13-1235-12}
+
+- **Status:** open
+- **Context:** fixing round-5 bugs P3 by P3; the remaining ones include changes that shape behaviour or rest on response shapes nobody has seen from the live server.
+- **Decision:** defer BUG-165 (which SOAP faults count as "server trouble"; ⚠️ hand-written fault), BUG-184 (one mailbox/selection per viewer window: a state-model change), BUG-202 (showing recurrence: closer to a feature), BUG-210 ("[cid:…]" placeholders: ⚠️ whether Exchange writes them), BUG-225 (a silent server holding up other accounts: scheduler design). Each bug file says why (`status: deferred`).
+- **Why:** each needs the user's choice or real data; a guess could make behaviour worse.
+- **Alternatives:** fix them on assumptions (risk of wrong behaviour on the real server).
+- **Consequences:** they stay in the list, marked deferred, for the user's review.

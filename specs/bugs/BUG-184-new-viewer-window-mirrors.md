@@ -2,7 +2,7 @@
 title: 'File ▸ New Viewer Window opens a second window that always shows the same mailbox and selection as the first'
 priority: P3
 area: UI / MessageViewer
-status: open
+status: deferred
 found: 2026-11-13
 ---
 Draft id: R5E-07 (probe suites `Probe_R5*` in `probes/Probe_R5*Tests.swift`).
@@ -21,3 +21,6 @@ Both windows follow each other's mailbox and selection (by construction: one sha
 
 ## Fix idea
 Keep mailbox and selection per window (`@State`/`@SceneStorage` in `MessageViewer`, passed into list queries), or remove New Viewer Window until that exists.
+
+## Deferred (2026-11-13)
+a design choice: should each viewer window have its own mailbox and selection (Mail does)? That moves selection state out of MailStore. See DECISIONS.md run-2026-11-13-1235-12.
