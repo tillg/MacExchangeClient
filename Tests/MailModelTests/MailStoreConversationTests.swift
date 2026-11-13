@@ -150,4 +150,33 @@ struct MailStoreConversationTests {
             guard ConversationRow.senders(names) == "a@x.com, c@x.com & Bob" else { exit(1) }
         }
     }
+
+    /// BUG-155: a reply arrived in the selected conversation: the row stands for the reply, the selection still holds the
+    /// older message. Deleting the row by swipe or context menu should select the next row, as Delete does.
+    @Test func swipeDeleteOfRowWhoseOlderMessageIsSelectedSelectsNextRow() {
+        let s = store([])
+        s.merge([mail(work, "Plan", conv: "P", read: true, minutesAgo: 30, rid: "R1"),
+                 mail(work, "Other", from: "Bob Ray", minutesAgo: 60, rid: "R3")], account: work.id, mailbox: .inbox)
+        let q = s.messages.first { $0.remoteID == "R1" }!.id, other = s.messages.first { $0.remoteID == "R3" }!.id
+        s.selection = [q]
+        s.merge([mail(work, "Re: Plan", from: "Bob Ray", conv: "P", minutesAgo: 1, rid: "R2")], account: work.id, mailbox: .inbox)
+        let row = s.visibleMessages[0].id
+        #expect(s.listSelection == [row])
+        s.delete(s.withConversations([row]))  // swipe ▸ Trash on the selected row
+        #expect(s.selection == [other])
+    }
+
+    /// BUG-155, same state: flagging (or marking unread) the open conversation, which stays in the list, clears the selection,
+    /// so the message pane goes blank.
+    @Test func flaggingTheOpenConversationAfterAReplyArrivedKeepsItSelected() {
+        let s = store([])
+        s.merge([mail(work, "Plan", conv: "P", read: true, minutesAgo: 30, rid: "R1")], account: work.id, mailbox: .inbox)
+        s.selection = [s.messages[0].id]
+        s.merge([mail(work, "Re: Plan", from: "Bob Ray", conv: "P", minutesAgo: 1, rid: "R2")], account: work.id, mailbox: .inbox)
+        let row = s.visibleMessages[0].id
+        s.setFlag(.red, for: s.withConversations(s.selection))  // Message ▸ Flag ▸ Red
+        #expect(s.visibleMessages.map(\.id).contains(row))
+        #expect(s.listSelection == [row])
+    }
+
 }

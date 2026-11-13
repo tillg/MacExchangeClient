@@ -663,12 +663,14 @@ public final class MailStore {
     /// false: a read or flag change only lets go of them, so no other message is opened and marked read).
     private func keepingSelectionVisible(_ ids: Set<Message.ID>, selectNext: Bool = true, _ body: () -> Void) {
         guard !selection.isDisjoint(with: ids) else { body(); return }
-        let list = visibleMessages.map(\.id), before = selection
+        // A selected message is on screen through its conversation row, which may stand for a newer message (BUG-155).
+        let list = visibleMessages.map(\.id), before = selection, rowBefore = threads.rowOf
         body()
-        let remaining = Set(visibleMessages.map(\.id))
-        let gone = before.intersection(ids).subtracting(remaining)
+        let remaining = Set(visibleMessages.map(\.id)), rowAfter = threads.rowOf
+        let gone = before.intersection(ids).filter { !remaining.contains(rowAfter[$0] ?? $0) }
         guard !gone.isEmpty, selection == before else { return }
-        selection = gone == before && selectNext ? Self.following(before, in: list, remaining: remaining) ?? [] : before.subtracting(gone)
+        let rows = Set(before.map { rowBefore[$0] ?? $0 })
+        selection = gone == before && selectNext ? Self.following(rows, in: list, remaining: remaining) ?? [] : before.subtracting(gone)
     }
 
     /// The message after the last of `ids` in `list` that is still in it (else the one before), as Mail selects
