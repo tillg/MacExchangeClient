@@ -56,7 +56,7 @@ struct MessageTests {
         m.html = String(repeating: "<p>Text&#160;with&#8217;s references and words.</p>", count: 4_000) + String(repeating: "<image a ", count: 2_000)
         let start = Date()
         _ = m.hasRemoteContent
-        #expect(Date().timeIntervalSince(start) < 0.5)
+        #expect(Date().timeIntervalSince(start) < 2)  // about 0.35–0.5s on a busy machine; 5.7s before (quadratic)
     }
 
     /// Every way a mail can load something from the web makes the Load Remote Content banner appear.
@@ -210,6 +210,13 @@ struct MessageTests {
         let a = ComposeWindow(d), b = ComposeWindow(d)
         #expect(a != b)
         #expect(a.draft == d && b.draft == d)
+    }
+
+    /// BUG-213: a byte order mark, zero-width space or word joiner pasted with an address isn't part of it.
+    @Test func invisibleCharactersAroundAddressAreDropped() {
+        for s in ["\u{FEFF}ann@x.com", "Ann <ann@x.com\u{2060}>", "\u{200B}ann@x.com"] {
+            #expect(Contact.parseList(s).first?.email == "ann@x.com", "\(s.debugDescription)")
+        }
     }
 }
 

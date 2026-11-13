@@ -1948,4 +1948,22 @@ struct MailStoreTests {
     @Test func includeAttachmentsMenuOrderMatchesMail() {
         #expect(IncludeAttachments.allCases.map(\.title) == ["Always", "Never", "When Adding Recipients", "Ask"])
     }
+
+    /// BUG-203: a numbered ("Re[2]:") or indented (" Re:") prefix is replaced, not stacked.
+    @Test func replyDoesNotStackNumberedOrIndentedPrefix() {
+        let a = msg(work, subject: "Re[2]: Budget"), b = msg(work, subject: " Re: Budget"), c = msg(work, subject: "FW[3]: Plan")
+        let s = store([a, b, c])
+        #expect(s.draft(.reply, to: a.id).subject == "Re: Budget")
+        #expect(s.draft(.reply, to: b.id).subject == "Re: Budget")
+        #expect(s.draft(.forward, to: c.id).subject == "Fwd: Plan")
+    }
+
+    /// BUG-187: Reply All to a note sent only to myself goes to me, as Reply does.
+    @Test func replyAllToNoteToSelfGoesToMe() {
+        let me = Contact(name: "Me", email: work.address)
+        let m = Message(accountID: work.id, from: me, to: [me], subject: "Note", body: "x", date: .now)
+        let s = store([m])
+        #expect(s.draft(.reply, to: m.id).to == work.address)
+        #expect(s.draft(.replyAll, to: m.id).to == work.address)
+    }
 }

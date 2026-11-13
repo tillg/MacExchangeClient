@@ -218,7 +218,7 @@ struct MailStorePerformanceTests {
         let t = Date().timeIntervalSince(start)
         print(String(format: "PERF toggle flag 140 of 210k %.3fs", t))
         #expect(s.messages.filter { ids.contains($0.id) }.allSatisfy { $0.flag == .red })
-        #expect(t < 0.1)
+        #expect(t < Self.limit)  // about 0.09s; seconds with a scan of all mail per selected message
     }
 
     /// BUG-222: with conversations on, opening the next unread message marks it read without building the whole list

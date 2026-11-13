@@ -817,4 +817,28 @@ struct EWSParsingTests {
         #expect(url("https://MAIL.EXAMPLE.COM/EWS/Exchange.asmx") == plain)
         #expect(url("mail.example.com:8443")?.port == 8443)
     }
+
+    /// BUG-196: placed pictures get a Content-ID in msg-id form (with "@").
+    @Test func placedPictureContentIDIsAMsgID() {
+        var d = Draft(accountID: UUID(), body: String(Draft.fileMark))
+        d.attachments = [DraftAttachment(name: "p.png", contentType: "image/png", data: Data([1]))]
+        let ids = EWSBackend.contentIDs(d)
+        #expect(!ids.isEmpty && ids.values.allSatisfy { $0.contains("@") })
+    }
+
+    /// BUG-209: content types with parameters ("application/octet-stream; name=logo.png") are read without them.
+    @Test func contentTypeParametersAreIgnored() throws {
+        let d = try doc("""
+            <t:Message><t:Attachments>\
+            <t:FileAttachment><t:AttachmentId Id="A1"/><t:Name>logo.png</t:Name>\
+            <t:ContentType>application/octet-stream; name=logo.png</t:ContentType><t:ContentId>logo@x</t:ContentId>\
+            <t:IsInline>true</t:IsInline></t:FileAttachment>\
+            <t:FileAttachment><t:AttachmentId Id="A2"/><t:Name></t:Name>\
+            <t:ContentType>application/pdf; name="scan.pdf"</t:ContentType><t:Size>10</t:Size></t:FileAttachment>\
+            </t:Attachments></t:Message>
+            """)
+        let item = try #require(d.first("Message"))
+        #expect(EWSBackend.inlineAttachmentIDs(item, wanted: ["logo@x"]) == ["A1"])
+        #expect(EWSBackend.listedAttachments(item).map(\.attachment.name) == ["Attachment.pdf"])
+    }
 }
