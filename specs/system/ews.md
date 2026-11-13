@@ -13,7 +13,7 @@ is made, retries, undo): [architecture.md](architecture.md). Types: [domain-mode
 ## Account and URL
 
 - `ExchangeAccount`: `id`, `email`, `username` (`DOMAIN\user`), `server`; saved as JSON in UserDefaults
-  (`exchangeAccounts`). Its `Account` is named "Exchange" with the email as address.
+  (`exchangeAccounts`). Its `Account` is named after the email (trimmed; "Exchange" if blank), with the email as address.
 - `ewsURL`: `server` trimmed of blanks and line breaks; a leading `https://` or `http://` (any case), trailing `/`
   and a trailing `/EWS/Exchange.asmx` (any case) are dropped, then it becomes `https://<rest>/EWS/Exchange.asmx`
   (`http` is upgraded, never used). A rest whose path ends in `.asmx` is used as given; a path prefix in front of

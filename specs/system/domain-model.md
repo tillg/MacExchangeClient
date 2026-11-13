@@ -12,7 +12,7 @@ stored: [storage.md](storage.md). How EWS fills them: [ews.md](ews.md).
 
 ## Account and mailboxes
 
-- **`Account`**: `id` (UUID), `name` (always "Exchange" for EWS accounts), `address` (the email), `isServer` (true for
+- **`Account`**: `id` (UUID), `name` (for EWS accounts the email address, trimmed; "Exchange" if blank), `address` (the email), `isServer` (true for
   accounts set up in Settings, false for sample data). The Exchange settings
   (`username`, `server`) are in `ExchangeAccount` (`Sources/EWS/ExchangeAccount.swift`), persisted in UserDefaults.
 - **`MailboxKind`**: a string wrapper, so stored values stay readable as kinds are added. Standard kinds, in sidebar

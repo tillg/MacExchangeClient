@@ -14,7 +14,7 @@ Known limits of the current design, one line each. Open bugs (with repro probes 
 | Only Exchange over EWS; no IMAP, no Microsoft Graph (planned behind the same `MailBackend`) | [architecture.md](architecture.md#components) |
 | New mail is found by polling every 15 s (Inbox and the mailbox on screen); no EWS push notifications | [architecture.md](architecture.md#reading-from-the-server) |
 | The folder list is read once per launch; folders created, renamed or deleted elsewhere show after a relaunch (a deleted folder's mail goes then). Folders can't be created, renamed or deleted in the app | `MailStore.refresh`, [ews.md](ews.md#read-operations) |
-| Accounts can only be added, not edited or removed, in Settings; every EWS account is named "Exchange" | `AccountsSettings.swift` |
+| Accounts can only be added, not edited or removed, in Settings; every EWS account is named after its email address (no renaming, no display name from the server) | `AccountsSettings.swift` |
 | A wrong password pauses the account until relaunch; the password is fixed in the Keychain (`MailReplica-EWS`) | [ews.md](ews.md#transport-ewsclientcall) |
 | Exchange mail can't move to another account (drag, Move menu) | [functional.md](functional.md#drag-and-drop) |
 | Flag colours stay on this Mac; Exchange stores only flagged/not flagged, and a server flag shows as red | [domain-model.md](domain-model.md#account-and-mailboxes) |

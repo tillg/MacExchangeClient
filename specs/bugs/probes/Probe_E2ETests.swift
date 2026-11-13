@@ -184,19 +184,6 @@ struct Probe_E2ETests {
         #expect(s2.unreadCount(.smart(.flagged)) == 0, "\(s2.unreadCount(.smart(.flagged))) flagged still unread")
     }
 
-    /// Two Exchange accounts look the same everywhere: every one is called "Exchange" (sidebar sections,
-    /// All Inboxes rows, window title, "Found in Sent – …", sync progress, sign-in errors).
-    @Test func twoExchangeAccountsCanBeToldApart() {
-        let one = ExchangeAccount(email: "till@work.com", username: "W\\till", server: "mail.work.com")
-        let two = ExchangeAccount(email: "till@club.org", username: "C\\till", server: "mail.club.org")
-        let s = MailStore(accounts: [one.account, two.account], messages: [])
-        s.selectedMailbox = .account(one.id, .inbox)
-        let t1 = s.title
-        s.selectedMailbox = .account(two.id, .inbox)
-        #expect(t1 != s.title, "both Inboxes are titled \(t1)")
-        #expect(one.account.name != two.account.name)
-    }
-
     /// An Exchange account whose Keychain password is missing has no backend. Before it has any stored sync
     /// position (fresh database), Send files the message under Sent as if sent, and nothing is queued.
     @Test func sendFromAnExchangeAccountWithoutPasswordIsNotShownAsSent() {
