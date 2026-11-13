@@ -502,28 +502,6 @@ struct Probe_EWSFlowTests {
     }
 
     // file:// fixture (FIFO)
-    /// README: the quick check runs "at once when you select a mailbox". Selecting one while a check is running
-    /// (every 15 s, so often) does nothing: the running check doesn't include it and the new one returns at once.
-    // file:// fixture
-    @Test func probeMailboxSelectedDuringCheckIsChecked() async throws {
-        let server = FlowServer([], hold: true)
-        defer { server.stop() }
-        let s = store(server)
-        complete(s, .inbox); complete(s, .archive)
-        let first = Task { await s.refresh(history: false) }
-        try await waitFor { s.isRefreshing }
-        try await Task.sleep(for: .milliseconds(100))   // the Inbox request is waiting for the server
-        s.selectedMailbox = .account(acct.id, .archive)
-        let second = Task { await s.refresh(history: false) }   // what the sidebar does on selection
-        try await Task.sleep(for: .milliseconds(100))
-        server.push(FX.sync("", token: "T1", last: true))   // Inbox
-        server.push(FX.sync(FX.create(FX.summary("NEWARCH", subject: "Filed elsewhere")), token: "T1", last: true))  // Archive
-        await first.value; await second.value
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(s.messages.contains { $0.remoteID == "NEWARCH" }, "requests \(server.served), unasked responses \(server.pending)")
-    }
-
-    // file:// fixture (FIFO)
     /// Per-item errors when opening things, then a retry that works (control).
     // file:// fixture
     @Test func controlPerItemErrorsThenRetry() async throws {

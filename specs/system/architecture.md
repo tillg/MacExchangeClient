@@ -76,7 +76,8 @@ flowchart LR
   (`setRemoteFolders`; a folder of the stored tree the list no longer has was removed on the server: its mail leaves
   memory and disk, also mail loaded later during launch, its sync position goes, and if it was selected, the
   account's Inbox is selected), and for the Inbox plus the selected mailbox of that account either sync changes (folder complete) or merge the
-  newest 50 (`firstScreen`). Then it starts the history sync. A second `refresh` while one runs returns at once.
+  newest 50 (`firstScreen`). The mailboxes to check are read again after each folder, so one selected while the check
+  runs is checked by it before it ends. Then it starts the history sync. A second `refresh` while one runs returns at once.
 - **Status line:** notices about an account's connection — its failed check ("Name: error"), and "Offline – …" /
   "Exchange is busy – …" from the outbox — are noted per account (`connectionNotices`). That account's next
   successful check clears its own notice (to `historyError`), only while it is still the one shown. Other notices
