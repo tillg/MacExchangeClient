@@ -30,7 +30,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [069](BUG-069-invite-answer-for-vanished-invite-silently-dropped.md) | P3 | Invite | Respond with Comments: if the invite is gone by the time you press Send, the answer and comment vanish without a word |
 | [070](BUG-070-draft-of-removed-account-sent-from-another-account.md) | P3 | MailStore | A message written for an account that no longer exists is silently sent (or saved) from the first other account |
 | [071](BUG-071-forward-released-without-original-files.md) | P3 | MailStore | A forward whose original files can't be fetched becomes sendable without them, with no message at all when the body couldn't be loaded |
-| [078](BUG-078-refused-batch-undo-freezes-ui.md) | P3 | MailStore | Undoing a refused batch of 100 changes takes about 1 s on a 70k-message account (main thread) |
 | [079](BUG-079-mail-of-account-no-longer-set-up-loaded-at-launch.md) | P4 | MailStore | Stored mail of an account that is no longer set up is loaded at launch and shows in All Inboxes and search (its rows are never removed) |
 | [080](BUG-080-switching-account-scope-flashes-no-results.md) | P4 | MailStore | Switching from one account's mailbox to another's during a search shows an empty list (No Results) until the new answer arrives |
 | [081](BUG-081-cjk-words-inside-sentence-not-found.md) | P4 | MailDatabase | Index search can't find a Chinese or Japanese word inside a sentence (the old search could) |

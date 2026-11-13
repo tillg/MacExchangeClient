@@ -219,20 +219,6 @@ struct Probe_SyncTests {
         return s
     }
 
-    @Test func refusedBatchOf100IsUndoneQuicklyOnABigAccount() {
-        let t = (0..<3).map { _ in
-            let s = big()
-            s.markAllRead(in: .account(work.id, .inbox))  // already read: nothing
-            s.archive(Set(s.messages.suffix(100).map(\.id)))
-            let p = s.outbox[0]
-            let start = Date()
-            s.failed(p, "refused")
-            return Date().timeIntervalSince(start)
-        }.min()!
-        print("PERF failed() 100 in 70k: \(Int(t * 1000)) ms")
-        #expect(t < 0.25, "\(Int(t * 1000)) ms")
-    }
-
     @Test func renamingAMovedBatchOf100IsQuickOnABigAccount() {
         let t = (0..<3).map { _ in
             let s = big()

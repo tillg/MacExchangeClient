@@ -139,7 +139,8 @@ flowchart LR
     the property they set, and only while it still holds the value they set: read state (`setRead`), flag
     (`setFlagged`), mailbox (`move`), the invite (and the mailbox, if still in Trash) for invite answers. A later
     change to the same message stays. Only a refused erase (`delete`) re-adds a message that is gone; a message
-    erased after the refused change stays gone. Status shows the reason.
+    erased after the refused change stays gone. Status shows the reason. The batch's messages are found in one pass
+    over all messages (an index by local ID), not one search each.
 - A move needs the folder list (read on demand) and renames the moved messages to the new IDs Exchange returns,
   in memory and in the queued changes (`renameRemote`). If the destination's sync already brought a moved item under
   its new ID, that copy is dropped first; the moved message keeps its local ID, body and selection. An answer sent with "Do Not Send a Response" and Remove from
