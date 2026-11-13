@@ -778,3 +778,10 @@ edited: 2026-11-13
 - **Decision:** `MailStore` remembers the query of the memory scan last shown (`memoryQuery`) and keeps showing it while the next index answer is pending; a failed index query clears `searchHits`, so the newer memory results win over older hits. For the first answer of a search there is nothing to keep: the list still shows the mailbox (as documented), and `awaitingSearchResults` tells the list not to show "No Results" over an empty one meanwhile.
 - **Why:** fast-search spec §4 ("don't flash an empty list or No Results"). Scanning memory for the first pending query (what the third probe asked for, a non-empty list) would cost the per-keystroke scan of BUG-146 on 180,000 messages.
 - **Alternatives:** Memory scan of the typed text until the first answer (rejected: freezes per keystroke with all mail in memory).
+
+## 04:33 — Memory search per keystroke on 180,000 messages: deferred {#d-bug-146}
+
+- **Status:** deferred
+- **Context:** BUG-146. Without the index (build failed, first launch after the update, a query the index throws on), `visibleMessages` scans and folds every message on the main actor on each keystroke: 0.6–1 s with 180,000 messages.
+- **Decision:** Deferred, no code change. Meeting the 0.25 s budget with a 10× margin needs the memory scan off the main actor (debounced, detached, the previous results kept meanwhile, as BUG-132's fix now does). That makes memory results arrive later, and existing tests read them synchronously right after typing; changing them needs the user's approval.
+- **Open question for review:** (a) asynchronous memory search like the index path, updating the synchronous tests to await `searchTask`; or (b) a folded-text cache per message (costs about the memory of the loaded bodies again, and the first keystroke still scans cold); or (c) narrowing: a query that extends the previous one scans only the previous results (helps typing on, not the first letter).
