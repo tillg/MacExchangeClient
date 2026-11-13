@@ -1252,11 +1252,14 @@ public final class MailStore {
             if let f = state.folders, folders[acct] == nil { folders[acct] = f }
             serverAccounts.insert(acct)
         }
-        if sending { scheduleFlush() }
+        if sending { scheduleFlush() } else { holdingSends = true }
     }
 
     /// Sends the changes waiting for the server, once storing them can no longer bring them back (after an import).
-    public func resumeSending() { scheduleFlush() }
+    public func resumeSending() {
+        holdingSends = false
+        scheduleFlush()
+    }
 
     /// Every folder syncs once more from the start (an import of mail from before conversations).
     func forgetSyncPositions() {
@@ -1382,9 +1385,13 @@ public final class MailStore {
         if !d.attachments.isEmpty { keepFiles(d.attachments.map(\.data), for: m) }
     }
 
+    /// Set while the old cache is imported: nothing is sent, also not by an action meanwhile, until `resumeSending()`
+    /// (BUG-177: a quit before the cache is renamed would import, and send, the same message again).
+    @ObservationIgnored private var holdingSends = false
+
     private func scheduleFlush() {
         // Not while loading: the server renames moved messages, and those not in memory yet would keep old IDs.
-        guard flushTask == nil, loadedBoxes == nil, outbox.contains(where: canSend) else { return }
+        guard flushTask == nil, loadedBoxes == nil, !holdingSends, outbox.contains(where: canSend) else { return }
         flushTask = Task {
             await drain()
             flushTask = nil

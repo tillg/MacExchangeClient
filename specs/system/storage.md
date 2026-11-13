@@ -128,7 +128,7 @@ Runs when `Mail.sqlite` doesn't exist (`MailDatabase.importCache`); the sidebar 
    (`.unreadable-2`, … if taken; never deleted), an empty database is created and returned, and the status says the
    old cache couldn't be read and names the kept file. Mail is then downloaded again from the server.
    Caches from builds whose attachments were plain names decode (see `Attachment` in [domain-model.md](domain-model.md)).
-3. `store.restore(cache, sending: false)`: messages (skipping known `remoteID`s), sync tokens, outbox, complete folders, folder trees.
+3. `store.restore(cache, sending: false)`: holds all sending (also changes the user makes meanwhile) until step 7; messages (skipping known `remoteID`s), sync tokens, outbox, complete folders, folder trees.
    Then `forgetSyncPositions()`: the cache predates conversations, so, as for an older database, every folder syncs
    once more from the start and the imported mail learns its conversation.
 4. Write everything into `Mail.sqlite.importing` (old leftovers removed first) and check the row count.

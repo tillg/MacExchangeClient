@@ -500,6 +500,43 @@ struct EWSFlowTests {
         #expect(s.isPaused(acct.id))
     }
 
+
+    /// BUG-177 follow-up: a user action during the import (opening/marking a message) enqueues a change, whose
+    /// scheduleFlush drains the whole outbox, including the imported send, while Cache.json still exists.
+    @Test func actionDuringImportSendsTheImportedSendEarly() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ImportSend2-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
+        let msgs = (0..<30_000).map { n in
+            Message(accountID: acct.id, from: Contact(name: "Ann", email: "ann@x.com"), to: [Contact(name: "Me", email: "me@work.com")],
+                    subject: "Message \(n)", body: String(repeating: "text ", count: 40), date: Date(timeIntervalSinceReferenceDate: Double(n)),
+                    remoteID: "R\(n)")
+        }
+        let send = PendingChange(account: acct.id, change: .send(Draft(accountID: acct.id, to: "bob@x.com", subject: "Offer", body: "Hi")),
+                                 previous: [])
+        try MailCache(accounts: [acct.id: .init(messages: msgs, syncTokens: [.inbox: "T"], outbox: [send], complete: [.inbox], folders: [])])
+            .save(to: cacheURL)
+        let endpoint = LoopbackEndpoint()
+        defer { endpoint.stop() }
+        let seen = SeenAtSend()
+        endpoint.start {
+            seen.note(cacheStillThere: FileManager.default.fileExists(atPath: cacheURL.path))
+            return EWSReply.resp("CreateItem", EWSReply.ok("CreateItem"))
+        }
+        let s = MailStore(accounts: [], messages: [])
+        s.add(acct, backend: EWSBackend(client: EWSClient(url: endpoint.url, username: "u", password: "p")))
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .sent, id: "SENT")], account: acct.id)
+
+        let importing = Task { try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s) }
+        for _ in 0..<30000 where s.messages.isEmpty { try await Task.sleep(for: .milliseconds(1)) }
+        #expect(!s.messages.isEmpty)
+        // The user marks a message read (or opens it) while "Updating Mail Storage…" shows.
+        s.toggleRead([s.messages[0].id])
+        _ = try await importing.value
+        for _ in 0..<300 where seen.value == nil { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(seen.value == false, "the imported send went out while Cache.json (holding it) was still there")
+    }
 }
 
 /// What the server saw when the send arrived (BUG-177).
