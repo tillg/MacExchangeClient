@@ -78,6 +78,9 @@ flowchart LR
   "Exchange is busy – …" from the outbox — are noted per account (`connectionNotices`). That account's next
   successful check clears its own notice (to `historyError`), only while it is still the one shown. Other notices
   ("Couldn't send …", "Exchange refused a change", sign-in, files) are not cleared by checks; the next notice replaces them.
+  A load cancelled because the view that asked moved on (another message selected, a compose window closed:
+  `CancellationError` or `URLError.cancelled` while the task is cancelled, `MailStore.wasCancelled`) reports nothing:
+  body, `cid:` pictures, the calendar day, attachment files and a forward's original files.
 - **History** (`syncHistory`): phase 1 fetches the newest 200 of every incomplete folder, merged in batches of
   1.5 s. Phase 2 syncs one folder at a time in pages of 512 (`MaxChangesReturned`), collecting pages for up to 1.5 s
   (`historyBatch`) and applying them in one merge; after each batch the next folder is chosen again. Order:

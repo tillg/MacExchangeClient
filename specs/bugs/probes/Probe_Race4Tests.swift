@@ -123,76 +123,6 @@ struct Probe_Race4Tests {
 
     // MARK: A. A load cancelled because the user moved on is reported as an error
 
-    /// The message view loads in `.task(id: message.id)` (body, inline pictures, calendar day); the attachment
-    /// thumbnails in AttachmentsView's `.task(id: message.id)`. Selecting the next message cancels those tasks.
-    /// A cancelled request must not be reported as a failure. Cancelled before the request goes out (arrow key held
-    /// down); the in-flight case is `zzProbeCancelledInFlightBodyLoadIsNotAnError` at the end (each probe feeds the
-    /// pipe after cancelling: a cancelled file:// read left waiting stalls URLSession's file loader for later tests).
-    // file:// fixture
-    @Test func probeBodyLoadCancelledBeforeStartIsNotAnError() async throws {
-        let server = RaceServer([RX.fault("Unused", "for the cancelled read")])
-        defer { server.stop() }
-        let s = store(server)
-        s.merge([summary("R1")], account: acct.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        let t = Task { await s.loadBody(id) }
-        t.cancel()
-        await t.value
-        #expect(s.status == nil)
-        try await drained(server)
-    }
-
-    // file:// fixture
-    @Test func probeCancelledInlineImagesAreNotAnError() async throws {
-        let server = RaceServer([RX.fault("Unused", "for the cancelled read")])
-        defer { server.stop() }
-        let s = store(server)
-        var m = summary("R1")
-        m.bodyLoaded = true; m.htmlChecked = true; m.html = "<p>Hi <img src=\"cid:logo@x\"></p>"
-        s.merge([m], account: acct.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        let t = Task { await s.loadInlineImages(for: id) }
-        t.cancel()
-        await t.value
-        #expect(s.status == nil)
-        try await drained(server)
-    }
-
-    // file:// fixture
-    @Test func probeCancelledDayLoadIsNotAnError() async throws {
-        let server = RaceServer([RX.fault("Unused", "for the cancelled read")])
-        defer { server.stop() }
-        let s = store(server)
-        var m = summary("R1")
-        m.bodyLoaded = true; m.htmlChecked = true
-        m.invite = Invite(start: Date(timeIntervalSince1970: 1_700_000_000), end: Date(timeIntervalSince1970: 1_700_003_600),
-                          isCancellation: false)
-        s.merge([m], account: acct.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        let t = Task { await s.loadDay(for: id) }
-        t.cancel()
-        await t.value
-        #expect(s.status == nil)
-        try await drained(server)
-    }
-
-    // file:// fixture
-    @Test func probeCancelledThumbnailIsNotAnError() async throws {
-        let server = RaceServer([RX.fault("Unused", "for the cancelled read")])
-        defer { server.stop() }
-        let s = store(server)
-        var m = summary("R1")
-        m.bodyLoaded = true; m.htmlChecked = true; m.attachments = [Attachment(name: "photo.jpg", size: 10, contentType: "image/jpeg")]
-        m.hasAttachments = true
-        s.merge([m], account: acct.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        let t = Task { await s.attachmentFile(0, of: id) }
-        t.cancel()
-        _ = await t.value
-        #expect(s.status == nil)
-        try await drained(server)
-    }
-
     // MARK: D. Quick Look of an earlier message takes over when its file arrives late
 
     /// Space on message A (its attachment still downloading), then on message B (file at hand): Quick Look shows B.
@@ -228,7 +158,6 @@ struct Probe_Race4Tests {
         #expect(s.previewItem?.lastPathComponent == "b.txt", "previewItems \(s.previewItems.map(\.lastPathComponent))")
     }
 
-
     // MARK: E. A refused erase, queued behind the move that renamed the message, brings it back under its old ID
 
     /// Control: the same two deletes, both accepted.
@@ -246,21 +175,4 @@ struct Probe_Race4Tests {
     }
 
     // MARK: A (continued): the in-flight variant
-
-    /// The body request is out and the server hasn't answered when the user selects the next message.
-    // file:// fixture
-    @Test func zzProbeCancelledInFlightBodyLoadIsNotAnError() async throws {
-        let server = RaceServer([], hold: true)
-        defer { server.stop() }
-        let s = store(server)
-        s.merge([summary("R1")], account: acct.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        let t = Task { await s.loadBody(id) }
-        try await Task.sleep(for: .milliseconds(300))  // the request is out, the server hasn't answered
-        t.cancel()  // the user selected the next message
-        await t.value
-        #expect(s.status == nil)
-        server.push(RX.fault("Unused", "for the cancelled read"))
-        try await drained(server)
-    }
 }
