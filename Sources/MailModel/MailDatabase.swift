@@ -113,7 +113,7 @@ public final class MailDatabase: @unchecked Sendable {
               read INTEGER NOT NULL, flag TEXT, from_name TEXT NOT NULL, from_email TEXT NOT NULL, to_list TEXT NOT NULL,
               cc_list TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL, category TEXT NOT NULL, bits INTEGER NOT NULL,
               attachments TEXT NOT NULL, preview TEXT, invite BLOB, html TEXT, is_invite INTEGER, html_checked INTEGER,
-              conversation TEXT);
+              conversation TEXT, reply_to TEXT);
             CREATE INDEX IF NOT EXISTS messages_mailbox ON messages(account, mailbox);
             CREATE TABLE IF NOT EXISTS sync(account TEXT NOT NULL, mailbox TEXT NOT NULL, token TEXT, complete INTEGER NOT NULL,
               PRIMARY KEY(account, mailbox));
@@ -131,6 +131,16 @@ public final class MailDatabase: @unchecked Sendable {
             try exec("""
                 BEGIN IMMEDIATE; ALTER TABLE messages ADD COLUMN conversation TEXT;
                 UPDATE sync SET token = NULL, complete = 0; COMMIT;
+                """)
+        }
+        // From before Reply-To was stored: loaded server bodies are marked as fetched without HTML, so `needsBody`
+        // fetches them once more when opened, this time with Reply-To.
+        var hasReplyTo = false
+        try query("SELECT 1 FROM pragma_table_info('messages') WHERE name = 'reply_to'") { _ in hasReplyTo = true }
+        if !hasReplyTo {
+            try exec("""
+                BEGIN IMMEDIATE; ALTER TABLE messages ADD COLUMN reply_to TEXT;
+                UPDATE messages SET html_checked = 0 WHERE remote IS NOT NULL AND bits & \(Self.loaded) != 0; COMMIT;
                 """)
         }
         // A new database gets the search index right away; an older one in `prepareSearch()`, after the Inbox has loaded.
@@ -502,8 +512,8 @@ public final class MailDatabase: @unchecked Sendable {
     // MARK: Rows
 
     private static let columns = "id, account, mailbox, remote, date, read, flag, from_name, from_email, to_list, cc_list, "
-        + "subject, body, category, bits, attachments, preview, invite, html, is_invite, html_checked, conversation"
-    private static let columnCount = 22
+        + "subject, body, category, bits, attachments, preview, invite, html, is_invite, html_checked, conversation, reply_to"
+    private static let columnCount = 23
     private static let upsertSet = columns.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
         .filter { $0 != "id" }.map { "\($0) = excluded.\($0)" }.joined(separator: ", ")
 
@@ -571,7 +581,7 @@ public final class MailDatabase: @unchecked Sendable {
         st.bind(16, attachments(m.attachments)); st.bind(17, m.serverPreview)
         st.bind(18, try m.invite.map { try JSONEncoder().encode($0) }); st.bind(19, m.html)
         st.bind(20, m.isInvite.map { $0 ? 1 : 0 }); st.bind(21, m.htmlChecked.map { $0 ? 1 : 0 })
-        st.bind(22, m.conversationID)
+        st.bind(22, m.conversationID); st.bind(23, m.replyTo.map(contacts))
     }
 
     private static func message(_ r: Statement) -> Message? {
@@ -591,6 +601,7 @@ public final class MailDatabase: @unchecked Sendable {
         m.html = r.optionalText(18)
         m.htmlChecked = r.isNull(20) ? nil : r.int(20) == 1
         m.conversationID = r.optionalText(21)
+        m.replyTo = r.optionalText(22).map(contacts)
         return m
     }
 

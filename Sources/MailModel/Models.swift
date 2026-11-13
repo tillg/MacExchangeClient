@@ -209,6 +209,8 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
     public var htmlChecked: Bool?
     /// The server's conversation (Exchange ConversationId): the messages, received and sent, that belong together.
     public var conversationID: String?
+    /// Where the sender asks replies to go (Reply-To). nil: the body was loaded before Reply-To was asked for.
+    public var replyTo: [Contact]?
 
     public init(id: UUID = UUID(), accountID: UUID, mailbox: MailboxKind = .inbox, from: Contact, to: [Contact],
                 cc: [Contact] = [], subject: String, body: String, date: Date, isRead: Bool = false,

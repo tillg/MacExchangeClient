@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Reply and Reply All now go to the address the sender asked answers to go to (Reply-To), for example a shop's support address instead of its no-reply address.",
             "With seven or more accounts the app no longer quits at launch; ⌘1 to ⌘9 go to the first nine mailboxes in the Mailbox menu.",
             "A conversation with a sender whose name is just a comma no longer makes the app quit; the sender's address is shown instead.",
             "The window responds faster in an account with many folders: the sidebar and the Move menu no longer slow down every click.",

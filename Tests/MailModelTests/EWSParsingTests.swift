@@ -717,4 +717,17 @@ struct EWSParsingTests {
             """)
         #expect(EWSBackend.parseMaxMessageSize(d) == 36_700_160)
     }
+
+    /// BUG-186: the body request asks for Reply-To, and it is read (empty when the message has none).
+    @Test func bodyReadsReplyTo() throws {
+        #expect(EWSBackend.bodyRequest("ID1").contains(#"FieldURI="message:ReplyTo""#))
+        let d = try doc("""
+            <t:Message><t:ItemId Id="ID1"/><t:Body BodyType="Text">Your ticket</t:Body>
+            <t:From><t:Mailbox><t:Name>Shop</t:Name><t:EmailAddress>noreply@shop.example</t:EmailAddress></t:Mailbox></t:From>
+            <t:ReplyTo><t:Mailbox><t:Name>Support</t:Name><t:EmailAddress>support@shop.example</t:EmailAddress></t:Mailbox></t:ReplyTo></t:Message>
+            """)
+        #expect(EWSBackend.parseBody(try #require(d.first("Message"))).replyTo == [Contact(name: "Support", email: "support@shop.example")])
+        let none = try doc(#"<t:Message><t:ItemId Id="ID2"/><t:Body BodyType="Text">x</t:Body></t:Message>"#)
+        #expect(EWSBackend.parseBody(try #require(none.first("Message"))).replyTo == [])
+    }
 }

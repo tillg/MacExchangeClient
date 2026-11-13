@@ -1525,6 +1525,7 @@ public final class MailStore {
         if let f = b.from { messages[i].from = f }
         if let to = b.to { messages[i].to = to }
         if let cc = b.cc { messages[i].cc = cc }
+        if let r = b.replyTo { messages[i].replyTo = r }
         if let invite = b.invite { messages[i].invite = invite; messages[i].isInvite = true }
     }
 
@@ -2062,10 +2063,12 @@ public final class MailStore {
         case .reply:
             // Replying to my own message (from Sent, or in a conversation) goes to its recipients, as in Mail.
             // A note only to myself still goes to me.
+            // Otherwise to Reply-To when the sender set one (RFC 5322 §3.6.2), else to the sender.
             let recipients = m.from.email.lowercased() == me?.lowercased() ? addresses(m.to) : ""
-            to = recipients.isEmpty ? m.from.email : recipients
+            let replyTo = addresses(m.replyTo ?? [])
+            to = !recipients.isEmpty ? recipients : !replyTo.isEmpty ? replyTo : m.from.email
         case .replyAll:
-            to = addresses([m.from] + m.to)
+            to = addresses((m.replyTo.flatMap { $0.isEmpty ? nil : $0 } ?? [m.from]) + m.to)
             cc = addresses(m.cc)
         case .forward: break
         }

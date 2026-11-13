@@ -1839,4 +1839,17 @@ struct MailStoreTests {
         #expect(MailStore.favoriteKey(at: 8) == "9")
         #expect(MailStore.favoriteKey(at: 9) == nil)
     }
+
+    /// BUG-186: Reply goes to the Reply-To addresses when the message has them (RFC 5322 §3.6.2); Reply All to them
+    /// plus the other recipients.
+    @Test func replyGoesToReplyTo() {
+        var m = msg(work, from: "Shop")
+        m.replyTo = [Contact(name: "Support", email: "support@shop.example")]
+        m.cc = [Contact(name: "Bob", email: "bob@x.com")]
+        let s = store([m])
+        #expect(s.draft(.reply, to: m.id).to == "support@shop.example")
+        let all = s.draft(.replyAll, to: m.id)
+        #expect(all.to == "support@shop.example")
+        #expect(all.cc == "bob@x.com")
+    }
 }

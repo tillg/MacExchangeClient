@@ -88,7 +88,7 @@ public struct EWSBackend: MailBackend {
         <t:AdditionalProperties><t:FieldURI FieldURI="item:Body"/><t:FieldURI FieldURI="item:TextBody"/>\
         <t:FieldURI FieldURI="item:Attachments"/>\
         <t:FieldURI FieldURI="message:From"/><t:FieldURI FieldURI="message:ToRecipients"/>\
-        <t:FieldURI FieldURI="message:CcRecipients"/>\(inviteProps)</t:AdditionalProperties></m:ItemShape>\
+        <t:FieldURI FieldURI="message:CcRecipients"/><t:FieldURI FieldURI="message:ReplyTo"/>\(inviteProps)</t:AdditionalProperties></m:ItemShape>\
         <m:ItemIds><t:ItemId Id="\(xmlEscape(remoteID))"/></m:ItemIds></m:GetItem>
         """
     }
@@ -617,7 +617,8 @@ public struct EWSBackend: MailBackend {
         return MessageBody(text: text, attachments: attachments,
                            from: item.child("From").map(contact),
                            to: item.child("ToRecipients").map(mailboxes) ?? [],
-                           cc: item.child("CcRecipients").map(mailboxes) ?? [], invite: parseInvite(item), html: html)
+                           cc: item.child("CcRecipients").map(mailboxes) ?? [], invite: parseInvite(item), html: html,
+                           replyTo: item.child("ReplyTo").map(mailboxes) ?? [])
     }
 
     /// Rough text of an HTML body, used only if the server sends no `TextBody`. One pass, so an unclosed tag or

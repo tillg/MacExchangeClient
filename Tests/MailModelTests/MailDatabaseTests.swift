@@ -58,6 +58,35 @@ struct MailDatabaseTests {
         #expect(Set(back) == [full, plain])
     }
 
+    /// BUG-186: Reply-To is stored; a message whose body was never asked for it keeps nil (not known yet).
+    @Test func replyToSurvives() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        var m = remote("RT"); m.replyTo = [Contact(name: "Support", email: "support@x.com")]
+        var empty = remote("E"); empty.replyTo = []
+        try MailDatabase(url: url).write(StoreChanges(upserts: [m, empty, remote("N")]))
+        let back = Dictionary(uniqueKeysWithValues: try reopen(url).messages().map { ($0.remoteID!, $0.replyTo) })
+        #expect(back["RT"] == [Contact(name: "Support", email: "support@x.com")])
+        #expect(back["E"] == [])
+        #expect(back["N"] == .some(nil))
+    }
+
+    /// BUG-186: a database from before Reply-To gets the column, and its loaded server bodies are fetched once more.
+    @Test func bodiesLoadedBeforeReplyToAreFetchedAgain() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        var m = remote("L"); m.body = "Text"; m.bodyLoaded = true; m.htmlChecked = true; m.replyTo = []
+        try MailDatabase(url: url).write(StoreChanges(upserts: [m, remote("U")]))
+        var raw: OpaquePointer?
+        #expect(sqlite3_open(url.path, &raw) == SQLITE_OK)
+        #expect(sqlite3_exec(raw, "ALTER TABLE messages DROP COLUMN reply_to", nil, nil, nil) == SQLITE_OK)
+        sqlite3_close(raw)
+        let back = Dictionary(uniqueKeysWithValues: try reopen(url).messages().map { ($0.remoteID!, $0) })
+        #expect(back["L"]?.needsBody == true)
+        #expect(back["L"]?.body == "Text")
+        #expect(back["U"]?.htmlChecked == nil)
+    }
+
     /// A meeting response ("Accepted: …") stored with an invite, as bodies loaded before BUG-038 were, reads without
     /// it: no answer buttons on someone's answer.
     @Test func aStaleInviteOnAMeetingResponseIsDroppedOnLoad() throws {
