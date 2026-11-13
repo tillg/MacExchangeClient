@@ -13,6 +13,7 @@ edited: 2026-11-13
   - [12:58 — The map lives in docs/feature-map.md, linked from the README](#run-2026-11-13-1235-3)
   - [12:58 — Contents list added to DECISIONS.md, older run listed without its decisions](#run-2026-11-13-1235-4)
   - [12:58 — Commit and push straight to main](#run-2026-11-13-1235-5)
+  - [13:20 — Five parallel probe hunters in detached worktrees; bugs numbered from BUG-154](#run-2026-11-13-1235-6)
 
 # 2026-11-12 23:16 — Unattended bug-fix run {#run-2026-11-12-2316}
 
@@ -949,3 +950,13 @@ edited: 2026-11-13
 - **Decision:** commit each green unit on `main` and push it.
 - **Why:** the user's earlier runs pushed to `main`, and branching is forbidden without permission.
 - **Consequences:** every later commit of this run goes to `main` as well.
+
+## 13:20 — Five parallel probe hunters in detached worktrees; bugs numbered from BUG-154 {#run-2026-11-13-1235-6}
+
+- **Status:** open
+- **Context:** follow-up task "run tests until u have at least 100 bugs … describe them in /specs/bugs … fix HIGH to LOW". Earlier rounds found BUG-001…153 (highest id in git history: 153).
+- **Question:** how to find 100 real bugs without breaking each other's builds, and how to rank them?
+- **Decision:** five agents, one area each (conversations/list, EWS sync over the loopback harness, search/database, rendering/compose/invites, UI via `tools/snapshot.sh`), each in its own `git worktree add --detach` under `.worktrees/` (no branches), with its own scratch path. Each bug needs a failing probe (or, for pure UI, a snapshot PNG). I rerun every probe on main before it is filed; ids continue at BUG-154; the existing P1–P4 scale is kept (P1 = HIGH … P4 = LOW). Fixes follow the earlier two-commit process, P1 first.
+- **Why:** concurrent builds in one `.build/tests` collide; detached worktrees need no branch.
+- **Alternatives:** one sequential hunter (much slower); hunting in the main checkout (one broken probe blocks everyone).
+- **Consequences:** if fewer than 100 real bugs turn up, the report says the true number instead of padding.

@@ -1,0 +1,358 @@
+import Foundation
+import Testing
+@testable import EWS
+@testable import MailModel
+
+/// Bug hunt round 5, hunter B: EWS over the loopback ScriptedServer harness, and EWS parsing.
+/// Every test here fails now and passes once its bug is fixed.
+enum R5B {
+    /// Exchange's throttling fault, with the back-off it asks for (as EWS writes it in `MessageXml`).
+    static func throttled(ms: Int = 60_000) -> String {
+        """
+        <?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>\
+        <s:Fault><faultcode xmlns:a="http://schemas.microsoft.com/exchange/services/2006/types">a:ErrorServerBusy</faultcode>\
+        <faultstring xml:lang="en-US">The server cannot service this request right now. Try again later.</faultstring><detail>\
+        <e:ResponseCode xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">ErrorServerBusy</e:ResponseCode>\
+        <e:Message xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">The server cannot service this request right now. Try again later.</e:Message>\
+        <t:MessageXml xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">\
+        <t:Value Name="BackOffMilliseconds">\(ms)</t:Value></t:MessageXml></detail></s:Fault></s:Body></s:Envelope>
+        """
+    }
+
+    /// GetFolder for inbox, drafts, sentitems, junkemail, deleteditems, outbox.
+    static func standardFolders(_ ids: [String] = ["INBOX", "DRAFTS", "SENT", "JUNK", "DEL", "OUTBOX"]) -> String {
+        EWSReply.resp("GetFolder", ids.map {
+            EWSReply.ok("GetFolder", "<m:Folders><t:Folder><t:FolderId Id=\"\($0)\" ChangeKey=\"CK\"/><t:TotalCount>0</t:TotalCount></t:Folder></m:Folders>")
+        }.joined())
+    }
+
+    static func folder(_ tag: String = "Folder", id: String, parent: String = "ROOT", name: String, cls: String? = "IPF.Note") -> String {
+        "<t:\(tag)><t:FolderId Id=\"\(id)\" ChangeKey=\"CK\"/><t:ParentFolderId Id=\"\(parent)\" ChangeKey=\"CK\"/>"
+            + (cls.map { "<t:FolderClass>\($0)</t:FolderClass>" } ?? "")
+            + "<t:DisplayName>\(name)</t:DisplayName><t:TotalCount>0</t:TotalCount></t:\(tag)>"
+    }
+}
+
+
+/// A loopback HTTP endpoint that answers each request with the next (status, body) of its script, so a probe can
+/// get an HTTP 401 (ScriptedServer always answers 200). Same approach as `LoopbackEndpoint`: 127.0.0.1 only.
+final class StatusServer: @unchecked Sendable {
+    let url: URL
+    private let listener: Int32
+    private let lock = NSLock()
+    private var script: [(Int, String)]
+    private var _served = 0
+    var served: Int { lock.withLock { _served } }
+
+    init(_ script: [(Int, String)]) {
+        self.script = script
+        signal(SIGPIPE, SIG_IGN)
+        let l = socket(AF_INET, SOCK_STREAM, 0)
+        var yes: Int32 = 1
+        setsockopt(l, SOL_SOCKET, SO_REUSEADDR, &yes, socklen_t(MemoryLayout<Int32>.size))
+        var addr = sockaddr_in()
+        addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+        var len = socklen_t(MemoryLayout<sockaddr_in>.size)
+        withUnsafeMutablePointer(to: &addr) { p in
+            p.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+                _ = bind(l, sa, len); _ = listen(l, 16); _ = getsockname(l, sa, &len)
+            }
+        }
+        listener = l
+        url = URL(string: "http://127.0.0.1:\(UInt16(bigEndian: addr.sin_port))/EWS/Exchange.asmx")!
+        let t = Thread { [self] in loop() }
+        t.start()
+    }
+
+    func stop() { close(listener) }
+
+    private func loop() {
+        while true {
+            let c = accept(listener, nil, nil)
+            if c < 0 { return }
+            var data: [UInt8] = []
+            var buf = [UInt8](repeating: 0, count: 65536)
+            while !Self.isComplete(data) {
+                let n = read(c, &buf, buf.count)
+                if n <= 0 { break }
+                data += buf[0..<n]
+            }
+            let (status, body) = lock.withLock { () -> (Int, String) in
+                _served += 1
+                return script.isEmpty ? (500, EWSReply.fault("ErrorScriptExhausted", "No scripted response left")) : script.removeFirst()
+            }
+            let bytes = Array(body.utf8)
+            let head = "HTTP/1.1 \(status) \(status == 200 ? "OK" : status == 401 ? "Unauthorized" : "Error")\r\n"
+                + "Content-Type: text/xml; charset=utf-8\r\nContent-Length: \(bytes.count)\r\nConnection: close\r\n\r\n"
+            let all = Array(head.utf8) + bytes
+            var off = 0
+            while off < all.count {
+                let n = all[off...].withUnsafeBytes { write(c, $0.baseAddress, $0.count) }
+                if n <= 0 { break }
+                off += n
+            }
+            shutdown(c, SHUT_WR); close(c)
+        }
+    }
+
+    private static func isComplete(_ data: [UInt8]) -> Bool {
+        guard let end = data.indices.dropLast(3).first(where: {
+            data[$0] == 13 && data[$0 + 1] == 10 && data[$0 + 2] == 13 && data[$0 + 3] == 10
+        }) else { return false }
+        let head = String(decoding: data[..<end], as: UTF8.self).lowercased()
+        let line = head.split(separator: "\r\n").first { $0.hasPrefix("content-length:") }
+        let length = line.flatMap { Int($0.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)) } ?? 0
+        return data.count - (end + 4) >= length
+    }
+}
+
+@MainActor
+@Suite(.serialized)
+struct Probe_R5BTests {
+    let acct = Account(name: "Exchange", address: "me@work.com")
+
+    func store(_ server: ScriptedServer, folders: [RemoteFolder]? = nil) -> MailStore {
+        let s = MailStore(accounts: [], messages: [])
+        s.add(acct, backend: EWSBackend(client: EWSClient(url: server.url, username: "u", password: "p")))
+        s.setRemoteFolders(folders ?? [RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .drafts, id: "DRAFTS"),
+                                       RemoteFolder(role: .sent, id: "SENT"), RemoteFolder(role: .trash, id: "DEL")],
+                           account: acct.id)
+        return s
+    }
+
+    func complete(_ s: MailStore, _ box: MailboxKind, token: String = "T0") {
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], token: token, more: false), account: acct.id, mailbox: box)
+    }
+
+    func waitFor(_ timeout: Duration = .seconds(5), _ cond: () -> Bool) async throws {
+        var left = timeout
+        while !cond() && left > .zero {
+            let start = ContinuousClock.now
+            try await Task.sleep(for: .milliseconds(10))
+            left -= min(start.duration(to: .now), .milliseconds(100))
+        }
+        #expect(cond(), "timed out")
+    }
+
+    func backend(_ server: ScriptedServer) -> EWSBackend {
+        EWSBackend(client: EWSClient(url: server.url, username: "u", password: "p"))
+    }
+
+    // MARK: R5B-01
+
+    /// Exchange throttles the account (ErrorServerBusy with a back-off) during the background checks of the folders
+    /// not on screen: the account must be set aside, as everywhere else, not asked again for every other folder.
+    @Test func r5b01_backgroundCheckStopsAtThrottling() async throws {
+        let server = ScriptedServer([], fallback: R5B.throttled())
+        defer { server.stop() }
+        let s = store(server)
+        for box in [MailboxKind.inbox, .drafts, .sent, .trash] { complete(s, box) }
+        await s.syncHistory()
+        #expect(server.served == 1, "a throttled account was asked \(server.served) times in one background run")
+    }
+
+    // MARK: R5B-02
+
+    /// A mail folder inside Contacts (Outlook allows "Mail and Post Items" folders anywhere). Its parent is in the
+    /// FindFolder answer, as a ContactsFolder: per ews.md it isn't kept (an ancestor isn't IPF.Note), and it is
+    /// certainly not the account's Archive.
+    @Test func r5b02_mailFolderInsideContactsIsNotShownOrTakenAsArchive() async throws {
+        let found = R5B.folder("ContactsFolder", id: "CONTACTS", name: "Contacts", cls: "IPF.Contact")
+            + R5B.folder(id: "F1", parent: "CONTACTS", name: "Archive")
+            + R5B.folder(id: "F2", parent: "CONTACTS", name: "Customers")
+        let server = ScriptedServer([R5B.standardFolders(), EWSReply.findFolder(found)])
+        defer { server.stop() }
+        let folders = try await backend(server).folders()
+        #expect(!folders.contains { $0.id == "F1" || $0.id == "F2" },
+                "\(folders.filter { ["F1", "F2"].contains($0.id) }.map { "\($0.id) as \($0.role.rawValue)" })")
+    }
+
+    // MARK: R5B-03
+
+    /// The Archive folder is gone from the server's folder list (deleted in Outlook). As for any other
+    /// folder (d-bug-077), its mail goes with it when the list is read; it stayed in Archive for good.
+    @Test func r5b03_archiveRemovedOnTheServerTakesItsMailWithIt() throws {
+        let server = ScriptedServer([])
+        defer { server.stop() }
+        let s = store(server, folders: [RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .archive, id: "ARCH")])
+        let m = Message(accountID: acct.id, mailbox: .archive, from: Contact(name: "Ann", email: "ann@x.com"), to: [],
+                        subject: "Old", body: "", date: .now, remoteID: "A1", bodyLoaded: false)
+        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "TA", more: false), account: acct.id, mailbox: .archive)
+        #expect(s.count(.account(acct.id, .archive)) == 1)
+        // The next launch reads the folder list: the Archive folder was deleted in Outlook (emptied from Deleted Items).
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX")], account: acct.id)
+        #expect(s.count(.account(acct.id, .archive)) == 0, "Archive still shows the mail of a folder the server no longer has as Archive")
+        #expect(s.syncToken(acct.id, .archive) == nil)
+    }
+
+    /// A store whose Inbox holds server messages with these IDs.
+    func inboxStore(_ server: ScriptedServer, _ rids: [String]) -> MailStore {
+        let s = store(server, folders: [RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .drafts, id: "DRAFTS"),
+                                        RemoteFolder(role: .sent, id: "SENT"), RemoteFolder(role: .trash, id: "DEL"),
+                                        RemoteFolder(role: .archive, id: "ARCH"), RemoteFolder(role: .junk, id: "JUNK")])
+        let ms = rids.map { Message(accountID: acct.id, mailbox: .inbox, from: Contact(name: "Ann", email: "ann@x.com"), to: [],
+                                    subject: "S \($0)", body: "", date: .now, isRead: false, remoteID: $0, bodyLoaded: false) }
+        s.apply(SyncResult(upserts: ms, deletedRemoteIDs: [], token: "T0", more: false), account: acct.id, mailbox: .inbox)
+        return s
+    }
+    func mid(_ s: MailStore, _ rid: String) -> Message.ID { s.messages.first { $0.remoteID == rid }!.id }
+
+    // MARK: R5B-04
+
+    /// Exchange throttles a send (ErrorServerBusy with a 60 s back-off). The send goes to Drafts, as decided; but the
+    /// account's other waiting changes must not be sent right after it, within the back-off (README: "your changes
+    /// aren't sent again before then").
+    @Test func r5b04_throttledSendHoldsTheAccountsOtherChanges() async throws {
+        let server = ScriptedServer([R5B.throttled()], fallback: EWSReply.resp("UpdateItem", EWSReply.ok("UpdateItem")))
+        defer { server.stop() }
+        let s = inboxStore(server, ["A"])
+        s.send(Draft(accountID: acct.id, to: "bob@x.com", subject: "Report", body: "Hi"))
+        s.toggleRead([mid(s, "A")])
+        try await waitFor { s.messages.contains { $0.mailbox == .drafts } }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(server.served == 1, "\(server.served) requests went to a server that asked to wait 60 s")
+        #expect(s.outbox.map(\.change) == [.setRead(["A"], true)])
+    }
+
+    // MARK: R5B-05
+
+    /// IIS/WCF answers an internal failure of the EWS service with a SOAP fault that holds no Exchange ResponseCode
+    /// (`a:InternalServiceFault`). Exchange didn't act on the change, so it isn't a refusal (d-bug-061: a body that
+    /// isn't an Exchange answer keeps changes queued); the mark as read was undone as "refused".
+    @Test func r5b05_wcfFaultWithoutExchangeCodeKeepsTheChangeQueued() async throws {
+        let wcf = """
+            <?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault>\
+            <faultcode xmlns:a="http://schemas.microsoft.com/net/2005/12/windowscommunicationfoundation/dispatcher">a:InternalServiceFault</faultcode>\
+            <faultstring xml:lang="en-US">The server was unable to process the request due to an internal error.</faultstring>\
+            </s:Fault></s:Body></s:Envelope>
+            """
+        let server = ScriptedServer([wcf])
+        defer { server.stop() }
+        let s = inboxStore(server, ["A"])
+        s.toggleRead([mid(s, "A")])
+        try await waitFor { server.served == 1 }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(s.message(mid(s, "A"))?.isRead == true, "status: \(s.status ?? "")")
+        #expect(s.outbox.map(\.change) == [.setRead(["A"], true)])
+    }
+
+    // MARK: R5B-06
+
+    /// A move waits for the folder list (e.g. a drop right after launch). Reading it fails because the mailbox store
+    /// is briefly unavailable (GetFolder answers the Inbox with ErrorMailboxStoreUnavailable, BUG-127). Exchange
+    /// never saw the move, so nothing was refused: it must stay queued, not be undone as "Exchange refused a change".
+    @Test func r5b06_failedFolderListDoesNotUndoAQueuedMove() async throws {
+        let e = EWSReply.err("GetFolder", "ErrorMailboxStoreUnavailable", "The mailbox database is temporarily unavailable.")
+        let server = ScriptedServer([EWSReply.resp("GetFolder", String(repeating: e, count: 6))])
+        defer { server.stop() }
+        let s = MailStore(accounts: [], messages: [])
+        s.add(acct, backend: backend(server))
+        let m = Message(accountID: acct.id, mailbox: .inbox, from: Contact(name: "Ann", email: "ann@x.com"), to: [],
+                        subject: "Invoice", body: "", date: .now, remoteID: "A", bodyLoaded: false)
+        s.merge([m], account: acct.id, mailbox: .inbox)
+        s.move([mid(s, "A")], to: .archive)
+        try await waitFor { server.served == 1 }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(s.message(mid(s, "A"))?.mailbox == .archive, "status: \(s.status ?? "")")
+        #expect(s.outbox.count == 1)
+    }
+
+    // MARK: R5B-07
+
+    /// Two moves of one message wait in the outbox (Inbox → Archive, then Archive → Junk), and Exchange refuses
+    /// both (access denied). On the server the message never left the Inbox; here it must end up there too.
+    @Test func r5b07_twoRefusedMovesPutTheMessageBackWhereTheServerHasIt() async throws {
+        let refused = EWSReply.resp("MoveItem", EWSReply.err("MoveItem", "ErrorAccessDenied", "Access is denied."))
+        let server = ScriptedServer([refused, refused])
+        defer { server.stop() }
+        let s = inboxStore(server, ["A"])
+        s.move([mid(s, "A")], to: .archive)
+        s.move([mid(s, "A")], to: .junk)
+        try await waitFor { server.served == 2 && s.outbox.isEmpty }
+        #expect(s.message(mid(s, "A"))?.mailbox == .inbox, "status: \(s.status ?? "")")
+    }
+
+    /// The same for read state: marked read, then unread again; both refused. The server has it unread.
+    @Test func r5b07_twoRefusedReadChangesLeaveTheServersState() async throws {
+        let refused = EWSReply.resp("UpdateItem", EWSReply.err("UpdateItem", "ErrorAccessDenied", "Access is denied."))
+        let server = ScriptedServer([refused, refused])
+        defer { server.stop() }
+        let s = inboxStore(server, ["A"])
+        s.toggleRead([mid(s, "A")])
+        s.toggleRead([mid(s, "A")])
+        try await waitFor { server.served == 2 && s.outbox.isEmpty }
+        #expect(s.message(mid(s, "A"))?.isRead == false, "status: \(s.status ?? "")")
+    }
+
+    // MARK: R5B-08
+
+    /// The history's first step fetches the newest 200 of every folder not synced yet. Exchange refuses one folder
+    /// (here the Inbox: access denied); the next folders must still get their newest messages ("A failing folder
+    /// doesn't stop the others", `syncHistory`). The first step stopped at the refused folder, without a word.
+    @Test func r5b08_oneRefusedFolderDoesNotStopTheNewestOfTheOthers() async throws {
+        let refused = EWSReply.resp("FindItem", EWSReply.err("FindItem", "ErrorAccessDenied", "Access is denied."))
+        let drafts = EWSReply.resp("FindItem", EWSReply.ok("FindItem", "<m:RootFolder TotalItemsInView=\"1\" IncludesLastItemInRange=\"true\">"
+            + "<t:Items>\(EWSReply.summary("D1", subject: "Plan"))</t:Items></m:RootFolder>"))
+        let server = ScriptedServer([refused, drafts], fallback: EWSReply.fault("ErrorAccessDenied", "Access is denied."))
+        defer { server.stop() }
+        let s = store(server, folders: [RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .drafts, id: "DRAFTS")])
+        await s.syncHistory()
+        #expect(s.messages.contains { $0.remoteID == "D1" && $0.mailbox == .drafts },
+                "Drafts got nothing; \(server.served) requests, status: \(s.status ?? "")")
+    }
+
+    // MARK: R5B-09
+
+    /// The email was pasted into Settings ▸ Accounts with a trailing blank. The account's name is trimmed (BUG-124),
+    /// its address isn't: an invitation you sent yourself then counts as someone else's and offers answer buttons
+    /// (functional.md: `canAnswer` is false when the sender is the account's address), and MailTips is asked for
+    /// " me@work.com " instead of the address.
+    @Test func r5b09_addressPastedWithABlankIsStillTheAccountsAddress() throws {
+        let ex = ExchangeAccount(email: "me@work.com ", username: "W\\me", server: "mail.work.com")
+        let s = MailStore(accounts: [ex.account], messages: [])
+        var m = Message(accountID: ex.id, mailbox: .inbox, from: Contact(name: "Me", email: "me@work.com"), to: [],
+                        subject: "Planning", body: "", date: .now, remoteID: "R1", bodyLoaded: true)
+        m.invite = Invite(start: .now, end: .now.addingTimeInterval(1800))
+        s.merge([m], account: ex.id, mailbox: .inbox)
+        let id = s.messages.first { $0.remoteID == "R1" }!.id
+        #expect(!s.canAnswer(id), "own invitation answerable; account address is \"\(ex.account.address)\"")
+        #expect(EWSBackend.mailTipsRequest(from: ex.account.address).contains("<t:EmailAddress>me@work.com</t:EmailAddress>"))
+    }
+
+    // MARK: R5B-10
+
+    /// Exchange rejects the password (HTTP 401) when the compose window asks for the size limit (MailTips). The
+    /// account must be paused like for any other request (README: "the app stops sending requests for that account
+    /// until you relaunch"); the error was swallowed and the next check sent the rejected password again.
+    @Test func r5b10_rejectedPasswordOnMailTipsPausesTheAccount() async throws {
+        let server = StatusServer([(401, "")])
+        defer { server.stop() }
+        let s = MailStore(accounts: [], messages: [])
+        s.add(acct, backend: EWSBackend(client: EWSClient(url: server.url, username: "u", password: "wrong")))
+        await s.loadMaxMessageSize(for: acct.id)
+        #expect(server.served == 1)
+        #expect(s.isPaused(acct.id), "status: \(s.status ?? "")")
+    }
+
+    /// The same after "Do Not Send a Response": the answer went out, then the move of the invite to Deleted Items gets
+    /// a 401. The move is queued, but the account isn't paused, so the drain at once sends it again with the
+    /// rejected password.
+    @Test func r5b10_rejectedPasswordOnTheMoveAfterAnAnswerPausesTheAccount() async throws {
+        let server = StatusServer([(200, EWSReply.created("X1")), (401, ""), (401, "")])
+        defer { server.stop() }
+        let s = MailStore(accounts: [], messages: [])
+        s.add(acct, backend: EWSBackend(client: EWSClient(url: server.url, username: "u", password: "p")))
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .trash, id: "DEL")], account: acct.id)
+        var m = Message(accountID: acct.id, mailbox: .inbox, from: Contact(name: "Jan", email: "jan@work.com"), to: [],
+                        subject: "Planning", body: "", date: .now, remoteID: "R1", bodyLoaded: true)
+        m.invite = Invite(start: .now, end: .now.addingTimeInterval(1800))
+        s.merge([m], account: acct.id, mailbox: .inbox)
+        s.respond(InviteReply(response: .accept, send: false), to: mid(s, "R1"))
+        try await waitFor { server.served >= 2 }
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(server.served == 2, "\(server.served) requests; the rejected password was sent again")
+        #expect(s.isPaused(acct.id))
+    }
+}
