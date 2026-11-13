@@ -1554,8 +1554,9 @@ public final class MailStore {
         return saved
     }
 
-    /// Quick Look over all of the message's attachments, starting at `index`.
-    public func quickLookAttachments(of id: Message.ID, at index: Int = 0) async {
+    /// Quick Look over all of the message's attachments, starting at `index` (nil: the first that loads). When the
+    /// chosen one can't be had, no other file is shown in its place; the status says why.
+    public func quickLookAttachments(of id: Message.ID, at index: Int? = nil) async {
         var files: [URL] = [], front: URL?
         for i in message(id)?.attachments.indices ?? 0..<0 {
             guard let url = await attachmentFile(i, of: id) else { continue }
@@ -1563,7 +1564,7 @@ public final class MailStore {
             if i == index { front = url }
         }
         previewItems = files
-        previewItem = front ?? files.first
+        previewItem = index == nil ? files.first : front
     }
 
     static func freeURL(for name: String, in folder: URL) -> URL {

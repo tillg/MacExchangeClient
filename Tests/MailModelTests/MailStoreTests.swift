@@ -1557,6 +1557,18 @@ struct MailStoreTests {
         #expect(s.previewItem == s.previewItems[1])
     }
 
+    /// Quick Look on a file that can't be had opens no other file in its place; without a chosen one (Quick Look
+    /// N Attachments) it starts at the first that loaded.
+    @Test func quickLookOnAnUnavailableFileShowsNoOther() async throws {
+        let (s, id, dir) = attachmentStore(["a.pdf", "b.pdf"], data: [Data([1])])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        await s.quickLookAttachments(of: id, at: 1)
+        #expect(s.previewItem == nil, "front \(s.previewItem?.lastPathComponent ?? "nil")")
+        #expect(s.status?.contains("b.pdf") == true)
+        await s.quickLookAttachments(of: id)
+        #expect(s.previewItem?.lastPathComponent == "a.pdf")
+    }
+
     /// A message without its content (no server, nothing stored) says so instead of opening an empty file.
     @Test func missingContentShowsAStatus() async {
         let (s, id, dir) = attachmentStore(["a.pdf"], data: [])
