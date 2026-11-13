@@ -600,3 +600,10 @@ edited: 2026-11-13
 - **Decision:** `ExchangeAccount.account` uses the email address (trimmed) as the name; "Exchange" only if it is blank. The name is computed at each launch, so existing accounts get it without a migration. Local copies in Drafts/Sent now show the address as the sender's name instead of "Exchange".
 - **Why:** the address is what the user typed and is unique per account. The user's display name would need an extra EWS call (ResolveNames) at sign-in and a stored field; not worth it for this.
 - **Alternatives:** A description field in Settings (rejected: a UI feature). The server's display name (deferred: extra request and stored field).
+
+## 02:56 — IPF.Note.* folders stay hidden for now {#d-bug-084}
+
+- **Status:** deferred
+- **Context:** BUG-084 asks to show folders whose class starts with `IPF.Note.` (e.g. RSS Feeds, `IPF.Note.OutlookHomepage`). The existing test `folderTreeKeepsMailFoldersNestedUnderTheirParents` requires exactly that RSS Feeds folder to be left out.
+- **Decision:** Deferred, no code change: the fix would contradict a pinned test, and existing tests can't be changed unattended.
+- **Open question for review:** show all `IPF.Note.*` folders (and reword the test), or keep RSS Feeds out by name/class and show other subclasses?

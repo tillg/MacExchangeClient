@@ -2,7 +2,7 @@
 title: 'Mail folders whose class is a subclass of IPF.Note (e.g. IPF.Note.OutlookHomepage) are left out of the folder tree'
 priority: P4
 area: EWS
-status: open
+status: deferred
 found: 2026-11-12
 ---
 ## Summary
@@ -76,3 +76,6 @@ struct Probe_EWS2Tests {
 
 ## Likely cause
 Sources/EWS/EWSBackend.swift:451: `mail: !hidden && (cls == nil || cls == "IPF.Note")` — exact comparison instead of a prefix test.
+
+## Deferred
+2026-11-13: the existing test `EWSParsingTests.folderTreeKeepsMailFoldersNestedUnderTheirParents` pins the opposite: its "RSS Feeds" folder with class `IPF.Note.OutlookHomepage` must be left out of the tree. Showing `IPF.Note.*` folders would mean changing that test, which an unattended run may not do, and which classes to show is a product decision (RSS Feeds is empty for most users, and Mail.app's view of such folders is unverified). See DECISIONS.md#d-bug-084.
