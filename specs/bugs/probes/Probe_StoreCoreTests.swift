@@ -40,17 +40,6 @@ struct Probe_StoreCoreTests {
         #expect(s.selection == [ms[3].id])
     }
 
-    // 3'. An action that changes nothing (Archive while viewing Archive) must not move the selection.
-    @Test func archivingInArchiveKeepsTheSelection() {
-        let a = msg(work, .archive, subject: "a", minutesAgo: 1), b = msg(work, .archive, subject: "b", minutesAgo: 2)
-        let s = store([a, b])
-        s.selectedMailbox = .account(work.id, .archive)
-        s.selection = [a.id]
-        s.archiveSelection()
-        #expect(s.message(a.id)?.mailbox == .archive)
-        #expect(s.selection == [a.id])
-    }
-
     // 9. drop returns false when nothing changed (doc comment): flagged message in Trash dropped on Flagged.
     @Test func dropOnFlaggedOfAnAlreadyFlaggedTrashMessageChangesNothing() {
         let a = msg(work, .trash, flag: .blue)

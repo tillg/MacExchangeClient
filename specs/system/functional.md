@@ -61,6 +61,7 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
   menu, a drag of exactly the selection, and an invite answer on the selected invite go through `actOnSelection`: afterwards the first still-visible message after
   the last selected one is selected, else the nearest one before it, else nothing. If no selected message was in
   the list (hidden by the unread filter or a search), nothing stays selected that the action took out of the list.
+  An action that changes none of the selected messages (Archive in Archive) keeps the selection as it is.
 - **No hidden selection:** every delete or move (also from the context menu, a swipe or a drop) takes the selected
   messages it removes from the visible list (or erases) out of the selection. If that was the whole selection, the
   next message is selected by the rule above; otherwise the rest stays selected. A selected message that stays in
