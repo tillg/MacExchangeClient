@@ -24,6 +24,8 @@ public struct StoredMeta: Sendable {
     public var folders: [UUID: [Folder]] = [:]
     public var sync: [SyncState] = []
     public var outbox: [PendingChange] = []
+    /// The content of the files of messages kept only on this Mac (a send Exchange refused), by position.
+    public var files: [Message.ID: [Data]] = [:]
 }
 
 /// What changed in the store since the last write. Messages are written one by one; sync positions,
@@ -39,12 +41,16 @@ public struct StoreChanges: Sendable {
     public var sync: [SyncState]?
     public var folders: [UUID: [Folder]]?
     public var outbox: [PendingChange]?
+    /// File content of messages kept only on this Mac; replaces what is stored for each of them.
+    public var files: [Message.ID: [Data]] = [:]
     public init(upserts: [Message] = [], removed: [Message.ID] = [], sync: [SyncState]? = nil,
-                folders: [UUID: [Folder]]? = nil, outbox: [PendingChange]? = nil) {
+                folders: [UUID: [Folder]]? = nil, outbox: [PendingChange]? = nil, files: [Message.ID: [Data]] = [:]) {
         self.upserts = upserts; self.removed = removed; self.sync = sync; self.folders = folders; self.outbox = outbox
+        self.files = files
     }
     public var isEmpty: Bool {
         upserts.isEmpty && snapshotIDs.isEmpty && removed.isEmpty && sync == nil && folders == nil && outbox == nil
+            && files.isEmpty
     }
 
     /// With the changed messages picked from the snapshot into `upserts`.
@@ -114,6 +120,8 @@ public final class MailDatabase: @unchecked Sendable {
             CREATE TABLE IF NOT EXISTS folders(account TEXT NOT NULL, box TEXT NOT NULL, name TEXT NOT NULL, parent TEXT,
               position INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS outbox(position INTEGER PRIMARY KEY, change BLOB NOT NULL);
+            CREATE TABLE IF NOT EXISTS files(message TEXT NOT NULL, position INTEGER NOT NULL, data BLOB NOT NULL,
+              PRIMARY KEY(message, position));
             """)
         // From before conversations: every folder syncs again from the start, so the messages already here learn
         // their conversation. Known messages keep their ID, body and flag colour (`MailStore.merge`).
@@ -266,6 +274,9 @@ public final class MailDatabase: @unchecked Sendable {
             try query("SELECT change FROM outbox ORDER BY position") { r in
                 if let p = try? decoder.decode(PendingChange.self, from: r.data(0)) { m.outbox.append(p) }
             }
+            try query("SELECT message, data FROM files ORDER BY message, position") { r in
+                if let id = UUID(uuidString: r.text(0)) { m.files[id, default: []].append(r.data(1)) }
+            }
             return m
         }
     }
@@ -327,6 +338,19 @@ public final class MailDatabase: @unchecked Sendable {
             if !c.removed.isEmpty {
                 try prepared("DELETE FROM messages WHERE id = ?") { st in
                     for id in c.removed { st.bind(1, id.uuidString); try step(st) }
+                }
+                try prepared("DELETE FROM files WHERE message = ?") { st in
+                    for id in c.removed { st.bind(1, id.uuidString); try step(st) }
+                }
+            }
+            if !c.files.isEmpty {
+                try prepared("DELETE FROM files WHERE message = ?") { st in
+                    for id in c.files.keys { st.bind(1, id.uuidString); try step(st) }
+                }
+                try prepared("INSERT INTO files VALUES(?,?,?)") { st in
+                    for (id, list) in c.files {
+                        for (i, data) in list.enumerated() { st.bind(1, id.uuidString); st.bind(2, i); st.bind(3, data); try step(st) }
+                    }
                 }
             }
             if let sync = c.sync {

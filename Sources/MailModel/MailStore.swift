@@ -92,6 +92,8 @@ public final class MailStore {
     @ObservationIgnored private var syncChanged = false
     @ObservationIgnored private var foldersChanged = false
     @ObservationIgnored private var outboxChanged = false
+    /// Messages kept only on this Mac whose file content is still to be written (`keepFiles`).
+    @ObservationIgnored private var filesChanged = Set<Message.ID>()
     /// Mailboxes whose stored mail is in memory while launch is still loading; nil once everything is.
     @ObservationIgnored private var loadedBoxes: Set<String>?
     private var flushTask: Task<Void, Never>?
@@ -768,7 +770,8 @@ public final class MailStore {
         if syncChanged { c.sync = syncStates() }
         if foldersChanged { c.folders = folders.filter { isStored($0.key) } }
         if outboxChanged { c.outbox = outbox }
-        changedIDs = []; removedIDs = []
+        for id in filesChanged where !removedIDs.contains(id) { c.files[id] = localAttachments[id] }
+        changedIDs = []; removedIDs = []; filesChanged = []
         syncChanged = false; foldersChanged = false; outboxChanged = false
         return c
     }
@@ -780,12 +783,14 @@ public final class MailStore {
         if c.sync != nil { syncChanged = true }
         if c.folders != nil { foldersChanged = true }
         if c.outbox != nil { outboxChanged = true }
+        filesChanged.formUnion(c.files.keys.filter { !removedIDs.contains($0) })
     }
 
     /// Everything that is stored, to fill a new database.
     public func storedState() -> StoreChanges {
-        StoreChanges(upserts: messages.filter { isStored($0.accountID) }, sync: syncStates(),
-                     folders: folders.filter { isStored($0.key) }, outbox: outbox)
+        let stored = messages.filter { isStored($0.accountID) }, ids = Set(stored.map(\.id))
+        return StoreChanges(upserts: stored, sync: syncStates(), folders: folders.filter { isStored($0.key) }, outbox: outbox,
+                            files: localAttachments.filter { ids.contains($0.key) })
     }
 
     private func syncStates() -> [SyncState] {
@@ -809,6 +814,7 @@ public final class MailStore {
             serverAccounts.insert(a)
         }
         outbox += meta.outbox.filter { mine.contains($0.account) }
+        localAttachments.merge(meta.files) { current, _ in current }
         loadedBoxes = []
         // What was just read from disk doesn't need writing back.
         syncChanged = false; foldersChanged = false; outboxChanged = false
@@ -890,7 +896,7 @@ public final class MailStore {
                             subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
                             body: d.text, date: .now, isRead: true, attachments: d.attachments.map(\.attachment))
             add(m)
-            if !d.attachments.isEmpty { setAttachmentData(d.attachments.map(\.data), for: m.id) }
+            if !d.attachments.isEmpty { keepFiles(d.attachments.map(\.data), for: m) }
             status = "Couldn't send “\(d.subject)”: \(error). It's in Drafts on this Mac."
         default:
             // Only what this change set, and only while it still holds: later changes (still queued or sent)
@@ -1116,6 +1122,12 @@ public final class MailStore {
 
     /// For sample data and tests: the content of a local message's attachments, in order.
     public func setAttachmentData(_ data: [Data], for id: Message.ID) { localAttachments[id] = data }
+
+    /// The files of a message kept only on this Mac; written to disk with it when its account is stored.
+    private func keepFiles(_ data: [Data], for m: Message) {
+        localAttachments[m.id] = data
+        if isStored(m.accountID) { filesChanged.insert(m.id) }
+    }
 
     /// The attachment as a file, fetched from the server the first time. nil (and a status) if that fails.
     public func attachmentFile(_ index: Int, of id: Message.ID) async -> URL? {

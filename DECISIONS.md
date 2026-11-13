@@ -320,3 +320,11 @@ edited: 2026-11-13
 - **`ErrorSyncFolderNotFound`:** not handled the same way. It means the folder itself is gone; syncing it again from the start fails the same way. That case belongs to the removed-folder bug (BUG-077).
 - **Why:** Microsoft's guidance for an invalid sync state is to sync again without one (⚠️ recalled).
 - **Alternatives:** Reset on any sync error (rejected: a network or throttling error would throw away a good token and re-download whole folders).
+
+## 01:15 — Files of a draft kept after a failed send are stored in a new `files` table {#d-bug-055}
+
+- **Status:** decided
+- **Context:** BUG-055. A send Exchange refused is kept in Drafts on this Mac. Its row was written, but the file content stayed in memory only, so after a relaunch the files couldn't be opened; they may exist nowhere else.
+- **Decision:** A new table `files(message, position, data)`, created with `CREATE TABLE IF NOT EXISTS` (an older database simply gets it when opened; no other change). `MailStore.failed` keeps the content for writing when the account is stored; `takeChanges` carries it in `StoreChanges.files`, `retry` and `storedState` include it, `meta()` reads it back at launch, and removing the message removes its rows. Sample data still keeps file content in memory only.
+- **Why:** The outbox already stores a draft's files inside its JSON row; once the change leaves the outbox the kept message needs its own copy. A separate table keeps the 22-column `messages` row unchanged.
+- **Alternatives:** A BLOB column on `messages` (rejected: every message row and the upsert would change for a rare case). Files in a folder next to the database (rejected: a second store that can get out of step with the database).

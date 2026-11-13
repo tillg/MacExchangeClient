@@ -198,4 +198,62 @@ struct MailStoreSyncTests {
         #expect(s.syncToken(work.id, .inbox) == nil)
         #expect(s.syncToken(work.id, .sent) == nil && !s.isComplete(work.id, .sent))
     }
+
+    // MARK: A message kept in Drafts after a failed send keeps its files (BUG-055)
+
+    func keptDraft(_ s: MailStore, files: [DraftAttachment]) throws -> Message.ID {
+        var d = Draft(accountID: work.id, to: "bo@x.com", subject: "Report", body: "See attached")
+        d.attachments = files
+        s.failed(PendingChange(account: work.id, change: .send(d), previous: []), "The server is busy")
+        return try #require(s.messages.first { $0.mailbox == .drafts && $0.subject == "Report" }?.id)
+    }
+
+    /// The files of a message Exchange refused to send are written with it, so they still open after a relaunch.
+    @Test func failedSendKeepsAttachmentContentAcrossRelaunch() async throws {
+        let url = tempURL(); defer { cleanup(url) }
+        let s = MailStore(accounts: [work], messages: [])
+        s.merge([(.inbox, [])], account: work.id)  // work is a server account
+        let id = try keptDraft(s, files: [DraftAttachment(name: "report.pdf", contentType: "application/pdf", data: Data("PDFDATA".utf8)),
+                                          DraftAttachment(name: "b.txt", contentType: "text/plain", data: Data("B".utf8))])
+        try MailDatabase(url: url).write(s.takeChanges())
+        let s2 = try launch([work], from: url)
+        s2.downloadsFolder = url.deletingLastPathComponent().appendingPathComponent("Mail Downloads")
+        #expect(s2.message(id)?.attachments.map(\.name) == ["report.pdf", "b.txt"])
+        let file = await s2.attachmentFile(0, of: id)
+        #expect(file.flatMap { try? Data(contentsOf: $0) } == Data("PDFDATA".utf8), "status: \(s2.status ?? "nil")")
+        let second = await s2.attachmentFile(1, of: id)
+        #expect(second.flatMap { try? Data(contentsOf: $0) } == Data("B".utf8))
+    }
+
+    /// Erasing the kept draft erases its files on disk too.
+    @Test func erasingAKeptDraftErasesItsFiles() throws {
+        let url = tempURL(); defer { cleanup(url) }
+        let db = try MailDatabase(url: url)
+        let s = MailStore(accounts: [work], messages: [])
+        s.merge([(.inbox, [])], account: work.id)
+        let id = try keptDraft(s, files: [DraftAttachment(name: "a.pdf", contentType: nil, data: Data("A".utf8))])
+        try db.write(s.takeChanges())
+        #expect(try db.meta().files[id] == [Data("A".utf8)])
+        s.delete([id])
+        s.delete([id])  // erased from Trash
+        try db.write(s.takeChanges())
+        #expect(try MailDatabase(url: url).meta().files.isEmpty)
+    }
+
+    /// A database from before kept files gets their table when opened; its rows still read.
+    @Test func databaseWithoutTheFilesTableStillOpens() throws {
+        let url = tempURL(); defer { cleanup(url) }
+        let s0 = MailStore(accounts: [work], messages: [])
+        s0.apply(page(["R1"], token: "T1"), account: work.id, mailbox: .inbox)
+        try MailDatabase(url: url).write(s0.takeChanges())
+        var raw: OpaquePointer?
+        #expect(sqlite3_open(url.path, &raw) == SQLITE_OK)
+        #expect(sqlite3_exec(raw, "DROP TABLE files", nil, nil, nil) == SQLITE_OK)
+        sqlite3_close(raw)
+        let s = try launch([work], from: url)
+        #expect(inbox(s) == ["R1"])
+        let id = try keptDraft(s, files: [DraftAttachment(name: "a.pdf", contentType: nil, data: Data("A".utf8))])
+        try MailDatabase(url: url).write(s.takeChanges())
+        #expect(try MailDatabase(url: url).meta().files[id] == [Data("A".utf8)])
+    }
 }
