@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "If the mail storage file is damaged, it is kept aside and a fresh one is started, so mail is saved again; mail is downloaded again from the server.",
             "A message with a file of 2 GB or more waiting to be sent no longer makes the app quit while saving.",
             "More kinds of web pictures in mail (drawings, picture sets, pages with a web base address) now offer Load Remote Content.",
             "Mail that hides web addresses in coded characters now also shows Load Remote Content instead of quietly showing nothing.",

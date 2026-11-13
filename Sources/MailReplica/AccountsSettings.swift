@@ -42,6 +42,10 @@ enum AppSetup {
                 return (db, try db.meta(), try db.messages(in: first))
             }.value
             database = db
+            if let aside = db.setAside {
+                store.status = "The mail database couldn't be read. It was kept as \(aside.lastPathComponent); "
+                    + "mail is downloaded again from the server."
+            }
             store.restore(meta)
             store.restore(inboxes, boxes: first)
             // The rest arrives while the Inbox is already usable and checked with the server.

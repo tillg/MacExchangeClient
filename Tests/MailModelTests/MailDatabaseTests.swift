@@ -685,4 +685,23 @@ struct MailDatabaseTests {
             _ = try? db.write(StoreChanges(files: [UUID(): [big]]))
         }
     }
+
+    /// BUG-175: a Mail.sqlite that isn't a database (damaged file) makes every launch fail with "Couldn't load mail
+    /// from disk … Changes aren't saved until relaunch", and a relaunch fails the same way: nothing is ever saved
+    /// again. Cache.json in the same situation is set aside (DECISIONS #d-bug-009).
+    @Test func aDamagedDatabaseFileIsSetAsideAndANewOneCreated() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("MailDatabaseTests-bad-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("Mail.sqlite")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data(repeating: 0x41, count: 8192).write(to: url)
+        var opened: MailDatabase?
+        do { opened = try MailDatabase(url: url) } catch {
+            Issue.record("damaged database isn't recovered: \(error.localizedDescription)")
+        }
+        #expect(opened != nil)
+        let kept = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0 != "Mail.sqlite" && !$0.hasPrefix("Mail.sqlite-") }
+        #expect(kept == ["Mail.sqlite.unreadable"], "the damaged file should be kept aside, never deleted: \(kept)")
+        #expect(opened?.setAside?.lastPathComponent == "Mail.sqlite.unreadable")
+    }
 }

@@ -90,11 +90,28 @@ public final class MailDatabase: @unchecked Sendable {
         URL.applicationSupportDirectory.appending(components: "MailReplica", "Mail.sqlite")
     }
 
+    /// Where a damaged database file was moved before a new one was created (BUG-175); nil normally.
+    public private(set) var setAside: URL?
+
     public init(url: URL) throws {
         self.url = url
         let fm = FileManager.default
         try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
                                attributes: [.posixPermissions: 0o700])
+        // A file that isn't an SQLite database (damaged) is kept as `Mail.sqlite.unreadable` (never deleted) and a new
+        // one is created; mail comes back from the server. Otherwise every launch would fail and nothing be saved.
+        if let h = FileHandle(forReadingAtPath: url.path) {
+            let header = (try? h.read(upToCount: 16)) ?? Data()
+            try? h.close()
+            if !header.isEmpty, header != Data("SQLite format 3\0".utf8) {
+                let aside = Self.freeName(url, "unreadable")
+                try fm.moveItem(at: url, to: aside)
+                for suffix in ["-wal", "-shm"] where fm.fileExists(atPath: url.path + suffix) {
+                    try? fm.moveItem(atPath: url.path + suffix, toPath: aside.path + suffix)
+                }
+                setAside = aside
+            }
+        }
         // Created readable only by the user; SQLite gives its journal files the same permissions.
         if !fm.fileExists(atPath: url.path) {
             fm.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
