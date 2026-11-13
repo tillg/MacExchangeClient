@@ -615,17 +615,94 @@ public struct EWSBackend: MailBackend {
                            cc: item.child("CcRecipients").map(mailboxes) ?? [], invite: parseInvite(item), html: html)
     }
 
-    /// Rough text of an HTML body, used only if the server sends no `TextBody`.
+    /// Rough text of an HTML body, used only if the server sends no `TextBody`. One pass, so an unclosed tag or
+    /// comment can't make it slow: comments, head, style and script are dropped (an unclosed one to the end),
+    /// `<br>` and the end of a block are line breaks, the end of a table cell a space, other tags go, and
+    /// character references are decoded.
     static func plainText(_ html: String) -> String {
-        var s = html.replacingOccurrences(of: #"(?is)<(head|style|script)\b.*?</\1>"#, with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: #"(?i)<br\s*/?>|</(p|div|tr|li|h\d)>"#, with: "\n", options: .regularExpression)
-        s = s.replacingOccurrences(of: "<[^>]*>", with: "", options: .regularExpression)
-        for (e, c) in [("&nbsp;", " "), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&#39;", "'"), ("&amp;", "&")] {
-            s = s.replacingOccurrences(of: e, with: c)
+        let s = html as NSString, n = s.length
+        var out = "", i = 0, textStart = 0
+        func find(_ x: String, from: Int, _ options: NSString.CompareOptions = []) -> Int? {
+            guard from <= n else { return nil }
+            let r = s.range(of: x, options: options, range: NSRange(location: from, length: n - from))
+            return r.location == NSNotFound ? nil : r.location
         }
-        return s.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        func flush(_ end: Int) {
+            if end > textStart { out += decodeEntities(s.substring(with: NSRange(location: textStart, length: end - textStart))) }
+        }
+        while i < n {
+            guard s.character(at: i) == 0x3C else { i += 1; continue }  // <
+            flush(i)
+            if find("<!--", from: i, .anchored) != nil {
+                i = find("-->", from: i + 4).map { $0 + 3 } ?? n
+                textStart = i
+                continue
+            }
+            guard let gt = find(">", from: i + 1) else { textStart = i; break }  // not a tag: text to the end
+            let tag = s.substring(with: NSRange(location: i + 1, length: gt - i - 1))
+            i = gt + 1
+            textStart = i
+            let closing = tag.hasPrefix("/")
+            let name = String(tag.drop { $0 == "/" }.prefix { $0.isASCII && ($0.isLetter || $0.isNumber) }).lowercased()
+            if !closing, ["head", "style", "script"].contains(name) {
+                i = find("</" + name, from: i, .caseInsensitive).map { find(">", from: $0).map { $0 + 1 } ?? n } ?? n
+                textStart = i
+            } else if name == "br" || closing && ["p", "div", "tr", "li", "h1", "h2", "h3", "h4", "h5", "h6"].contains(name) {
+                out += "\n"
+            } else if closing && (name == "td" || name == "th") {
+                out += " "
+            }
+        }
+        flush(n)
+        return out.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
             .joined(separator: "\n")
     }
+
+    /// `&name;`, `&#nnn;` and `&#xhh;` decoded; a no-break space becomes a space. Unknown names stay as written.
+    static func decodeEntities(_ text: String) -> String {
+        guard text.contains("&") else { return text }
+        var out = "", rest = text[...]
+        while let amp = rest.firstIndex(of: "&") {
+            out += rest[..<amp]
+            rest = rest[amp...]
+            guard let semi = rest.prefix(34).firstIndex(of: ";") else { out += "&"; rest = rest.dropFirst(); continue }
+            let ref = rest[rest.index(after: amp)..<semi]
+            var scalar: Unicode.Scalar?
+            if ref.hasPrefix("#x") || ref.hasPrefix("#X") {
+                scalar = UInt32(ref.dropFirst(2), radix: 16).flatMap(Unicode.Scalar.init)
+            } else if ref.hasPrefix("#") {
+                scalar = UInt32(ref.dropFirst()).flatMap(Unicode.Scalar.init)
+            } else {
+                scalar = namedEntities[String(ref)].flatMap(Unicode.Scalar.init)
+            }
+            guard let c = scalar, c.value != 0 else { out += "&"; rest = rest.dropFirst(); continue }
+            out.unicodeScalars.append(c.value == 0xA0 ? " " : c)
+            rest = rest[rest.index(after: semi)...]
+        }
+        return out + rest
+    }
+
+    /// HTML's Latin-1 names (U+00A0 to U+00FF, in order) and the common punctuation ones.
+    static let namedEntities: [String: UInt32] = {
+        let latin1 = """
+            nbsp iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr deg plusmn sup2 sup3 \
+            acute micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest Agrave Aacute Acirc Atilde Auml \
+            Aring AElig Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml ETH Ntilde Ograve Oacute Ocirc Otilde \
+            Ouml times Oslash Ugrave Uacute Ucirc Uuml Yacute THORN szlig agrave aacute acirc atilde auml aring aelig \
+            ccedil egrave eacute ecirc euml igrave iacute icirc iuml eth ntilde ograve oacute ocirc otilde ouml divide \
+            oslash ugrave uacute ucirc uuml yacute thorn yuml
+            """.split(separator: " ")
+        var map = Dictionary(uniqueKeysWithValues: latin1.enumerated().map { (String($0.element), UInt32(0xA0 + $0.offset)) })
+        let more: [String: UInt32] = [
+            "amp": 38, "lt": 60, "gt": 62, "quot": 34, "apos": 39, "OElig": 338, "oelig": 339, "Scaron": 352,
+            "scaron": 353, "Yuml": 376, "ensp": 8194, "emsp": 8195, "thinsp": 8201, "zwnj": 8204, "zwj": 8205,
+            "ndash": 8211, "mdash": 8212, "lsquo": 8216, "rsquo": 8217, "sbquo": 8218, "ldquo": 8220, "rdquo": 8221,
+            "bdquo": 8222, "dagger": 8224, "Dagger": 8225, "bull": 8226, "hellip": 8230, "permil": 8240,
+            "lsaquo": 8249, "rsaquo": 8250, "euro": 8364, "trade": 8482,
+        ]
+        map.merge(more) { a, _ in a }
+        return map
+    }()
 
     static func contact(_ n: XMLNode) -> Contact {
         let mail = n.text("EmailAddress") ?? ""

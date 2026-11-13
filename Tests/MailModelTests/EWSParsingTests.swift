@@ -94,6 +94,38 @@ struct EWSParsingTests {
         #expect(b.text == "Fish & chips\nBye")
     }
 
+    @Test func plainTextDecodesCommonEntities() {
+        #expect(EWSBackend.plainText("<p>Gr&uuml;&szlig;e &ndash; Till&#8217;s &euro;5 &#x27;x&#x27;</p>") == "Grüße – Till’s €5 'x'")
+        #expect(EWSBackend.namedEntities["yuml"] == 0xFF && EWSBackend.namedEntities.count == 96 + 32)
+        #expect(EWSBackend.plainText("AT&T &unknown; a &amp b &#0; &amp;lt;") == "AT&T &unknown; a &amp b &#0; &lt;")
+    }
+
+    @Test func plainTextBreaksLinesAtBrWithAttributes() {
+        #expect(EWSBackend.plainText("Line1<br clear=\"all\">Line2") == "Line1\nLine2")
+    }
+
+    @Test func plainTextKeepsTableCellsApart() {
+        #expect(EWSBackend.plainText("<table><tr><td>Name</td><td>Value</td></tr></table>") == "Name Value")
+    }
+
+    @Test func plainTextDropsComments() {
+        #expect(EWSBackend.plainText("<!-- if a > b then --><p>Hi</p>") == "Hi")
+        #expect(EWSBackend.plainText("Hi<!-- never closed <p>x</p>") == "Hi")
+        #expect(EWSBackend.plainText("<header>Top</header><STYLE>p{}</style >Body") == "TopBody")
+    }
+
+    /// Unclosed `<style>` tags and comments don't make it slow (it was 7.7 s before; well under 1 s now).
+    @Test func plainTextUnclosedStyleIsFast() {
+        let html = String(repeating: "<style>x", count: 5_000) + String(repeating: "a", count: 100_000)
+        let t = Date()
+        #expect(EWSBackend.plainText(html) == "")
+        #expect(EWSBackend.plainText(String(repeating: "<!--x", count: 5_000) + html) == "")
+        let big = "<html><head><style>p{}</style></head><body>"
+            + String(repeating: "<p>Hello <b>world</b> &amp; more</p>\n", count: 100_000) + "</body></html>"
+        #expect(EWSBackend.plainText(big).hasPrefix("Hello world & more\nHello"))
+        #expect(Date().timeIntervalSince(t) < 5)
+    }
+
     @Test func plainTextBodyHasNoHTML() throws {
         let d = try doc(#"<t:Message><t:ItemId Id="ID1"/><t:Body BodyType="Text">Hi there</t:Body></t:Message>"#)
         let b = EWSBackend.parseBody(try #require(d.first("Message")))
