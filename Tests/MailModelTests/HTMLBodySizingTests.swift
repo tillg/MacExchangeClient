@@ -68,6 +68,19 @@ struct HTMLBodySizingTests {
         #expect(h >= content, "measured \(h), page \(content), scrollY \(scroll)")
     }
 
+    /// Newsletters give the body padding instead of margin; generated mail (invoices, PDF-to-HTML) places its text
+    /// with `position: absolute`, out of flow. Both are part of the mail's height.
+    @Test(arguments: [
+        #"<body style="margin:0;padding:40px 0"><table width="100%"><tr><td>Newsletter</td></tr></table><p>Unsubscribe</p></body>"#,
+        #"<div style="position:relative"><div style="position:absolute;top:0;left:0;width:500px">Line<br>Line<br>Line<br>Line<br>Line<br>Line<br>Line<br>Line<br>Total: 120,00 €</div></div>"#,
+    ])
+    func paddingAndPlacedContentAreMeasured(_ mail: String) async {
+        let p = await BodyPage(mail)
+        let content = await p.contentHeight()
+        let h = await p.settle()
+        #expect(h >= content, "measured \(h), page \(content)")
+    }
+
     /// The view gets shorter again when the window is widened (a fresh load at the new width is the reference).
     @Test func plainMailShrinksWhenTheWindowWidens() async {
         let mail = "<p>\(String(repeating: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ", count: 40))</p>"

@@ -19,9 +19,15 @@ public enum HTMLPage {
     /// The app's script for the message's height (app scripts run with content JavaScript off): the bottom of the
     /// root element, whose box holds the body with its margins. Not our wrapper: a stray `</div>` in the mail closes
     /// it early, and what follows lands outside it. Counted from the page's top, not the view's: a form field with
-    /// `autofocus` scrolls the page at load.
+    /// `autofocus` scrolls the page at load. Content placed with `position: absolute` is outside every box: the
+    /// body's `scrollHeight` counts it (plus the body's bottom margin). Neither depends on the view's own height,
+    /// which `documentElement.scrollHeight` never drops below, so the view still shrinks when the window widens.
     public static let measureScript = """
-        Math.ceil(document.documentElement.getBoundingClientRect().bottom + window.scrollY)
+        (() => {
+            const b = document.body, root = document.documentElement.getBoundingClientRect().bottom;
+            const placed = b.getBoundingClientRect().top + b.scrollHeight + parseFloat(getComputedStyle(b).marginBottom);
+            return Math.ceil(Math.max(root, placed) + window.scrollY);
+        })()
         """
 
     /// `inline` replaces `cid:` references with the message's own images, as `data:` URIs the policy allows.
