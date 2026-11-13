@@ -1629,8 +1629,10 @@ public final class MailStore {
         guard error is AuthenticationError else { return false }
         paused.insert(acct)
         // A connection notice of the account, so a successful check after signing in again clears it (BUG-223).
-        connectionNotice("Sign-in to “\(account(acct)?.name ?? "")” failed. Update the password in the Keychain "
-            + "(MailReplica-EWS), then relaunch. Nothing is sent until then.", account: acct)
+        // Signing in again lifts the pause and stores the password where the app looks first (BUG-252); editing the
+        // Keychain item by hand may not.
+        connectionNotice("Sign-in to “\(account(acct)?.name ?? "")” failed. Sign in again with the right password under "
+            + "Settings ▸ Accounts. Nothing is sent until then.", account: acct)
         return true
     }
 

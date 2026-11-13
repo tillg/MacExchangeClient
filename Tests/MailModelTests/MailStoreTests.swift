@@ -1990,4 +1990,12 @@ struct MailStoreTests {
         s.searchText = ""
         #expect(s.title == "All Inboxes")
     }
+
+    /// The sign-in-failed notice points to what works: signing in again in Settings (which lifts the pause and stores
+    /// the password under the per-server Keychain name, BUG-252), not editing a Keychain item by hand.
+    @Test func signInFailedNoticeSaysToSignInAgain() {
+        let s = store([])
+        _ = s.pauseIfSignInFailed(AuthenticationError(), account: work.id)
+        #expect(s.status == "Sign-in to “Work” failed. Sign in again with the right password under Settings ▸ Accounts. Nothing is sent until then.")
+    }
 }

@@ -24,6 +24,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "When a password is rejected, the notice now says to sign in again under Settings ▸ Accounts, which is what fixes it.",
             "While searching, the window title says what is searched and how many results were found, as in Mail.",
             "In Junk, the Junk button and menus now say \"Not Junk\", since they move mail back to the Inbox.",
             "Help ▸ What's New shows the right weekday and date on Macs set to a time zone west of Europe.",
