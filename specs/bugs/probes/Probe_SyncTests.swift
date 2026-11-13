@@ -93,24 +93,6 @@ struct Probe_SyncTests {
         #expect(c.upserts.isEmpty && c.removed.isEmpty)
     }
 
-    /// Launch: a move made offline last session is still queued; the moved message sits in Archive on disk
-    /// (not loaded yet). The quick check of the Inbox reports a change of it (read on the phone). After loading,
-    /// there must be one message, not one in the Inbox and one in the Archive.
-    @Test func quickCheckDuringLaunchDoesNotDuplicateAMessageMovedOfflineLastSession() {
-        var moved = remote("A"); moved.accountID = work.id; moved.mailbox = .archive
-        var inboxMsg = remote("B"); inboxMsg.accountID = work.id
-        let s = store()
-        var meta = StoredMeta()
-        meta.sync = [SyncState(account: work.id, mailbox: .inbox, token: "t0", complete: true)]
-        meta.outbox = [PendingChange(account: work.id, change: .move(["A"], to: .archive), previous: [remote("A")])]
-        s.restore(meta)
-        s.restore([inboxMsg], boxes: [MailboxKey(account: work.id, mailbox: .inbox)])
-        #expect(s.quickCheckRoles(work.id) == [.inbox])
-        s.apply(page([remote("A", read: true)], token: "t1"), account: work.id, mailbox: .inbox)
-        s.finishLoading([moved])
-        #expect(s.messages.filter { $0.remoteID == "A" }.count == 1, "boxes: \(s.messages.filter { $0.remoteID == "A" }.map(\.mailbox.rawValue))")
-    }
-
     /// The existing test severalPagesApplyLikeOneAfterTheOther feeds delete-A-then-upsert-A across pages.
     /// Applied in one batch, the message keeps its local ID, selection and loaded body; one by one, it doesn't.
     @Test func batchedDeleteThenReupsertMatchesOneByOne() {

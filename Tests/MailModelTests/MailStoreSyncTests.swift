@@ -862,4 +862,21 @@ struct MailStoreSyncTests {
         #expect(s.message(a)?.mailbox == .archive)
         #expect(s.message(a)?.isRead == true, "read on the phone, still unread here")
     }
+
+    /// Launch: a move made offline last session is still queued and the moved message is in Archive on disk, not yet
+    /// in memory. The Inbox check reports it (read on the phone); after loading there is one message, not two (BUG-076).
+    @Test func quickCheckDuringLaunchDoesNotDuplicateAMessageMovedOfflineLastSession() {
+        var moved = remote("A"); moved.mailbox = .archive
+        let s = MailStore(accounts: [work, home], messages: [])
+        var meta = StoredMeta()
+        meta.sync = [SyncState(account: work.id, mailbox: .inbox, token: "t0", complete: true)]
+        meta.outbox = [PendingChange(account: work.id, change: .move(["A"], to: .archive), previous: [remote("A")])]
+        s.restore(meta)
+        s.restore([remote("B")], boxes: [MailboxKey(account: work.id, mailbox: .inbox)])
+        #expect(s.quickCheckRoles(work.id) == [.inbox])
+        s.apply(SyncResult(upserts: [remote("A", read: true)], deletedRemoteIDs: [], token: "t1", more: false),
+                account: work.id, mailbox: .inbox)
+        s.finishLoading([moved])
+        #expect(s.messages.filter { $0.remoteID == "A" }.map(\.mailbox) == [.archive])
+    }
 }

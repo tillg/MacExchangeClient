@@ -295,39 +295,6 @@ struct Probe_DB2Tests {
         }
     }
 
-    // MARK: Staged launch and pending moves
-
-    /// Deleted (moved to Trash) while offline; the move still waits in the outbox at relaunch. The Inbox is
-    /// checked while the other mailboxes are still loading, and the server still has the message in its Inbox
-    /// (here: read elsewhere, so the check returns it). Fully loaded, the pending move keeps it in Trash; while
-    /// loading, the stored copy isn't in memory yet.
-    @Test(arguments: [true, false])
-    func probePendingMoveSurvivesInboxCheckDuringLaunch(staged: Bool) throws {
-        let url = tempURL(); defer { cleanup(url) }
-        let d = try MailDatabase(url: url)
-        let s = MailStore(accounts: [work], messages: [])
-        s.apply(SyncResult(upserts: [mail("keep", rid: "K"), mail("to delete", rid: "R")], deletedRemoteIDs: [], token: "t1", more: false),
-                account: work.id, mailbox: .inbox)
-        s.delete([s.messages.first { $0.remoteID == "R" }!.id])
-        #expect(s.outbox.count == 1)
-        try d.write(s.takeChanges())
-        // Relaunch.
-        let d2 = try MailDatabase(url: url)
-        let s2 = MailStore(accounts: [work], messages: [])
-        let first = [MailboxKey(account: work.id, mailbox: .inbox)]
-        s2.restore(try d2.meta())
-        s2.restore(try d2.messages(in: first), boxes: first)
-        if !staged { s2.finishLoading(try d2.messages(notIn: first)) }
-        #expect(s2.quickCheckRoles(work.id) == [.inbox])
-        // The quick check of the Inbox: the server still has R there (the move hasn't gone out), now read.
-        var server = mail("to delete", rid: "R"); server.isRead = true
-        s2.apply(SyncResult(upserts: [server], deletedRemoteIDs: [], token: "t2", more: false), account: work.id, mailbox: .inbox)
-        if staged { s2.finishLoading(try d2.messages(notIn: first)) }
-        let copies = s2.messages.filter { $0.remoteID == "R" }.map(\.mailbox.rawValue)
-        #expect(copies == ["trash"], "copies of the deleted message: \(copies)")
-        #expect(s2.count(.account(work.id, .inbox)) == 1, "Inbox shows \(s2.count(.account(work.id, .inbox)))")
-    }
-
     // MARK: Stale journal
 
     /// The user deletes Mail.sqlite to start fresh but leaves Mail.sqlite-wal (README asks for all three; the
