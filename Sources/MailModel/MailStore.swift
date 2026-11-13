@@ -1711,10 +1711,11 @@ public final class MailStore {
                             do {
                                 var more = true
                                 while more {
-                                    let asked = requestStamp
-                                    let r = try await backend.sync(folder, token: syncToken(acct, role))
+                                    let asked = requestStamp, sent = syncToken(acct, role)
+                                    let r = try await backend.sync(folder, token: sent)
                                     apply(r, account: acct, mailbox: role, asked: asked)
                                     more = r.more
+                                    if more && r.token == sent { throw SamePageAgain() }
                                 }
                             } catch is SyncTokenRejected {
                                 resetSync(acct, role)
@@ -1736,6 +1737,11 @@ public final class MailStore {
             }
         } while backends.keys.contains { !paused.contains($0) && next($0) != nil }
         if history { startHistory() }
+    }
+
+    /// A server that answers "more" without moving its sync position on would be asked for the same page forever.
+    struct SamePageAgain: LocalizedError {
+        var errorDescription: String? { "The server sent the same page again" }
     }
 
     /// Roles the quick check covers: the Inbox, plus the mailbox on screen if it belongs to this account.
@@ -1825,6 +1831,7 @@ public final class MailStore {
                 repeat {
                     let r = try await backend.sync(folder, token: token)
                     pages.append(r)
+                    if r.more && r.token == token { throw SamePageAgain() }
                     token = r.token
                 } while pages.last?.more == true && start.duration(to: .now) < Self.historyBatch
             } catch where pauseIfSignInFailed(error, account: acct) {
@@ -1849,10 +1856,11 @@ public final class MailStore {
                 do {
                     var more = true
                     while more {
-                        let asked = requestStamp
-                        let r = try await backend.sync(folder, token: syncToken(acct, role))
+                        let asked = requestStamp, sent = syncToken(acct, role)
+                        let r = try await backend.sync(folder, token: sent)
                         apply(r, account: acct, mailbox: role, asked: asked)
                         more = r.more
+                        if more && r.token == sent { throw SamePageAgain() }
                     }
                 } catch is SyncTokenRejected {
                     resetSync(acct, role)  // synced from the start by the next history run

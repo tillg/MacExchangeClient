@@ -203,6 +203,9 @@ enum EWSReply {
 
 // MARK: - Flows
 
+/// Set when a task started by a test has finished.
+@MainActor final class Done { var yes = false }
+
 /// Whole flows (store, outbox, backend, client) against a scripted server.
 @MainActor
 @Suite(.serialized)
@@ -316,6 +319,45 @@ struct EWSFlowTests {
         #expect(s.status?.contains("The mailbox database is temporarily unavailable.") == true, "\(String(describing: s.status))")
         await s.refresh(history: false)
         #expect(server.served > afterFirst)
+    }
+
+    /// A server that keeps answering "more" with the same SyncState (a fault, not Exchange's way): the quick check
+    /// stops at the repeated page and says so, instead of asking for it forever (BUG-126).
+    // file:// fixture (a plain file: every request reads the same answer)
+    @Test func quickCheckPagingEndsWhenTheServerRepeatsAPage() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("ews-\(UUID().uuidString).xml")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data(EWSReply.sync("", token: "T1", last: false).utf8).write(to: url)
+        let s = MailStore(accounts: [], messages: [])
+        s.add(acct, backend: EWSBackend(client: EWSClient(url: url, username: "u", password: "p")))
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX")], account: acct.id)
+        complete(s, .inbox, token: "T1")
+        let done = Done()
+        let task = Task { await s.refresh(history: false); done.yes = true }
+        try await waitFor(.seconds(10)) { done.yes }
+        let stillRunning = !done.yes
+        try Data(EWSReply.sync("", token: "T1", last: true).utf8).write(to: url)
+        await task.value
+        #expect(!stillRunning, "the check is still running (same page asked again and again)")
+        #expect(s.status?.contains("same page") == true, "\(String(describing: s.status))")
+    }
+
+    /// The same for the history: the folder stops after the repeated page and the progress bar goes away.
+    // file:// fixture (a plain file)
+    @Test func historyPagingEndsWhenTheServerRepeatsAPage() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("ews-\(UUID().uuidString).xml")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data(EWSReply.sync("", token: "T1", last: false).utf8).write(to: url)
+        let s = MailStore(accounts: [], messages: [])
+        s.add(acct, backend: EWSBackend(client: EWSClient(url: url, username: "u", password: "p")))
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX", totalCount: 1)], account: acct.id)
+        let done = Done()
+        let task = Task { await s.syncHistory(); done.yes = true }
+        try await waitFor(.seconds(10)) { done.yes }
+        let progress = s.progress
+        try Data(EWSReply.sync("", token: "T1", last: true).utf8).write(to: url)
+        await task.value
+        #expect(progress == nil, "history still running, progress \(String(describing: progress))")
     }
 
     /// Two Exchange accounts are named after their addresses, so their Inboxes can be told apart.

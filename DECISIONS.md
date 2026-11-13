@@ -865,3 +865,10 @@ edited: 2026-11-13
 - **Context:** BUG-125. The sidebar's `refresh()` on selection returned at once while a check ran, and the running check had fixed its mailboxes at its start, so the new mailbox waited for the next poll (up to 15 s).
 - **Decision:** The running check reads the mailboxes to check again after each folder (`quickCheckRoles`), per account, and covers a newly selected one before it ends; for an account it has already passed it goes round once more for the new mailbox only. A second `refresh` while one runs still returns at once.
 - **Alternatives:** queue a whole second check (rejected: it asks the Inbox again for nothing, and a caller waiting on it would wait for both).
+
+## 07:25 — Paging stops when the server repeats a page with the same SyncState {#d-bug-126}
+
+- **Status:** decided
+- **Context:** BUG-126. The quick check, the history and the background checks followed "more" without checking that the SyncState moved on; a server repeating the same page made the check never end (every later check skipped) and the history ask forever.
+- **Decision:** A page that says "more" with the token that was sent throws `SamePageAgain` ("The server sent the same page again"). The page is still applied. Quick check: that account's check ends with a status notice, as for other errors. History: the folder goes on the failed list for this run, with the status. Background check: that folder stops until the next run.
+- **Why:** the same guard the folder list has ("never the same page twice"). No user-visible change with a correct server, so no What's New line.
