@@ -465,10 +465,10 @@ public struct EWSBackend: MailBackend {
 
     /// SoftDelete: into Recoverable Items, like Outlook's delete from Deleted Items. Trash also holds deleted
     /// appointments and tasks, which Exchange won't delete without SendMeetingCancellations / AffectedTaskOccurrences
-    /// (optional for other items); erasing sends no cancellation (BUG-216).
+    /// (optional for other items); erasing sends no cancellation (BUG-216) and no "not read" receipt (BUG-214).
     static func deleteRequest(_ ids: [String]) -> String {
         "<m:DeleteItem DeleteType=\"SoftDelete\" SendMeetingCancellations=\"SendToNone\" "
-            + "AffectedTaskOccurrences=\"AllOccurrences\"><m:ItemIds>\(itemIDs(ids))</m:ItemIds></m:DeleteItem>"
+            + "AffectedTaskOccurrences=\"AllOccurrences\" SuppressReadReceipts=\"true\"><m:ItemIds>\(itemIDs(ids))</m:ItemIds></m:DeleteItem>"
     }
 
     /// With content IDs (pictures placed in the text) the body goes as HTML that shows them in their place.

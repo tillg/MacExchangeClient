@@ -626,6 +626,12 @@ struct EWSParsingTests {
         #expect(d.attr("AffectedTaskOccurrences") == "AllOccurrences")
     }
 
+    /// BUG-214: erasing an unread message tells the sender nothing, as marking read doesn't (UpdateItem).
+    @Test func deleteSuppressesReadReceipts() throws {
+        let d = try #require(try request(EWSBackend.deleteRequest(["A"])).first("DeleteItem"))
+        #expect(d.attr("SuppressReadReceipts") == "true")
+    }
+
     @Test func createRequestSendsOrSavesInSchemaOrder() throws {
         let draft = Draft(accountID: UUID(), to: "Ann <ann@x.com>, bob@x.com", cc: "c@x.com", subject: "S <1>", body: "B & C")
         let sent = try request(EWSBackend.createRequest(draft, send: true))
