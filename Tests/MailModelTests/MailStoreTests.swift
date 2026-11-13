@@ -1894,4 +1894,22 @@ struct MailStoreTests {
         d.excludeOriginalAttachments()
         #expect(d.body.contains("Look \u{FFFD} here"))
     }
+
+    /// BUG-172: memory search splits the query where the index does (punctuation, symbols): "Q3 - report" and
+    /// "report, q3" find "Q3 report"; a query of only invisible characters finds nothing, not everything.
+    @Test func memorySearchSplitsWordsLikeTheIndex() {
+        let q3 = msg(work, subject: "Q3 report"), other = msg(work, subject: "Lunch")
+        let s = store([q3, other])
+        for q in ["Q3 - report", "report, q3", "q3/report"] {
+            s.searchText = q
+            #expect(s.visibleMessages.map(\.id) == [q3.id], "\(q)")
+        }
+        for q in ["\u{2028}", "-", "–, /"] {
+            s.searchText = q
+            #expect(s.visibleMessages.isEmpty, "\(q.debugDescription)")
+        }
+        // A zero-width space counts as a blank (Foundation's whitespace): no search, the mailbox as without one.
+        s.searchText = "\u{200B}"
+        #expect(Set(s.visibleMessages.map(\.id)) == [q3.id, other.id])
+    }
 }

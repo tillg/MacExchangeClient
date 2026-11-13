@@ -375,7 +375,8 @@ public final class MailStore {
         let words = Self.searchWords(q)
         let found = messages.filter { m in
             if !q.isEmpty {
-                guard inSearchScope(m), !isDeleted(m), m.mailbox != .junk else { return false }
+                // A query without any word (only punctuation or invisible characters) finds nothing (BUG-172).
+                guard !words.isEmpty, inSearchScope(m), !isDeleted(m), m.mailbox != .junk else { return false }
                 return Self.matches(m, words)
             }
             if !opened.isEmpty && opened.contains(m.id) {
@@ -423,9 +424,12 @@ public final class MailStore {
         return withUnsafeBytes(of: a.id.uuid) { x in withUnsafeBytes(of: b.id.uuid) { y in memcmp(x.baseAddress!, y.baseAddress!, 16) < 0 } }
     }
 
-    /// The typed words, folded as memory search compares them.
+    /// The typed words, folded as memory search compares them. Split where the index's tokenizer splits: at anything
+    /// but letters, digits and marks, so "Q3 - report" and "report, q3" are the words q3 and report (BUG-172).
     nonisolated private static func searchWords(_ q: String) -> [String] {
-        q.split(whereSeparator: \.isWhitespace).map { fold(String($0)) }
+        q.split { c in !c.unicodeScalars.contains { s in
+            s.properties.isAlphabetic || s.properties.numericType != nil || s.properties.generalCategory == .nonspacingMark
+        } }.map { fold(String($0)) }
     }
 
     nonisolated private static func fold(_ s: String) -> String {
