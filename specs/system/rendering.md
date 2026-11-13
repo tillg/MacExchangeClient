@@ -44,7 +44,10 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
   when the HTML, the remote decision or the set of inline image IDs changes. Its height is measured by an app script
   (`HTMLPage.measureScript`: the bottom of the root element's box, which holds the body with its margins, so markup
   that closes our wrapper early can't cut the mail off; plus `scrollY`, so a page scrolled at load, e.g. to an
-  `autofocus` field, is measured from its top) after load and on width changes; vertical scrolling goes to
+  `autofocus` field, is measured from its top; at least the body's top plus its `scrollHeight` and bottom margin,
+  which counts `position: absolute` content inside a positioned element (absolute content with no positioned
+  ancestor isn't counted). None of these terms depends on the view's own height, so the view shrinks again when
+  the window widens) after load and on width changes; vertical scrolling goes to
   the surrounding scroll view, horizontal stays in the page.
 - Navigation (`BodyNavigation`): `about:blank` is allowed only for the app's own load, from `willLoad()` (called before
   each `loadHTMLString`) until that load commits; a meta refresh or link to `about:blank` afterwards is cancelled, like

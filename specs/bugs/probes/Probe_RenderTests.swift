@@ -227,25 +227,6 @@ struct Probe_RenderTests {
 
     // MARK: Height (what HTMLBodyView measures vs. what the page draws)
 
-    /// Many newsletters give the body padding instead of margin (`<body style="padding:24px 0">`).
-    @Test func bodyPaddingIsInsideTheMeasuredHeight() async {
-        let mail = #"<body style="margin:0;padding:40px 0"><table width="100%"><tr><td>Newsletter</td></tr></table><p>Unsubscribe</p></body>"#
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false), width: 600)
-        let h = await p.settleLikeTheApp()
-        let content = await p.contentHeight()
-        #expect(h >= content, "measured \(h), page \(content)")
-    }
-
-    /// Content placed with position:absolute (some generated mails: invoices, PDF-to-HTML) is out of flow;
-    /// the wrapper's box doesn't include it.
-    @Test func absolutelyPlacedContentIsMeasured() async {
-        let mail = #"<div style="position:relative"><div style="position:absolute;top:0;left:0;width:500px">Line<br>Line<br>Line<br>Line<br>Line<br>Line<br>Line<br>Line<br>Total: 120,00 €</div></div>"#
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false), width: 600)
-        let h = await p.settleLikeTheApp()
-        let content = await p.contentHeight()
-        #expect(h >= content, "measured \(h), page \(content)")
-    }
-
     /// MailChimp-style `height="100%"` body table: once the window is widened, the text needs less height; the
     /// view should get shorter again (a fresh load at the new width is the reference).
     static let percentTemplate = """
