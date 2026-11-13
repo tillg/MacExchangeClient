@@ -273,6 +273,12 @@ struct MailStoreTests {
         #expect(sent[0].isRead)
     }
 
+    @Test func sendWithoutSubjectShowsNoSubjectInSent() {
+        let s = store([])
+        s.send(Draft(accountID: work.id, to: "a@x.com", subject: "", body: "B"))
+        #expect(s.messages.first { $0.mailbox == .sent }?.subject == "(No Subject)")
+    }
+
     @Test func replyDraftQuotesOriginal() {
         let m = msg(work, subject: "Plans", from: "Ann")
         let s = store([m])

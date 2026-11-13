@@ -1927,7 +1927,8 @@ public final class MailStore {
             return true
         }
         let m = Message(accountID: acct.id, mailbox: .sent, from: Contact(name: acct.name, email: acct.address),
-                        to: Contact.parseList(d.to), cc: Contact.parseList(d.cc), subject: d.subject,
+                        to: Contact.parseList(d.to), cc: Contact.parseList(d.cc),
+                        subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
                         body: d.text, date: .now, isRead: true, attachments: d.attachments.map(\.attachment))
         add(m)
         if !d.attachments.isEmpty { setAttachmentData(d.attachments.map(\.data), for: m.id) }
