@@ -462,7 +462,7 @@ public final class MailStore {
         let q = normalizedSearch
         guard !q.isEmpty else {
             searchTask = nil; searchHits = nil; fallbackQuery = nil; memoryQuery = nil
-            if statusIsAboutSearch { status = nil }
+            if statusIsAboutSearch { clearSearchNotice() }
             return
         }
         guard searcher != nil else { return }
@@ -502,16 +502,29 @@ public final class MailStore {
                                                hits: hitsGeneration, openedUnread: openedUnread), list)
             }
             if ids.count >= MailDatabase.searchLimit {
-                status = Self.limitNotice
+                showSearchNotice(Self.limitNotice)
             } else if statusIsAboutSearch {
-                status = nil
+                clearSearchNotice()
             }
         } catch {
             guard !Task.isCancelled, normalizedSearch == q else { return }
             fallbackQuery = q
             searchHits = nil  // memory answers now: its results, not older hits, stay while the next query is pending
-            status = Self.searchFailed + error.localizedDescription
+            showSearchNotice(Self.searchFailed + error.localizedDescription)
         }
+    }
+
+    /// The notice a search's own notice covers ("Couldn't send …"); it comes back when the search's notice goes (BUG-248).
+    @ObservationIgnored private var statusUnderSearchNotice: String?
+
+    private func showSearchNotice(_ text: String) {
+        if !statusIsAboutSearch { statusUnderSearchNotice = status }
+        status = text
+    }
+
+    private func clearSearchNotice() {
+        status = statusUnderSearchNotice
+        statusUnderSearchNotice = nil
     }
 
     static let limitNotice = "Showing the newest 2,000 results"

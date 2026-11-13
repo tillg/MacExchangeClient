@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "A search no longer makes a \"Couldn't send\" or sign-in notice disappear; it shows again when the search is cleared.",
             "Toggle Flag on many selected messages in a large mailbox is instant again.",
             "The message list shows a date, not a weekday, for mail from exactly a week ago or dated in the future.",
             "Background pictures in Outlook mail (such as logos in signature tables) now show.",

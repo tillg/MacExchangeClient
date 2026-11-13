@@ -562,6 +562,23 @@ struct MailDatabaseTests {
         #expect(Set(try db.search("shared", accounts: nil)) == [w.id, h.id])
     }
 
+    /// BUG-248: a search's own notice (the 2,000 limit) doesn't erase another notice; clearing the search brings it back.
+    @Test func searchNoticeDoesNotEraseAnotherNotice() async throws {
+        let msgs = (0..<2001).map { mail("Report \($0)", minutesAgo: Double($0)) }
+        let (db, url) = try searchable(msgs)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let s = MailStore(accounts: [work], messages: msgs)
+        s.searchDebounce = .zero
+        s.searcher = { q, a in try db.search(q, accounts: a) }
+        let notice = "Couldn't send “Budget”: The server refused it"
+        s.status = notice
+        s.searchText = "report"
+        await s.searchTask?.value
+        #expect(s.status == "Showing the newest 2,000 results")
+        s.searchText = ""
+        #expect(s.status == notice)
+    }
+
     /// Trash and Junk are left out before the 2,000 limit, so newer hits there can't crowd out real ones.
     @Test func trashAndJunkHitsDontCrowdOutResults() async throws {
         var msgs: [Message] = []
