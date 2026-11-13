@@ -41,7 +41,7 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [190](BUG-190-remote-content-missed-entity-encoded.md) | P3 | rendering / privacy | An entity-encoded web address (src="&#104;ttps://…") is not seen as remote content: no banner |
 | [191](BUG-191-video-never-loads-after-load-remote-content.md) | P4 | rendering | A web video counts as remote content, but Load Remote Content never loads it (no media-src in the policy) |
 | [192](BUG-192-overnight-invite-calendar-until-midnight.md) | P3 | invites | An invite that runs past midnight reads the calendar only until midnight: conflicts after 00:00 are never shown |
-| [194](BUG-194-dotfile-attachment-saved-hidden.md) | P4 | attachments | An attachment named ".something.pdf" is saved as a hidden file the user can't find |
+| [194](BUG-194-dotfile-attachment-saved-hidden.md) | P4 | attachments | An attachment named ".something.pdf" is saved as a hidden file the user can't find (deferred: conflicts with an existing test) |
 | [195](BUG-195-recipient-group-and-comment-syntax.md) | P4 | compose | Recipients written with RFC 5322 group syntax or a comment become invalid addresses ("Team: a@x.com", "a@x.com (Ann)") |
 | [196](BUG-196-content-id-not-a-msg-id.md) | P4 | compose / sent HTML | Placed pictures are sent with a Content-ID without "@" (bare UUID) |
 | [197](BUG-197-blocked-picture-source-broken-box.md) | P4 | rendering | With remote content blocked, <picture> with a web <source> and <input type=image> show WebKit's broken-image box |

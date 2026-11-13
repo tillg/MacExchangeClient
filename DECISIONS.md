@@ -15,6 +15,7 @@ edited: 2026-11-13
   - [12:58 — Commit and push straight to main](#run-2026-11-13-1235-5)
   - [13:20 — Five parallel probe hunters in detached worktrees; bugs numbered from BUG-154](#run-2026-11-13-1235-6)
   - [13:58 — Commit while timing and WebKit tests fail under the hunters' load](#run-2026-11-13-1235-7)
+  - [14:40 — BUG-194 deferred: its fix contradicts an existing test](#run-2026-11-13-1235-8)
 
 # 2026-11-12 23:16 — Unattended bug-fix run {#run-2026-11-12-2316}
 
@@ -974,3 +975,13 @@ edited: 2026-11-13
 - **Consequences:** a full-suite rerun at low load is owed; its result goes into the report. Applies to every commit made while hunters run.
 - 14:02: full suite 470/470 green at normal load (after BUG-218).
 - 14:12: BUG-219 committed with `droppingTheSelectionStaysFastAt210kMessages` over budget at load 51 (wave-4 hunters); the change doesn't touch drops.
+
+## 14:40 — BUG-194 deferred: its fix contradicts an existing test {#run-2026-11-13-1235-8}
+
+- **Status:** open
+- **Context:** BUG-194 (".invoice.pdf" saved as a hidden file). Dropping leading dots in `Attachment.fileName` makes `MailStoreTests.openedAttachmentsAreFilesInTheDownloadsFolder` fail: it expects "../../etc" → "..:..:etc", which is itself a hidden name.
+- **Question:** change the existing test, or defer?
+- **Decision:** defer (`status: deferred` in the bug file), fix reverted.
+- **Why:** the user's rule: never make tests pass by changing them without permission.
+- **Alternatives:** prefix hidden names with "_" (still breaks that test); only strip a single leading dot (inconsistent: "..x" stays hidden).
+- **Consequences:** the user decides whether "..:..:etc" is intended; then BUG-194 is a two-line fix.
