@@ -119,6 +119,7 @@ new `id` per request), so equal drafts (two New Messages, two replies to one mes
   `delete(ids)`, `send(Draft)`, `saveDraft(Draft)`, `respond(id, InviteResponse)` (older form, still decoded),
   `reply(id, InviteReply)`, `removeFromCalendar(id)`. IDs are `remoteID`s. `renamed(_:)` swaps IDs after a move.
 - **`PendingChange`**: `id`, `account`, `change`, and `previous` — the messages as they were, to undo a refused
-  change. The ordered list of these is the store's `outbox` ([architecture.md](architecture.md#writing-to-the-server-the-outbox)).
+  change (for read, flag and move changes without body, HTML, attachment list and preview; erases and invite
+  answers keep whole messages). The ordered list of these is the store's `outbox` ([architecture.md](architecture.md#writing-to-the-server-the-outbox)).
 - **`SyncResult`**: `upserts`, `deletedRemoteIDs`, `readChanges`, `token`, `more`. **`MessageBody`**: text,
   attachments, from/to/cc, invite, html. **`AuthenticationError`**: "Sign-in failed"; pauses the account.

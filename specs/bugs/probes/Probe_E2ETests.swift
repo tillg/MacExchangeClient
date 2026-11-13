@@ -144,48 +144,6 @@ struct Probe_E2ETests {
         for _ in 0..<500 where !cond() { try await Task.sleep(for: .milliseconds(10)) }
     }
 
-    /// Select All ▸ Archive on an Inbox of 2,870 messages (README's size), half of them opened: the queued move
-    /// holds a full copy of every message, bodies and HTML included, and every later change to the outbox
-    /// (one more flag, one batch sent) rewrites all of it on the next save.
-    @Test func archivingAWholeInboxKeepsTheOutboxSmall() throws {
-        let url = tempURL()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let s = MailStore(accounts: [a], messages: [])
-        let db = try MailDatabase(url: url)
-        let html = "<html><body>" + String(repeating: "<p>Quarterly numbers and some text</p>", count: 500) + "</body></html>"
-        s.apply(page((0..<2870).map { i in
-            var m = server("R\(i)", read: true, minutes: i)
-            if i % 2 == 0 {
-                m.body = String(repeating: "Plain text line of the body. ", count: 150)
-                m.html = html; m.htmlChecked = true; m.bodyLoaded = true
-            }
-            return m
-        }), account: a.id, mailbox: .inbox)
-        try db.write(s.takeChanges())
-        s.selectedMailbox = .account(a.id, .inbox)
-        s.selection = Set(s.visibleMessages.map(\.id))
-        s.archiveSelection()
-        try db.write(s.takeChanges())
-        s.setFlag(.red, for: [s.messages[0].id])  // one more change while offline
-        let changes = s.takeChanges()
-        let bytes = try (changes.outbox ?? []).reduce(0) { $0 + (try JSONEncoder().encode($1)).count }
-        let start = ContinuousClock.now
-        try db.write(changes)
-        let t = start.duration(to: .now)
-        print("PROBE outbox \(changes.outbox?.count ?? 0) changes, \(bytes / 1_000_000) MB JSON, write \(t)")
-        #expect(bytes < 2_000_000, "flagging one message rewrites \(bytes / 1_000_000) MB of outbox; the save took \(t)")
-    }
-
-    /// Control: the same with summaries only (nothing opened) stays small.
-    @Test func archivingAWholeInboxOfSummariesIsSmall() throws {
-        let s = MailStore(accounts: [a], messages: [])
-        s.apply(page((0..<2870).map { server("R\($0)", read: true, minutes: $0) }), account: a.id, mailbox: .inbox)
-        s.archive(Set(s.messages.map(\.id)))
-        let bytes = try s.outbox.reduce(0) { $0 + (try JSONEncoder().encode($1)).count }
-        print("PROBE summaries-only outbox \(bytes / 1000) kB")
-        #expect(bytes < 5_000_000)
-    }
-
     /// With the unread filter on, a search still lists read messages.
     @Test func unreadFilterAppliesToSearchResults() async throws {
         let url = tempURL()
