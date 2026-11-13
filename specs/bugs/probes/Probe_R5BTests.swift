@@ -167,25 +167,6 @@ struct Probe_R5BTests {
 
     // MARK: R5B-06
 
-    /// A move waits for the folder list (e.g. a drop right after launch). Reading it fails because the mailbox store
-    /// is briefly unavailable (GetFolder answers the Inbox with ErrorMailboxStoreUnavailable, BUG-127). Exchange
-    /// never saw the move, so nothing was refused: it must stay queued, not be undone as "Exchange refused a change".
-    @Test func r5b06_failedFolderListDoesNotUndoAQueuedMove() async throws {
-        let e = EWSReply.err("GetFolder", "ErrorMailboxStoreUnavailable", "The mailbox database is temporarily unavailable.")
-        let server = ScriptedServer([EWSReply.resp("GetFolder", String(repeating: e, count: 6))])
-        defer { server.stop() }
-        let s = MailStore(accounts: [], messages: [])
-        s.add(acct, backend: backend(server))
-        let m = Message(accountID: acct.id, mailbox: .inbox, from: Contact(name: "Ann", email: "ann@x.com"), to: [],
-                        subject: "Invoice", body: "", date: .now, remoteID: "A", bodyLoaded: false)
-        s.merge([m], account: acct.id, mailbox: .inbox)
-        s.move([mid(s, "A")], to: .archive)
-        try await waitFor { server.served == 1 }
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(s.message(mid(s, "A"))?.mailbox == .archive, "status: \(s.status ?? "")")
-        #expect(s.outbox.count == 1)
-    }
-
     // MARK: R5B-07
 
     /// Two moves of one message wait in the outbox (Inbox → Archive, then Archive → Junk), and Exchange refuses

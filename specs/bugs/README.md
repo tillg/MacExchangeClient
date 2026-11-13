@@ -27,7 +27,6 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [163](BUG-163-archive-removed-on-server-keeps-mail.md) | P3 | Sync | An Archive folder deleted on the server keeps its mail and sync position in Archive for good |
 | [164](BUG-164-throttled-send-does-not-hold-account.md) | P3 | Outbox | A send that Exchange throttles doesn't hold back the account's other changes: they go out at once, inside the back-off |
 | [165](BUG-165-wcf-fault-without-code-undoes-change.md) | P3 | EWS | A SOAP fault without an Exchange ResponseCode (IIS/WCF internal error) undoes the change as "refused" (deferred) |
-| [166](BUG-166-folder-list-failure-undoes-queued-move.md) | P3 | Outbox | A queued move is undone as "refused" when reading the folder list fails |
 | [167](BUG-167-two-refused-changes-leave-wrong-state.md) | P3 | Outbox | Two refused changes of the same message leave it in the state of the first change, which the server never had |
 | [168](BUG-168-refused-folder-stops-newest-of-others.md) | P4 | Sync | One folder that Exchange refuses in the history's first step stops the newest-200 fetch for all the account's other folders |
 | [171](BUG-171-thai-halfwidth-kana-words-not-found.md) | P3 | search | A word inside Thai text (or half-width katakana) isn't found by search |
