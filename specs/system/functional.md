@@ -154,7 +154,9 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
   as its first – last day) and location, then Accept,
   Tentative and Decline menus (Respond with Comments…, Respond without Comments, Do Not Send a Response) and Propose
   New Time (with Tentative or Decline). The answer given is outlined in the accent colour. A cancellation shows only
-  Remove from Calendar.
+  Remove from Calendar. None of these (nor "Please respond.") on your own invite or cancellation:
+  `MailStore.canAnswer` is false in Sent or when the sender is the account's address, and `respond` /
+  `removeFromCalendar` then do nothing.
 - Banners: "Please respond." or "You answered: …" (with the proposed time and "the organizer wasn't told"), and a
   yellow conflict note when timed, non-free calendar events overlap (the invite's own entry excluded).
 - Next to the text, a day column from the Exchange calendar with overlapping events side by side
@@ -171,6 +173,9 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
 - An answer that fails (refused, or a network error: it may have gone out, so it isn't repeated) is undone. If it had
   a comment, the comment is kept in Drafts on this Mac, to the organizer with the answer's subject, and the status
   says "Couldn't send your answer to “…”: … Your comment is in Drafts on this Mac."
+- A refused answer or Remove from Calendar is undone with "Exchange refused a change: …". After a Remove from
+  Calendar (or an unsent answer) the app moves the message to Deleted Items itself; a refusal of that move (other than
+  "already gone") shows "Couldn't move “…” to Trash on the server: …", and the message returns at the next check.
 - Any answer or Remove from Calendar moves the message to Trash locally at once. An invite answered while it is one
   of several selected messages leaves the selection (`keepingSelectionVisible`), so Delete can't erase it unseen.
 
