@@ -146,7 +146,8 @@ struct DayColumn: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(invite.start.formatted(.dateTime.weekday(.wide).day().month()))
+            // An all-day invite's day as read for its calendar (BUG-200), not the organizer's midnight in UTC.
+            Text((invite.isAllDay ? invite.allDayDays().0 : invite.start).formatted(.dateTime.weekday(.wide).day().month()))
                 .font(.system(size: 12, weight: .semibold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
