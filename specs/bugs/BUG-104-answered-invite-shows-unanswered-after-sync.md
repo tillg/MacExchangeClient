@@ -2,7 +2,7 @@
 title: 'An invite answered here shows "Please respond" again once Exchange has moved it to Deleted Items'
 priority: P3
 area: Invite
-status: open
+status: deferred
 found: 2026-11-13
 ---
 ## Summary
@@ -69,3 +69,6 @@ README ✅ invites: "an answered invite moves to Trash right away, as Exchange w
 
 ## Likely cause
 `MailStore.answer` (`Sources/MailModel/MailStore.swift:928-942`) keeps the answer only in the local message under the old remote ID; `merge` (:585-596) removes it when the Inbox reports that ID deleted, and the Trash copy is a new message. `EWSBackend.bodyRequest`/`parseInvite` (`Sources/EWS/EWSBackend.swift:73-82, 200-209`) don't read the server's answer (e.g. `calendar:MyResponseType`), so loading the body can't restore it.
+
+## Deferred
+2026-11-13: the store can't tell which Trash item is the answered invite. Exchange moves the meeting request itself after a sent answer and gives it a new ItemId, which no answer the store gets names (the AcceptItem/DeclineItem response carries the created response message, not the moved request). The two ways left are (a) reading the answer from the server (⚠️ `t:ResponseType` on the meeting message or the calendar item's `MyResponseType`; not checked against the live server, and the probe's fixture would have to be rewritten to carry it) or (b) matching the new Trash item to the removed Inbox copy by conversation, subject and time, which can pick the wrong invite (an updated invite for the same meeting). Both need a decision or a live check. See DECISIONS.md#d-bug-104.

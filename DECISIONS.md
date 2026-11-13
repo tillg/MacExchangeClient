@@ -625,3 +625,10 @@ edited: 2026-11-13
 - **Why:** ChangeKey or LastModifiedTime aren't in the summaries or the stored message (a new stored field and a migration), and they change on any update, including this app's own Mark as Read: every opened message would lose its body at the next check, BUG-057's symptom again. The preview changes only when the text does.
 - **Not covered:** an edit past the first 255 characters, or of the attachments only, with the same start of text, keeps the old body.
 - **Note for review:** the EWS-flow probes of this bug (`probeDraftEditedElsewhereShowsNewText*`) build the loaded draft without a preview, which no EWS summary does; with no preview known they still keep the old body. Making them pass would need "another subject" as the signal, which the pinned test above forbids. They are removed with the bug; the regression tests use drafts with a preview, as the sync stores them.
+
+## 03:08 — An answered invite moved by Exchange: deferred {#d-bug-104}
+
+- **Status:** deferred
+- **Context:** BUG-104. After a sent answer, Exchange moves the meeting request to Deleted Items under a new ItemId. The Inbox sync deletes the old ID (the answered copy here goes), the Trash sync brings the new ID as a new message, and its body has no answer: "Please respond" again.
+- **Decision:** Deferred, no code change. Nothing the store receives links the new ID to the old one.
+- **Open question for review:** (a) read the answer from Exchange (⚠️ `t:ResponseType` / the calendar item's `MyResponseType`; to be checked on the live server with `EWSLiveMeetingProbe` first), or (b) carry the answer over to a new Trash invite with the same conversation, subject and start (risk: an updated invite for the same meeting takes the old answer). (a) is the sound one; it needs a live check this run can't make.
