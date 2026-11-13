@@ -12,7 +12,7 @@ struct ComposeView: View {
     @State private var excluded = false
     @State private var askInclude = false
     @State private var confirmSize = false
-    /// Why Send couldn't go ahead; the window stays open with the message.
+    /// Why Send or Save couldn't go ahead; the window stays open with the message.
     @State private var sendError: String?
     @FocusState private var inRecipients: Bool
     /// The draft as the window opened, to tell whether closing it loses anything.
@@ -29,7 +29,8 @@ struct ComposeView: View {
                 field("Cc:") { TextField("", text: $draft.cc).focused($inRecipients).onSubmit(checkNewRecipients) }
                 field("Subject:") { TextField("", text: $draft.subject) }
             }
-            if store.accounts.count > 1 && draft.inviteAnswer == nil {
+            // Also with one account when the draft's own account is gone (sample accounts go when signing in).
+            if (store.accounts.count > 1 || store.account(draft.accountID) == nil) && draft.inviteAnswer == nil {
                 field("From:") {
                     Picker("", selection: $draft.accountID) {
                         ForEach(store.accounts) { a in Text("\(a.name) – \(a.address)").tag(a.id) }
@@ -76,10 +77,8 @@ struct ComposeView: View {
         } message: {
             Text("\(sizeText) The server will probably refuse it. Remove some attachments, or try sending anyway.")
         }
-        .alert("The message can't be sent.", isPresented: Binding { sendError != nil } set: { if !$0 { sendError = nil } }) {
+        .alert(sendError ?? "", isPresented: Binding { sendError != nil } set: { if !$0 { sendError = nil } }) {
             Button("OK") {}
-        } message: {
-            Text(sendError ?? "")
         }
         .focusedSceneValue(\.attachFiles, draft.inviteAnswer == nil ? { attachFiles() } : nil)
         .background(Color(nsColor: .textBackgroundColor))
@@ -109,7 +108,9 @@ struct ComposeView: View {
                     }
                 }
                 ToolbarItem {
-                    Button { store.saveDraft(draft); dismiss() } label: { Label("Save Draft", systemImage: "doc") }
+                    Button { if store.saveDraft(draft) { dismiss() } else { sendError = store.status } } label: {
+                        Label("Save Draft", systemImage: "doc")
+                    }
                         .keyboardShortcut("s", modifiers: .command).disabled(draft.loadingOriginal != nil)
                 }
             }
@@ -223,9 +224,11 @@ struct ComposeView: View {
             switch response {
             case .alertFirstButtonReturn:
                 // While the original's files load, Save waits for them (`onChange` below) instead of losing the message.
-                if store.saveDraft(draft) { window.close() } else {
+                if store.saveDraft(draft) { window.close() } else if draft.loadingOriginal != nil {
                     closeWhenLoaded = window
                     store.status = "The message is saved and closed once its attachments have loaded."
+                } else {
+                    sendError = store.status
                 }
             case .alertThirdButtonReturn: window.close()
             default: closeWhenLoaded = nil  // Cancel: the window stays open, also once the files are in

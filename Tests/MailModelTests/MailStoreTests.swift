@@ -999,6 +999,22 @@ struct MailStoreTests {
         #expect(s.status?.contains("Q4 review") == true, "status: \(s.status ?? "nil")")
     }
 
+    /// A message written for a sample account that signing in has removed is not sent, or saved, from the
+    /// Exchange account behind the user's back: the window stays open and says why (BUG-070).
+    @Test func draftOfARemovedAccountIsNotSentFromAnother() {
+        let s = store([msg(home, subject: "sample")])
+        let d = Draft(accountID: home.id, to: "bo@x.com", subject: "Test", body: "written in sample mode")
+        let exchange = Account(name: "Exchange", address: "me@corp.com")
+        s.removeLocalAccounts()  // sign-in: sample accounts go
+        s.accounts.append(exchange)
+        s.merge([(.inbox, [])], account: exchange.id)  // the Exchange account (server mail)
+        s.send(d)
+        let saved = s.saveDraft(d)
+        #expect(s.outbox.isEmpty, "queued: \(s.outbox.map { s.account($0.account)?.name ?? "?" })")
+        #expect(!saved && !s.messages.contains { $0.subject == "Test" })
+        #expect(s.status?.contains("no longer set up") == true, "status: \(s.status ?? "nil")")
+    }
+
     /// Inline images can be megabytes: only the message on screen keeps them, in memory, never in the cache.
     @Test func inlineImagesAreKeptForTheShownMessageOnly() {
         let s = store([msg(work), msg(work)])

@@ -1871,6 +1871,14 @@ public final class MailStore {
         return true
     }
 
+    /// The account the draft is written from. Never another one: a draft whose account was removed meanwhile
+    /// (sample accounts go when signing in) waits for the user to choose one in From.
+    private func sendingAccount(_ d: Draft) -> Account? {
+        if let a = account(d.accountID) { return a }
+        status = "“\(d.subject)” was written from an account that is no longer set up. Choose another one in From."
+        return nil
+    }
+
     /// Sends the draft (queued for the server, or added to Sent without one). False when it can't go out: the
     /// caller keeps the message window open, and `status` says why.
     @discardableResult
@@ -1887,7 +1895,7 @@ public final class MailStore {
                                 proposedStart: a.proposedStart, proposedEnd: a.proposedEnd), to: a.messageID)
             return true
         }
-        let acct = account(d.accountID) ?? accounts[0]
+        guard let acct = sendingAccount(d) else { return false }
         if serverAccounts.contains(acct.id) {
             outbox.append(PendingChange(account: acct.id, change: .send(d), previous: []))
             scheduleFlush()
@@ -1906,7 +1914,7 @@ public final class MailStore {
     @discardableResult
     public func saveDraft(_ d: Draft) -> Bool {
         if attachmentsPending(d) { return false }
-        let acct = account(d.accountID) ?? accounts[0]
+        guard let acct = sendingAccount(d) else { return false }
         if serverAccounts.contains(acct.id) {
             outbox.append(PendingChange(account: acct.id, change: .saveDraft(d), previous: []))
             scheduleFlush()
