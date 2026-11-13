@@ -93,55 +93,7 @@ struct Probe_R5LTests {
 
     // MARK: R5L-01
 
-    /// Offline, a message is moved from the Inbox into "Projects". Before the next launch "Projects" is deleted on the
-    /// server. The queued move can't go, and the message is still in the Inbox on the server: it must stay in the app
-    /// (back in the Inbox), not vanish.
-    @Test func r5l01_moveQueuedIntoFolderDeletedOnServerKeepsTheMessage() async throws {
-        let a = msg("A1")
-        let saved = firstSession([a], folders: Self.withFX) { s in s.move([a.id], to: .folder("FX")) }
-        let server = ScriptedServer([R5L.standardFolders(), EWSReply.findFolder(R5L.standardInFind)])
-        defer { server.stop() }
-        let s = relaunch(saved, server)
-        try await waitFor { s.outbox.isEmpty && server.served >= 2 }
-        // The next check: nothing changed in the Inbox on the server.
-        server.push(EWSReply.sync("", token: "T1"))
-        await s.refresh(history: false)
-        let kept = s.messages.first { $0.remoteID == "A1" }
-        #expect(kept?.mailbox == .inbox, "message A1 after the refused move: \(kept.map { $0.mailbox.rawValue } ?? "gone from the app"); status: \(s.status ?? "-")")
-
-        // The app's usual path: the launch check reads the folder list while the stored mail beyond the Inbox is
-        // still loading; A1 (stored in "Projects") arrives afterwards.
-        let server2 = ScriptedServer([R5L.standardFolders(), EWSReply.findFolder(R5L.standardInFind), EWSReply.sync("", token: "T1")],
-                                     fallback: EWSReply.sync("", token: "T2"))
-        defer { server2.stop() }
-        let s2 = MailStore(accounts: [], messages: [])
-        s2.add(acct, backend: backend(server2))
-        s2.restore(StoredMeta(folders: saved.folders ?? [:], sync: saved.sync ?? [], outbox: saved.outbox ?? []))
-        s2.restore([], boxes: [MailboxKey(account: acct.id, mailbox: .inbox)])
-        await s2.refresh(history: false)
-        s2.finishLoading(saved.upserts)
-        try await waitFor { s2.outbox.isEmpty }
-        let kept2 = s2.messages.first { $0.remoteID == "A1" }
-        #expect(kept2?.mailbox == .inbox, "loading path: message A1 \(kept2.map { $0.mailbox.rawValue } ?? "gone from the app"); status: \(s2.status ?? "-")")
-    }
-
     // MARK: R5L-02
-
-    /// Offline, a flagged message is moved from "Projects" to the Inbox. Before the next launch "Projects" is deleted
-    /// for good on the server (Shift-Delete in Outlook), with its mail. The folder list no longer has it, and Exchange
-    /// answers the move with ErrorItemNotFound. The undo must not put the message back into a folder that no longer
-    /// exists: there it is invisible in the sidebar, but still listed in Flagged and found by search, for good.
-    @Test func r5l02_refusedMoveOutOfFolderDeletedOnServerLeavesNoGhost() async throws {
-        let a = msg("A1", .folder("FX"), flag: .red)
-        let saved = firstSession([a], folders: Self.withFX) { s in s.move([a.id], to: .inbox) }
-        let server = ScriptedServer([R5L.standardFolders(), EWSReply.findFolder(R5L.standardInFind), R5L.moved([("A1", nil)])])
-        defer { server.stop() }
-        let s = relaunch(saved, server)
-        try await waitFor { s.outbox.isEmpty && server.served >= 3 }
-        let tree = Set((s.folders[acct.id] ?? []).map(\.box))
-        let ghosts = s.messages.filter { !$0.mailbox.isStandard && !tree.contains($0.mailbox) }
-        #expect(ghosts.isEmpty, "messages in a mailbox the account no longer has: \(ghosts.map { "\($0.remoteID ?? "-") in \($0.mailbox.rawValue)" }); Flagged count \(s.count(.smart(.flagged)))")
-    }
 
     // MARK: R5L-03
 

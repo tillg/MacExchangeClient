@@ -151,6 +151,9 @@ flowchart LR
   - A send or invite answer that meets a timeout or "busy" goes to Drafts (never repeated), and the account's other
     changes wait as for any other change (set aside for this drain, `busyUntil` from the back-off) (BUG-164). The
     background check of complete folders stops for the account at throttling too (BUG-161).
+  - Folders that leave the server's list (`setRemoteFolders`): their mail goes, Archive included (BUG-163); a queued
+    move into such a folder is dropped and its message goes back where it came from, also stored mail loaded later
+    (BUG-253); a refused move out of such a folder removes the message instead of restoring it there (BUG-254).
   - A refused read, flag or move change undoes only while its value still holds; when a later queued change of the
     same kind overwrote it, that change's undo copy takes this one's old value, so two refusals end in the server's
     state (BUG-167).

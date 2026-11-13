@@ -23,7 +23,6 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [158](BUG-158-delete-in-folder-inside-trash-moves-to-trash.md) | P4 | MailStore / actions | Delete in a folder inside Trash moves the mail to Trash instead of erasing it |
 | [159](BUG-159-invite-answer-selection-depends-on-hidden-member.md) | P4 | MailStore / conversations | Answering an invite moves the selection to another conversation, but only when the selection holds the invite rather than its row |
 | [162](BUG-162-mail-folder-in-non-mail-folder-shown-or-archive.md) | P4 | EWS | A mail folder inside Contacts, Calendar or Tasks shows at the top level, and one named Archive becomes the account's Archive |
-| [163](BUG-163-archive-removed-on-server-keeps-mail.md) | P3 | Sync | An Archive folder deleted on the server keeps its mail and sync position in Archive for good |
 | [165](BUG-165-wcf-fault-without-code-undoes-change.md) | P3 | EWS | A SOAP fault without an Exchange ResponseCode (IIS/WCF internal error) undoes the change as "refused" (deferred) |
 | [168](BUG-168-refused-folder-stops-newest-of-others.md) | P4 | Sync | One folder that Exchange refuses in the history's first step stops the newest-200 fetch for all the account's other folders |
 | [171](BUG-171-thai-halfwidth-kana-words-not-found.md) | P3 | search | A word inside Thai text (or half-width katakana) isn't found by search |
@@ -80,6 +79,4 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [249](BUG-249-conversations-off-keeps-read-members.md) | P4 | MailStore / Viewing settings | Turning conversations off with the unread filter on keeps an opened conversation's other messages in the list, read and unselected |
 | [250](BUG-250-one-row-two-messages-nothing-open.md) | P4 | MailStore / search, conversations | Two results of one conversation selected in a search become one selected row after clearing it, but nothing opens ("2 messages selected", Reply disabled) |
 | [251](BUG-251-title-not-searching.md) | P4 | MailStore / MessageViewer | While searching, the window title and subtitle describe the mailbox, not the search results |
-| [253](BUG-253-queued-move-into-deleted-folder-loses-message.md) | P3 | Outbox / folders | A move queued offline into a folder that is then deleted on the server makes the message vanish from the app; the status says "There is no  folder |
-| [254](BUG-254-refused-move-restores-into-deleted-folder.md) | P3 | Outbox / folders | A refused move out of a folder deleted on the server puts the message back into that folder, where it is invisible but still in Flagged and search |
 | [255](BUG-255-archive-without-folder-says-exchange-refused.md) | P4 | MailStore / actions | Archive in an Exchange account without an Archive folder moves the message, then jumps it back with "Exchange refused a change", though nothing was sent |

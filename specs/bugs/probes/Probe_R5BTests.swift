@@ -87,22 +87,6 @@ struct Probe_R5BTests {
 
     // MARK: R5B-03
 
-    /// The Archive folder is gone from the server's folder list (deleted in Outlook). As for any other
-    /// folder (d-bug-077), its mail goes with it when the list is read; it stayed in Archive for good.
-    @Test func r5b03_archiveRemovedOnTheServerTakesItsMailWithIt() throws {
-        let server = ScriptedServer([])
-        defer { server.stop() }
-        let s = store(server, folders: [RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .archive, id: "ARCH")])
-        let m = Message(accountID: acct.id, mailbox: .archive, from: Contact(name: "Ann", email: "ann@x.com"), to: [],
-                        subject: "Old", body: "", date: .now, remoteID: "A1", bodyLoaded: false)
-        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "TA", more: false), account: acct.id, mailbox: .archive)
-        #expect(s.count(.account(acct.id, .archive)) == 1)
-        // The next launch reads the folder list: the Archive folder was deleted in Outlook (emptied from Deleted Items).
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX")], account: acct.id)
-        #expect(s.count(.account(acct.id, .archive)) == 0, "Archive still shows the mail of a folder the server no longer has as Archive")
-        #expect(s.syncToken(acct.id, .archive) == nil)
-    }
-
     /// A store whose Inbox holds server messages with these IDs.
     func inboxStore(_ server: ScriptedServer, _ rids: [String]) -> MailStore {
         let s = store(server, folders: [RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .drafts, id: "DRAFTS"),
