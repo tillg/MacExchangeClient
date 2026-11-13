@@ -531,3 +531,10 @@ edited: 2026-11-13
 - **Decision:** `HTMLPage.observeResizes` adds `HTMLPage.resizeScript` to the web view's user content controller in the `.defaultClient` world: a `ResizeObserver` on the root and the body posts `mailReplicaResize`; `MailWebView.Coordinator` measures again. Checked in a real `WKWebView` that user scripts in that world run and post with content JavaScript off. The mail's own scripts still never run.
 - **Feedback guard:** it is installed only when `HTMLPage.pinViewportUnits` works (d-bug-110), and the measurement doesn't depend on the view's height (d-bug-064, 108), so a re-measure can't grow the view again; a test checks that a `100vh` mail stops re-measuring.
 - **Alternatives:** Re-measure on a timer (rejected: work for every open message and a delay). KVO on the web view's content size (rejected: no public property on macOS).
+
+## 02:24 — In the history, only a back-off sets an account aside {#d-bug-098-followup}
+
+- **Status:** decided (review follow-up to d-bug-061 and d-bug-098)
+- **Context:** With 061, an unreadable or result-less answer is `ServerBusy`; with 098, `ServerBusy` in the history set the whole account aside. A folder whose page is unreadable every time would then never be marked failed, come first on every run, and stall the account's other folders without a status, against the README ("A folder whose history fails is skipped, and the error stays under the window title").
+- **Decision:** The history sets an account aside only for a `URLError` or a `ServerBusy` with a back-off (throttling). A `ServerBusy` without one (a page that isn't an Exchange answer) counts as that folder's failure: skipped for the session, with a status. The outbox keeps treating every `ServerBusy` as "not refused, wait".
+- **Why:** Throttling is per account and passes; a broken page for one folder is that folder's problem.

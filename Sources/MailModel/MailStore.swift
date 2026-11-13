@@ -1476,7 +1476,7 @@ public final class MailStore {
     /// Fetches every folder's full contents in the background: first the newest messages of each folder,
     /// then one page at a time, shown in batches (`historyBatch`). The next folder is picked after every batch,
     /// so switching mailboxes takes effect within moments. A failing folder doesn't stop the others; an account
-    /// whose server can't be reached (or is busy) waits for the next check, while the other accounts go on.
+    /// whose server can't be reached (or asks to wait) waits for the next check, while the other accounts go on.
     public func syncHistory() async {
         defer { progress = nil }
         var unreachable = Set<UUID>()
@@ -1518,7 +1518,9 @@ public final class MailStore {
             } catch is SyncTokenRejected {
                 pages = []  // the pass starts over; nothing of the old one is applied
                 resetSync(acct, folder.role)
-            } catch where error is URLError || error is ServerBusy {
+            } catch where error is URLError || (error as? ServerBusy)?.retryAfter != nil {
+                // Unreachable or throttled: the account waits for the next run. A page that isn't an Exchange
+                // answer (no back-off) counts as this folder's failure below, so it can't hold up the others.
                 unreachable.insert(acct)
             } catch {
                 historyFailed.insert(key(acct, folder.role))

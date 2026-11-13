@@ -805,4 +805,26 @@ struct MailStoreSyncTests {
         try await waitForOutbox(s)
         #expect(s.message(a)?.remoteID == "N1" && s.message(a)?.mailbox == .archive)
     }
+
+    /// A folder whose history keeps getting a page that isn't an Exchange answer is skipped with a status; it doesn't
+    /// hold up the account's other folders.
+    @Test func historyAgainstANonAnswerSkipsTheFolder() async throws {
+        let s = try store(answering: serviceUnavailablePage)
+        await s.syncHistory()
+        // Inbox comes first; the history went on to Sent, the last folder, which failed the same way.
+        #expect(s.status?.hasPrefix("Sent: Unreadable EWS response") == true, "status: \(s.status ?? "nil")")
+    }
+
+    /// Throttling sets the account aside for this run only: the next run completes the folder.
+    @Test func historyAfterThrottlingGoesOnNextTime() async throws {
+        let file = try responseFile(serverBusy)
+        let s = MailStore(accounts: [], messages: [])
+        s.add(work, backend: backend(file))
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX")], account: work.id)
+        await s.syncHistory()
+        #expect(!s.isComplete(work.id, .inbox))
+        try Data(success.utf8).write(to: file)
+        await s.syncHistory()
+        #expect(s.isComplete(work.id, .inbox))
+    }
 }
