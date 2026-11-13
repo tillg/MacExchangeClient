@@ -135,6 +135,22 @@ struct MessageTests {
         #expect(d.placedPictures == [0])
     }
 
+    /// For random bodies of marks, combining characters, emoji and text, every mark counted by scalar is a placed file.
+    @Test func randomDraftsMarksMatchPictures() {
+        var rng = SplitMix(state: 42)
+        let pieces = ["a", " ", "\n", "é", "\u{0301}", "😀", "👍🏽", "שלום", "\u{200D}", "<", "&", String(Draft.fileMark)]
+        var failures = 0
+        for _ in 0..<2000 {
+            var body = ""
+            for _ in 0..<Int.random(in: 0..<20, using: &rng) { body += pieces.randomElement(using: &rng)! }
+            let marks = body.unicodeScalars.filter { $0 == "\u{FFFC}" }.count
+            var d = Draft(accountID: UUID(), body: body)
+            d.attachments = (0..<marks).map { DraftAttachment(name: "p\($0).png", contentType: "image/png", data: Data([7])) }
+            if d.placedPictures != Array(0..<marks) || d.text.unicodeScalars.contains("\u{FFFC}") { failures += 1 }
+        }
+        #expect(failures == 0, "\(failures) of 2000 drafts misplace files")
+    }
+
     /// The compose window shows the size on every keystroke: the estimate must not walk a long body.
     @Test func estimatedSizeIsCheapForALongReply() {
         let line = "> Thanks, that works for me. Let's keep Friday at 10 as planned, ok?\n"
@@ -153,5 +169,17 @@ struct MessageTests {
         let a = ComposeWindow(d), b = ComposeWindow(d)
         #expect(a != b)
         #expect(a.draft == d && b.draft == d)
+    }
+}
+
+/// A seeded random number generator (SplitMix64), so random tests repeat.
+struct SplitMix: RandomNumberGenerator {
+    var state: UInt64
+    mutating func next() -> UInt64 {
+        state &+= 0x9E3779B97F4A7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
+        z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
+        return z ^ (z >> 31)
     }
 }
