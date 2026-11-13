@@ -68,7 +68,8 @@ One connection, `journal_mode=WAL`, `synchronous=NORMAL`.
   without U+001F gets an empty email. Names or addresses containing these characters are corrupted.
 - Attachments: `name U+001F size U+001F contentType`, joined with U+001E; empty size or type means nil. Older rows
   hold only names.
-- Text is bound as C strings, so text after a NUL character is not stored.
+- Text is bound and read with its byte count, so a NUL character is stored like any other. Rows written before
+  this hold the text up to the first NUL and read as they did.
 
 ### Search index
 

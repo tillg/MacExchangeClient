@@ -32,20 +32,6 @@ struct Probe_DatabaseTests {
 
     // MARK: Round trips
 
-    @Test func probeNulCharacterInSubjectAndBodySurvives() throws {
-        let m = mail("before\u{0}after", body: "line one\u{0}line two")
-        let (d, url) = try db([m]); defer { cleanup(url) }
-        _ = d
-        let back = try MailDatabase(url: url).messages()
-        #expect(back.first?.subject.debugDescription == m.subject.debugDescription)
-        #expect(back.first?.body.debugDescription == m.body.debugDescription)
-    }
-
-    @Test func probeNulCharacterInSearchNeverThrows() throws {
-        let (d, url) = try db([mail("hello")]); defer { cleanup(url) }
-        #expect(throws: Never.self) { _ = try d.search("hel\u{0}\"lo", accounts: nil) }
-    }
-
     @Test func probeSeparatorCharactersInContactNamesSurvive() throws {
         var m = mail("sep", to: [Contact(name: "A\u{1E}B", email: "a@x.com"), Contact(name: "C", email: "c\u{1F}d@x.com")])
         m.cc = [Contact(name: "Unit\u{1F}Sep", email: "u@x.com")]

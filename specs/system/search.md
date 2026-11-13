@@ -53,7 +53,7 @@ Before the first answer of a search — no hits yet — the list shows the selec
 
 ### Query and matching (`MailDatabase.search`, `matchExpression`)
 
-- The text (already lowercased by the store) is split on whitespace; words without any letter or digit are dropped.
+- The text (already lowercased by the store), with NUL characters as spaces, is split on whitespace; words without any letter or digit are dropped.
   No word left: no results.
 - Each word becomes an FTS5 string with prefix star: `"word"*`, with `"` doubled. Words are joined by spaces: all
   must match (AND), each in any indexed field. User input is never FTS syntax.
