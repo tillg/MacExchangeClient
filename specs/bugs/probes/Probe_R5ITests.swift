@@ -114,25 +114,6 @@ struct Probe_R5I_EWS {
         #expect(s.message(id)?.bodyLoaded == true, "status: \(s.status ?? "")")
     }
 
-    /// R5I-06: a content type with parameters (`application/octet-stream; name=logo.png`, `application/pdf; name=…`)
-    /// is compared as a whole: an inline logo sent that way isn't fetched (and is listed as a file instead), an unnamed
-    /// PDF gets no extension.
-    @Test func contentTypeParametersAreIgnored() throws {
-        let doc = try probeR5IDoc("""
-            <t:Message><t:Attachments>\
-            <t:FileAttachment><t:AttachmentId Id="A1"/><t:Name>logo.png</t:Name>\
-            <t:ContentType>application/octet-stream; name=logo.png</t:ContentType><t:ContentId>logo@x</t:ContentId>\
-            <t:IsInline>true</t:IsInline></t:FileAttachment>\
-            <t:FileAttachment><t:AttachmentId Id="A2"/><t:Name></t:Name>\
-            <t:ContentType>application/pdf; name="scan.pdf"</t:ContentType><t:Size>10</t:Size></t:FileAttachment>\
-            </t:Attachments></t:Message>
-            """)
-        let item = try #require(doc.first("Message"))
-        #expect(EWSBackend.inlineAttachmentIDs(item, wanted: ["logo@x"]) == ["A1"], "inline logo not fetched")
-        let names = EWSBackend.listedAttachments(item).map(\.attachment.name)
-        #expect(names == ["Attachment.pdf"], "\(names)")
-    }
-
     /// R5I-07 ⚠️: Exchange's own text version of an HTML mail writes each inline picture as "[cid:image001.png@…]".
     /// That reference isn't text: it shows in the list preview and is quoted in replies.
     @Test func cidPlaceholdersOfTextBodyAreNotShownOrQuoted() throws {
@@ -203,12 +184,4 @@ struct Probe_R5I_Attachments {
 }
 
 struct Probe_R5I_Recipients {
-    /// R5I-10: an address pasted with an invisible character around it (BOM from a text file, word joiner from a web
-    /// page) keeps it and goes to an address that doesn't exist. (A zero-width space is already trimmed.)
-    @Test func invisibleCharactersAroundAddressAreDropped() {
-        for s in ["\u{FEFF}ann@x.com", "Ann <ann@x.com\u{2060}>"] {
-            let e = Contact.parseList(s).first?.email
-            #expect(e == "ann@x.com", "\(s.debugDescription) -> \(e.debugDescription)")
-        }
-    }
 }

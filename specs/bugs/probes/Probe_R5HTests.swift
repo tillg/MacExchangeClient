@@ -45,11 +45,4 @@ struct Probe_R5H_Dates {
         #expect(asked.contains("calendar:Recurrence") || asked.contains("calendar:IsRecurring"),
                 "invite properties asked: \(asked)")
     }
-
-    /// R5H-05: reply prefixes "Re[2]:" and a prefix after a leading blank aren't recognised: a second "Re:" is stacked.
-    @Test func replyDoesNotStackNumberedOrIndentedPrefix() {
-        let numbered = replySubject("Re[2]: Budget"), indented = replySubject(" Re: Budget")
-        #expect(numbered == "Re: Budget", "Re[2]: → \(numbered)")
-        #expect(indented == "Re: Budget", "' Re:' → \(indented)")
-    }
 }

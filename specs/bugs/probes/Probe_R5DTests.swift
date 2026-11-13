@@ -20,30 +20,12 @@ struct Probe_R5D_Compose {
 
     func store(_ m: [Message]) -> MailStore { MailStore(accounts: [work], messages: m) }
 
-    /// R5D-02: Reply All to a note only to myself goes to me, as Reply does (d-bug-029 follow-up), not to nobody.
-    @Test func replyAllToNoteToSelfGoesToMe() {
-        let me = Contact(name: "Me", email: "me@work.com")
-        let m = msg(from: me, to: [me])
-        let s = store([m])
-        #expect(s.draft(.reply, to: m.id).to == "me@work.com")
-        let to = s.draft(.replyAll, to: m.id).to
-        #expect(to == "me@work.com", "Reply All To is \(to.debugDescription)")
-    }
-
     /// R5D-11: RFC 5322 §3.4 group syntax and a trailing comment are parsed to the real addresses.
     @Test func recipientGroupAndCommentSyntax() {
         let group = Contact.parseList("Team: a@x.com, b@y.com;").map(\.email)
         #expect(group == ["a@x.com", "b@y.com"], "\(group)")
         let comment = Contact.parseList("a@x.com (Ann Smith)").map(\.email)
         #expect(comment == ["a@x.com"], "\(comment)")
-    }
-
-    /// R5D-12: a placed picture's Content-ID is a msg-id (`id-left "@" id-right`, RFC 2045 §7 / RFC 5322 §3.6.4).
-    @Test func placedPictureContentIDIsAMsgID() {
-        var d = Draft(accountID: work.id, body: String(Draft.fileMark))
-        d.attachments = [DraftAttachment(name: "p.png", contentType: "image/png", data: Data([1]))]
-        let ids = EWSBackend.contentIDs(d)
-        #expect(!ids.isEmpty && ids.values.allSatisfy { $0.contains("@") }, "\(ids)")
     }
 }
 

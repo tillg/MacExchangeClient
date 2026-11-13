@@ -33,26 +33,21 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [182](BUG-182-junk-button-label-in-junk.md) | P4 | UI / MessageViewer, MailCommands, MessageListView | Junk button, menu and context menu keep saying "Junk" / "Move to Junk" in the Junk mailbox, where they move mail to the Inbox |
 | [184](BUG-184-new-viewer-window-mirrors.md) | P3 | UI / MessageViewer | File ▸ New Viewer Window opens a second window that always shows the same mailbox and selection as the first (deferred) |
 | [185](BUG-185-flagged-badge-unread.md) | P4 | UI / SidebarView | Flagged in the sidebar shows no count while flagged messages are read |
-| [187](BUG-187-reply-all-note-to-self-empty-to.md) | P4 | compose | Reply All to a note sent only to myself opens with an empty To |
 | [191](BUG-191-video-never-loads-after-load-remote-content.md) | P4 | rendering | A web video counts as remote content, but Load Remote Content never loads it (no media-src in the policy) |
 | [194](BUG-194-dotfile-attachment-saved-hidden.md) | P4 | attachments | An attachment named ".something.pdf" is saved as a hidden file the user can't find (deferred: conflicts with an existing test) |
 | [195](BUG-195-recipient-group-and-comment-syntax.md) | P4 | compose | Recipients written with RFC 5322 group syntax or a comment become invalid addresses ("Team: a@x.com", "a@x.com (Ann)") |
-| [196](BUG-196-content-id-not-a-msg-id.md) | P4 | compose / sent HTML | Placed pictures are sent with a Content-ID without "@" (bare UUID) |
 | [197](BUG-197-blocked-picture-source-broken-box.md) | P4 | rendering | With remote content blocked, <picture> with a web <source> and <input type=image> show WebKit's broken-image box |
 | [199](BUG-199-whatsnew-date-day-early-west-of-utc.md) | P4 | UI / WhatsNewView | Help ▸ What's New dates each day one day early on a Mac west of UTC (2026-11-13 shown as Thursday, 12 November) |
 | [201](BUG-201-when-line-runs-backwards-on-clock-change.md) | P4 | invites | On the night the clocks go back, an invite's when line reads "at 2:30 – 2:15", as if it ended before it starts |
 | [202](BUG-202-recurring-invite-shown-as-one-off.md) | P3 | invites / EWS | A recurring meeting's invite is shown as a one-off meeting: nothing says it repeats (deferred) |
-| [203](BUG-203-reply-stacks-numbered-or-indented-prefix.md) | P4 | compose | Reply to "Re[2]: …" or to a subject with a leading blank (" Re: …") stacks a second "Re:" |
 | [204](BUG-204-html-source-line-breaks-kept.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail keeps the HTML source's line breaks: paragraphs break mid-sentence and every <br> gives a blank line in quotes |
 | [205](BUG-205-block-elements-run-together.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail runs blocks together: "Original textMy answer" after </blockquote>, <hr>, or an unclosed <p> |
 | [206](BUG-206-gt-in-attribute-leaks-markup.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail shows tag remains when an attribute value contains ">" (alt="->", title="a > b") |
 | [207](BUG-207-c1-numeric-references-become-controls.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail loses ’, € and – written as &#146; &#128; &#150; (they become invisible control characters) |
 | [208](BUG-208-non-utf8-byte-fails-whole-response.md) | P4 | ews / transport | A message whose text holds one non-UTF-8 byte or a raw control character never opens ("Unreadable EWS response" on every try) |
-| [209](BUG-209-content-type-parameters-not-stripped.md) | P4 | ews / attachments | An attachment content type with parameters ("application/octet-stream; name=logo.png") hides an inline logo and drops an unnamed file's extension |
 | [210](BUG-210-cid-placeholders-in-preview-and-quote.md) | P3 | ews body / preview / compose | ⚠️ "[cid:image001.png@01D…]" from Exchange's text version shows in the list preview and is quoted in replies (deferred) |
 | [211](BUG-211-colon-in-attachment-name-shows-as-slash.md) | P4 | attachments | ⚠️ An attachment with ":" in its name (attached message "Re: Budget") is saved as "Re/ Budget.eml" in the Finder |
 | [212](BUG-212-attachment-named-original-cant-be-saved.md) | P4 | attachments | An attachment named "Original" can't be saved once an app has changed the opened copy |
-| [213](BUG-213-invisible-characters-kept-in-address.md) | P4 | compose / recipients | An address pasted with a BOM or word joiner around it keeps the invisible character and goes to an address that doesn't exist |
 | [225](BUG-225-silent-server-holds-up-other-accounts.md) | P3 | MailStore | An account whose server doesn't answer (on-prem Exchange off the VPN) holds up the other accounts' new mail and changes for up to 60 s per check (deferred) |
 | [226](BUG-226-reply-to-message-deleted-while-body-loads.md) | P4 | MailStore | Reply to an unopened message that is deleted on the server while its body loads opens an empty message from the first account |
 | [228](BUG-228-message-menu-structure.md) | P4 | UI / MailCommands | Message menu differs from MainMenu.nib: "Mark as Read/Unread", Toggle Flag outside the Flag submenu, Move to Junk after Archive, Delete in Message instead of Edit |
