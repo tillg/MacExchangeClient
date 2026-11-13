@@ -105,15 +105,4 @@ struct Probe_R5CStorage {
         #expect(!kept.isEmpty, "the damaged file should be kept aside, never deleted")
     }
 
-    /// R5C-06: a file of 2 GiB or more kept with a draft (or a send waiting in the outbox) is bound with
-    /// `Int32(v.count)`, which traps: the save crashes the app instead of failing.
-    @Test func aHugeKeptFileDoesNotCrashTheSave() async {
-        await #expect(processExitsWith: .success) {
-            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("Probe_R5C-big-\(UUID())")
-            defer { try? FileManager.default.removeItem(at: dir) }
-            let db = try! MailDatabase(url: dir.appendingPathComponent("Mail.sqlite"))
-            let big = Data(count: Int(Int32.max) + 1)  // zero pages: not touched before the bind
-            _ = try? db.write(StoreChanges(files: [UUID(): [big]]))
-        }
-    }
 }

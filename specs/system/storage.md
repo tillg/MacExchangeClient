@@ -61,7 +61,8 @@ One connection, `journal_mode=WAL`, `synchronous=NORMAL`.
   older rows) marks a send whose request may have gone out.
 - **`files`**: `(message, position)` PK, `data` BLOB: the file content of messages kept only on this Mac (a send or
   draft Exchange refused, kept in Drafts). Read by `meta()`; rows go with their message. Created with
-  `CREATE TABLE IF NOT EXISTS`, so older databases get it on open.
+  `CREATE TABLE IF NOT EXISTS`, so older databases get it on open. Values are bound with 64-bit lengths: a file over
+  SQLite's 1 GB limit fails that save with an error instead of crashing (BUG-176).
 
 ### Encodings
 
