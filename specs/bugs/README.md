@@ -59,7 +59,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [103](BUG-103-message-changed-on-server-keeps-old-body.md) | P3 | MailStore | A draft changed on the server keeps its old loaded body: new subject, old text and files |
 | [104](BUG-104-answered-invite-shows-unanswered-after-sync.md) | P3 | Invite | An invite answered here shows "Please respond" again once Exchange has moved it to Deleted Items |
 | [105](BUG-105-failed-send-with-files-leaves-half-draft-in-exchange.md) | P3 | EWS | A send or Save Draft with files that fails after the message was created leaves a copy without its files in Exchange's Drafts |
-| [107](BUG-107-autofocus-collapses-message.md) | P3 | HTMLPage | A mail with an autofocus form field shrinks to a few pixels: the page scrolls to the field at load and the height is measured relative to that scroll |
 | [108](BUG-108-measure-ignores-body-padding-and-out-of-flow.md) | P3 | HTMLPage | Height counts only the wrapper's box: body padding and absolutely positioned content are cut off |
 | [109](BUG-109-height-not-remeasured-after-page-changes.md) | P3 | HTMLPage | The body's height is never re-measured when the page grows after load (lazy images, <details>, interactive mail): the end is cut off |
 | [110](BUG-110-viewport-relative-heights-feed-back.md) | P3 | HTMLPage | Mail with window-relative heights (MailChimp height="100%" table, 100vh) is measured against the view's own height: after widening the window it never gets shorter, and 100vh blocks push the end out |

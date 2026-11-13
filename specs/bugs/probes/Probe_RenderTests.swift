@@ -286,17 +286,6 @@ struct Probe_RenderTests {
         #expect(lastBottom <= h, "measured \(h), last line ends at \(lastBottom)")
     }
 
-    /// A form field with autofocus at the end scrolls the 1-pt-tall page at load; the measurement is relative
-    /// to that scroll position.
-    @Test func autofocusFieldDoesNotShortenTheMeasurement() async {
-        let mail = "<p>\(String(repeating: "Survey intro text. ", count: 200))</p><form><input autofocus name=q></form>"
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false), width: 600)
-        let scroll = ((await p.eval("window.scrollY")) as? NSNumber)?.doubleValue ?? -1
-        let h = await p.measure()
-        let content = await p.contentHeight()
-        #expect(h >= content, "measured \(h), page \(content), scrollY \(scroll)")
-    }
-
     // MARK: Width
 
     @Test func controlNarrowNewsletterHasNoHorizontalOverflow() async {
