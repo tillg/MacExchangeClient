@@ -991,4 +991,61 @@ struct MailStoreSyncTests {
         s.apply(SyncResult(upserts: [read], deletedRemoteIDs: [], token: "t2", more: false), account: work.id, mailbox: .inbox)
         #expect(s.message(a)?.needsBody == false && s.message(a)?.body == "New text")
     }
+
+    // MARK: Reply and forward of a message not opened yet (BUG-068)
+
+    /// Like a server summary (FindItem/SyncFolderItems): no body, names only for From/To.
+    func summary(_ rid: String) -> Message {
+        var m = Message(accountID: work.id, from: Contact(name: "Ann Lee", email: ""), to: [Contact(name: "Me", email: "")],
+                        subject: "Hi", body: "", date: Date(timeIntervalSince1970: 1_000_000),
+                        remoteID: rid, serverPreview: "Can we meet on Friday?", bodyLoaded: false)
+        m.conversationID = nil
+        return m
+    }
+
+    /// What the server has for it. // file:// fixture
+    var annsMessage: String {
+        envelope("<m:GetItemResponse><m:ResponseMessages><m:GetItemResponseMessage ResponseClass=\"Success\">"
+                 + "<m:ResponseCode>NoError</m:ResponseCode><m:Items><t:Message><t:ItemId Id=\"A\"/>"
+                 + "<t:Body BodyType=\"Text\">Can we meet on Friday?</t:Body>"
+                 + "<t:From><t:Mailbox><t:Name>Ann Lee</t:Name><t:EmailAddress>ann@x.com</t:EmailAddress></t:Mailbox></t:From>"
+                 + "<t:ToRecipients><t:Mailbox><t:Name>Me</t:Name><t:EmailAddress>me@work.com</t:EmailAddress></t:Mailbox></t:ToRecipients>"
+                 + "</t:Message></m:Items></m:GetItemResponseMessage></m:ResponseMessages></m:GetItemResponse>")
+    }
+
+    /// Reply from the list's context menu (or ⌘R before the body is in) on a message never opened: the body is
+    /// fetched first, so the reply has the sender's address and quotes the message.
+    @Test func replyToUnopenedServerMessageLoadsItFirst() async throws {
+        let s = try store(answering: annsMessage)
+        s.merge([summary("A")], account: work.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        let d = await s.loadedDraft(.reply, to: id)
+        #expect(d.to == "ann@x.com", "to: '\(d.to)'")
+        #expect(d.body.contains("Ann Lee <ann@x.com> wrote:") && d.body.contains("> Can we meet on Friday?"), "body: \(d.body)")
+        let f = await s.loadedDraft(.forward, to: id)
+        #expect(f.body.contains("Can we meet on Friday?"), "body: \(f.body)")
+    }
+
+    /// Without a connection the body can't be had: the attribution shows the name alone, not "Ann Lee <>".
+    @Test func replyToUnopenedMessageOfflineHasNoEmptyAddress() async {
+        let s = MailStore(accounts: [work], messages: [])
+        s.merge([summary("A")], account: work.id, mailbox: .inbox)
+        let d = await s.loadedDraft(.reply, to: s.messages[0].id)
+        #expect(!d.body.contains("<>") && d.body.contains("Ann Lee wrote:"), "body: \(d.body)")
+        let f = s.draft(.forward, to: s.messages[0].id)
+        #expect(!f.body.contains("<>"), "body: \(f.body)")
+    }
+
+    /// Include Attachments With Replies ▸ When Adding Recipients: writing to the sender of a message whose
+    /// addresses aren't known yet is not adding a recipient.
+    @Test func replyToSenderOfUnopenedMessageIsNotANewRecipient() {
+        var m = summary("A"); m.hasAttachments = true
+        let s = MailStore(accounts: [work], messages: [])
+        s.merge([m], account: work.id, mailbox: .inbox)
+        var d = s.draft(.reply, to: s.messages[0].id)
+        d.to = "Ann Lee <ann@x.com>"  // the sender, typed by hand because To was empty
+        #expect(!s.addsNewRecipient(d))
+        d.to += ", Cy <cy@x.com>"
+        #expect(s.addsNewRecipient(d))
+    }
 }

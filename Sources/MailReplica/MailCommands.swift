@@ -100,6 +100,7 @@ struct MailCommands: Commands {
 
     private func reply(_ kind: ReplyKind) {
         guard let m = store.selectedMessage else { return }
-        openWindow(id: "compose", value: ComposeWindow(store.draft(kind, to: m.id, includeAttachments: includeMode)))
+        // A message not opened yet is loaded first, so the draft has its addresses and text.
+        Task { openWindow(id: "compose", value: ComposeWindow(await store.loadedDraft(kind, to: m.id, includeAttachments: includeMode))) }
     }
 }

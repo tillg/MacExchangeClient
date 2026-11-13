@@ -102,7 +102,7 @@ struct MessageViewer: View {
 
     private func reply(_ kind: ReplyKind) {
         guard let m = store.selectedMessage else { return }
-        openWindow(id: "compose", value: ComposeWindow(store.draft(kind, to: m.id)))
+        Task { openWindow(id: "compose", value: ComposeWindow(await store.loadedDraft(kind, to: m.id))) }
     }
 
     private func goBack() {

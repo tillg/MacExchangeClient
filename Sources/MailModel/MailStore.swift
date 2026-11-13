@@ -1732,9 +1732,11 @@ public final class MailStore {
         // Any line ending: Exchange bodies use CRLF, which is one Character in Swift, not "\n".
         let quoted = m.body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map { "> \($0)" }
             .joined(separator: "\n")
+        // A summary not loaded yet has names without addresses: no empty "<>".
+        let sender = m.from.email.isEmpty ? m.from.name : "\(m.from.name) <\(m.from.email)>"
         let header = kind == .forward
-            ? "\n\nBegin forwarded message:\n\nFrom: \(m.from.name) <\(m.from.email)>\nSubject: \(m.subject)\nDate: \(df.string(from: m.date))\n\n"
-            : "\n\nOn \(df.string(from: m.date)), \(m.from.name) <\(m.from.email)> wrote:\n\n"
+            ? "\n\nBegin forwarded message:\n\nFrom: \(sender)\nSubject: \(m.subject)\nDate: \(df.string(from: m.date))\n\n"
+            : "\n\nOn \(df.string(from: m.date)), \(sender) wrote:\n\n"
         // Each address once, whatever its case, and never my own; the first occurrence is kept.
         var seen: Set<String> = me.map { [$0.lowercased()] } ?? []
         func addresses(_ cs: [Contact]) -> String {
@@ -1761,14 +1763,24 @@ public final class MailStore {
         return d
     }
 
+    /// A reply or forward of a message whose body was never loaded (only the list summary: names without
+    /// addresses, no text): the body is fetched first, so the draft has the addresses and the quote.
+    public func loadedDraft(_ kind: ReplyKind, to id: Message.ID, includeAttachments: IncludeAttachments = .never) async -> Draft {
+        if message(id)?.needsBody == true { await loadBody(id) }
+        return draft(kind, to: id, includeAttachments: includeAttachments)
+    }
+
     /// Include Attachments With Replies ▸ When Adding Recipients: the reply now goes to someone who
     /// wasn't on the original message.
     public func addsNewRecipient(_ d: Draft) -> Bool {
         guard let id = d.original, let m = message(id) else { return false }
-        var known = Set(([m.from] + m.to + m.cc).map { $0.email.lowercased() })
+        let original = [m.from] + m.to + m.cc
+        var known = Set(original.map { $0.email.lowercased() })
         if let me = account(m.accountID)?.address { known.insert(me.lowercased()) }
+        // Before its body is loaded, the original has names without addresses: a recipient of that name is known.
+        let names = Set(original.filter(\.email.isEmpty).map { $0.name.lowercased() }).subtracting([""])
         return (Contact.parseList(d.to) + Contact.parseList(d.cc))
-            .contains { $0.email.contains("@") && !known.contains($0.email.lowercased()) }
+            .contains { $0.email.contains("@") && !known.contains($0.email.lowercased()) && !names.contains($0.name.lowercased()) }
     }
 
     /// Adds files to a draft. A folder (or package) goes as a zip archive of it, made the way the Finder

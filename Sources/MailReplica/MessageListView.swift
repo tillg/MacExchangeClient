@@ -170,9 +170,9 @@ struct MessageContextMenu: View {
 
     var body: some View {
         if ids.count == 1, let id = ids.first {
-            Button("Reply") { openWindow(id: "compose", value: ComposeWindow(store.draft(.reply, to: id))) }
-            Button("Reply All") { openWindow(id: "compose", value: ComposeWindow(store.draft(.replyAll, to: id))) }
-            Button("Forward") { openWindow(id: "compose", value: ComposeWindow(store.draft(.forward, to: id))) }
+            Button("Reply") { Task { openWindow(id: "compose", value: ComposeWindow(await store.loadedDraft(.reply, to: id))) } }
+            Button("Reply All") { Task { openWindow(id: "compose", value: ComposeWindow(await store.loadedDraft(.replyAll, to: id))) } }
+            Button("Forward") { Task { openWindow(id: "compose", value: ComposeWindow(await store.loadedDraft(.forward, to: id))) } }
             Divider()
         }
         let unread = ids.contains { store.message($0)?.isRead == false }
