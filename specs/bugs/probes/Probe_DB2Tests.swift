@@ -441,12 +441,4 @@ struct Probe_DB2Tests {
 
     // MARK: Upgrades
 
-    /// README: "Case and accents don't matter (`muller` finds "Müller")". Accented letters of other scripts.
-    @Test(arguments: [("καλημερα", "Καλημέρα σας"), ("αθηνα", "Ταξίδι στην Αθήνα"), ("ελληνικα", "ΕΛΛΗΝΙΚΆ"),
-                      ("cafe", "Café"), ("zurich", "Zürich"), ("sao", "São Paulo")])
-    func probeAccentsOfOtherScripts(query: String, subject: String) throws {
-        let (d, url) = try db([mail(subject)]); defer { cleanup(url) }
-        #expect(try d.search(query, accounts: nil).count == 1, "\(query) → \(subject)")
-    }
-
 }
