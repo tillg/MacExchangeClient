@@ -1201,7 +1201,8 @@ public final class MailStore {
 
     /// Loads cached mail for the accounts this store has, before the first sync, so a launch starts
     /// where the last one stopped and syncs only what changed since.
-    public func restore(_ c: MailCache) {
+    /// `sending: false` (an import of the old cache) queues the waiting changes without sending them yet (BUG-177).
+    public func restore(_ c: MailCache, sending: Bool = true) {
         for acct in accounts.map(\.id) {
             guard let state = c.accounts[acct] else { continue }
             let known = Set(messages.compactMap { $0.accountID == acct ? $0.remoteID : nil })
@@ -1212,8 +1213,11 @@ public final class MailStore {
             if let f = state.folders, folders[acct] == nil { folders[acct] = f }
             serverAccounts.insert(acct)
         }
-        scheduleFlush()
+        if sending { scheduleFlush() }
     }
+
+    /// Sends the changes waiting for the server, once storing them can no longer bring them back (after an import).
+    public func resumeSending() { scheduleFlush() }
 
     /// Every folder syncs once more from the start (an import of mail from before conversations).
     func forgetSyncPositions() {

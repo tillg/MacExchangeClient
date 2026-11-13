@@ -429,4 +429,49 @@ struct EWSFlowTests {
         #expect(one.account.name == "till@work.com")
         #expect(ExchangeAccount(email: " ", username: "u", server: "s").account.name == "Exchange")
     }
+
+    /// BUG-177: moving Cache.json into the database sends nothing until the database has its real name and the cache
+    /// is renamed. Before, a waiting send went out during "Updating Mail Storage…": quit then, and the next launch
+    /// imported the cache again and sent the message a second time.
+    @Test func importSendsNothingWhileTheCacheCanStillBeImportedAgain() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ImportSend-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
+        // A cache from the old build: a big mailbox and a send still waiting.
+        let msgs = (0..<30_000).map { n in
+            Message(accountID: acct.id, from: Contact(name: "Ann", email: "ann@x.com"), to: [Contact(name: "Me", email: "me@work.com")],
+                    subject: "Message \(n)", body: String(repeating: "text ", count: 40), date: Date(timeIntervalSinceReferenceDate: Double(n)),
+                    remoteID: "R\(n)")
+        }
+        let send = PendingChange(account: acct.id, change: .send(Draft(accountID: acct.id, to: "bob@x.com", subject: "Offer", body: "Hi")),
+                                 previous: [])
+        try MailCache(accounts: [acct.id: .init(messages: msgs, syncTokens: [.inbox: "T"], outbox: [send], complete: [.inbox], folders: [])])
+            .save(to: cacheURL)
+
+        // The server notes, when the send arrives, whether a quit right then would import (and send) again.
+        let endpoint = LoopbackEndpoint()
+        defer { endpoint.stop() }
+        let seen = SeenAtSend()
+        endpoint.start {
+            seen.note(cacheStillThere: FileManager.default.fileExists(atPath: cacheURL.path))
+            return EWSReply.resp("CreateItem", EWSReply.ok("CreateItem"))
+        }
+        let s = MailStore(accounts: [], messages: [])
+        s.add(acct, backend: EWSBackend(client: EWSClient(url: endpoint.url, username: "u", password: "p")))
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .sent, id: "SENT")], account: acct.id)
+
+        _ = try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s)
+        for _ in 0..<300 where seen.value == nil { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(seen.value != nil, "the send never went out")
+        #expect(seen.value == false, "the send went out while Cache.json (holding it) was still there to import again")
+    }
+
+}
+
+/// What the server saw when the send arrived (BUG-177).
+final class SeenAtSend: @unchecked Sendable {
+    private let lock = NSLock()
+    private var first: Bool?
+    var value: Bool? { lock.withLock { first } }
+    func note(cacheStillThere: Bool) { lock.withLock { if first == nil { first = cacheStillThere } } }
 }

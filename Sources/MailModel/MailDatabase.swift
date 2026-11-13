@@ -474,7 +474,8 @@ public final class MailDatabase: @unchecked Sendable {
                 + "mail is downloaded again from the server."
             return db
         }
-        store.restore(cache)
+        // Nothing is sent before the cache is renamed below: a quit meanwhile would import, and send, it again.
+        store.restore(cache, sending: false)
         // The cache predates conversations: as for a database from before them, every folder syncs once more from
         // the start, so the imported mail learns its conversation.
         store.forgetSyncPositions()
@@ -506,6 +507,8 @@ public final class MailDatabase: @unchecked Sendable {
         }
         // A Cache.json.imported from an earlier import (copied back to go back) stays: this one gets the next free name.
         try FileManager.default.moveItem(at: cacheURL, to: freeName(cacheURL, "imported"))
+        // Only now: a send that went out before could be imported, and sent, again after a quit (BUG-177).
+        store.resumeSending()
         return db
     }
 
