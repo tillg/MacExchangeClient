@@ -607,7 +607,25 @@ public final class MailStore {
         return list
     }
 
+    /// While searching, what is searched, in Mail's words (`SearchingWindowTitleFormat`): the account, or every
+    /// account (BUG-251).
     public var title: String {
+        if !normalizedSearch.isEmpty {
+            let scope = if case let .account(id, _) = selectedMailbox { account(id)?.name ?? "" } else { "All Mailboxes" }
+            return "Searching “\(scope)”"
+        }
+        return mailboxTitle
+    }
+
+    /// While searching, the window's subtitle: "Found 1 result", "Found 12 results" (Mail's `SearchResultsFound`);
+    /// nil when not searching.
+    public var searchSubtitle: String? {
+        guard !normalizedSearch.isEmpty else { return nil }
+        let n = visibleMessages.count
+        return n == 1 ? "Found 1 result" : "Found \(n) results"
+    }
+
+    private var mailboxTitle: String {
         switch selectedMailbox {
         case .smart(let s): s == .allInboxes ? "All Inboxes" : s.title
         case let .account(id, kind):

@@ -1975,4 +1975,19 @@ struct MailStoreTests {
         #expect(!s.isAllJunk([a.id, c.id]))
         #expect(!s.isAllJunk([]))
     }
+
+    /// BUG-251: while searching, the title and subtitle describe the search, in Mail's words.
+    @Test func titleAndSubtitleDescribeTheSearch() {
+        let s = store([msg(work, subject: "Report"), msg(work, .sent, subject: "Report 2"), msg(work, subject: "Lunch")])
+        s.selectedMailbox = .account(work.id, .inbox)
+        #expect(s.title == "Inbox – Work")
+        #expect(s.searchSubtitle == nil)
+        s.searchText = "report"
+        #expect(s.title == "Searching “Work”")
+        #expect(s.searchSubtitle == "Found 2 results")
+        s.selectedMailbox = .smart(.allInboxes)
+        #expect(s.title == "Searching “All Mailboxes”")
+        s.searchText = ""
+        #expect(s.title == "All Inboxes")
+    }
 }

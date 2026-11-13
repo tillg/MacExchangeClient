@@ -33,6 +33,7 @@ struct MessageViewer: View {
 
     private var subtitle: String {
         if let status = store.status { return status }
+        if let searching = store.searchSubtitle { return searching }
         return MailStore.mailboxSubtitle(count: store.count(store.selectedMailbox), unread: store.unreadCount(store.selectedMailbox))
     }
 
