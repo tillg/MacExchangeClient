@@ -1,9 +1,10 @@
 import AppKit
 import MailModel
+import PDFKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The attachments below a message, as in Mail: pictures shown in place, other files as their Finder icon.
+/// The attachments below a message, as in Mail: pictures and PDFs shown in place, other files as their Finder icon.
 /// Double-click opens, Space shows Quick Look, drag saves to the Finder, Control-click has Mail's menu.
 struct AttachmentsView: View {
     @Environment(MailStore.self) private var store
@@ -16,13 +17,13 @@ struct AttachmentsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(Array(message.attachments.enumerated()), id: \.offset) { i, a in
-                if a.isPicture && !asIcon.contains(i) {
+                if a.showsInPlace && !asIcon.contains(i) {
                     // A picture that can't be loaded goes to the icons: it can still be opened (trying again) or saved.
                     AttachmentPicture(message: message, index: i, selected: selected == i) { asIcon.insert(i) }
                         .modifier(AttachmentActions(message: message, index: i, asIcon: $asIcon, selected: $selected))
                 }
             }
-            let icons = message.attachments.indices.filter { !message.attachments[$0].isPicture || asIcon.contains($0) }
+            let icons = message.attachments.indices.filter { !message.attachments[$0].showsInPlace || asIcon.contains($0) }
             if !icons.isEmpty {
                 FlowRow(spacing: 14) {
                     ForEach(icons, id: \.self) { i in
@@ -53,6 +54,9 @@ extension Attachment {
 
     /// Pictures are shown in place, as Mail does.
     var isPicture: Bool { type?.conforms(to: .image) == true }
+
+    /// Pictures and PDFs (every page) are shown in place, as Mail does.
+    var showsInPlace: Bool { isPicture || type?.conforms(to: .pdf) == true }
 
     /// "Report.pdf (1.2 MB)", Mail's AttachmentNameAndSizeFormat.
     var nameAndSize: String {
@@ -87,7 +91,7 @@ struct AttachmentIcon: View {
     }
 }
 
-/// A picture shown in place, at most as wide as the message.
+/// A picture, or each page of a PDF, shown in place, at most as wide as the message.
 private struct AttachmentPicture: View {
     @Environment(MailStore.self) private var store
     let message: Message
@@ -95,13 +99,21 @@ private struct AttachmentPicture: View {
     let selected: Bool
     /// The file couldn't be had or isn't a picture NSImage can draw: no endless spinner.
     let failed: () -> Void
-    @State private var image: NSImage?
+    @State private var images: [NSImage]?
+    private var isPDF: Bool { message.attachments[index].type?.conforms(to: .pdf) == true }
 
     var body: some View {
         Group {
-            if let image {
-                Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: min(image.size.width, 640), alignment: .leading)
+            if let images {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(images.indices, id: \.self) { i in
+                        Image(nsImage: images[i]).resizable().aspectRatio(contentMode: .fit)
+                            // A white PDF page on the white message: a hairline and a soft shadow show where it ends.
+                            .overlay { if isPDF { Rectangle().stroke(Color.black.opacity(0.12), lineWidth: 1) } }
+                            .shadow(color: .black.opacity(isPDF ? 0.15 : 0), radius: 3, y: 1)
+                            .frame(maxWidth: min(images[i].size.width, 640), alignment: .leading)
+                    }
+                }
             } else {
                 RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.1))
                     .frame(width: 240, height: 160).overlay(ProgressView().controlSize(.small))
@@ -110,10 +122,27 @@ private struct AttachmentPicture: View {
         .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.accentColor, lineWidth: selected ? 3 : 0))
         .help(message.attachments[index].nameAndSize)
         .task(id: message.id) {
-            image = nil
+            images = nil
             let url = await store.attachmentFile(index, of: message.id)
             if Task.isCancelled { return }  // another message was selected: nothing failed
-            if let picture = url.flatMap(NSImage.init(contentsOf:)) { image = picture } else { failed() }
+            if let pictures = url.flatMap({ Self.pictures($0, pdf: isPDF) }) { images = pictures } else { failed() }
+        }
+    }
+
+    /// The picture, or each page of a PDF drawn as it is printed (vector, so it stays sharp at any size).
+    private static func pictures(_ url: URL, pdf: Bool) -> [NSImage]? {
+        guard pdf else { return NSImage(contentsOf: url).map { [$0] } }
+        guard let doc = PDFDocument(url: url), doc.pageCount > 0 else { return nil }
+        return (0..<doc.pageCount).compactMap(doc.page).map { page in
+            var size = page.bounds(for: .cropBox).size
+            if page.rotation % 180 != 0 { size = NSSize(width: size.height, height: size.width) }
+            return NSImage(size: size, flipped: false) { r in
+                guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+                NSColor.white.setFill()
+                r.fill()
+                page.draw(with: .cropBox, to: ctx)
+                return true
+            }
         }
     }
 }
@@ -154,7 +183,7 @@ private struct AttachmentActions: ViewModifier {
         Button("Save to Downloads Folder") {
             Task { _ = await store.saveAttachment(index, of: message.id, to: AttachmentPanels.downloads) }
         }
-        if attachment.isPicture {
+        if attachment.showsInPlace {
             Divider()
             if asIcon.contains(index) {
                 Button("View in Place") { asIcon.remove(index) }

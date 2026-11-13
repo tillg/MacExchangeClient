@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "PDF attachments are now shown in the message, every page, as pictures already were. Control-click one to show it as an icon instead.",
             "Dropping messages on a mailbox in a large account takes far less time before the window responds again.",
             "Replies to your invitations, such as \"Accepted: …\", no longer show Accept, Tentative and Decline buttons, also for those read before.",
             "Invitations and cancellations you sent yourself no longer show Accept, Decline or Remove from Calendar, as in Outlook.",
