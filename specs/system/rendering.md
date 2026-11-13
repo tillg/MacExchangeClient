@@ -34,6 +34,8 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
   `default-src 'none'; style-src * 'unsafe-inline'; img-src * data:; font-src * data:`. No scripts, frames or fetches in either case.
 - Without remote content, every `<link` tag start of the mail (any case, matched by Unicode scalar) is renamed `<x-blocked-link`
   (`HTMLPage.withoutLinks`): WebKit opens connections for resource hints (`preconnect`, …) regardless of the CSP.
+- Apple Mail quotes, `blockquote[type=cite]`, as in Mail's MUIWebDocument.css: no margin, 8 px left padding, a 2 px solid
+  bar on the left; bar and text in `HTMLPage.quoteColours` (levels 1–3, deeper levels keep level 3).
 - `img[src^="cid:"]` is hidden (only exact lowercase `cid:`). Without remote content, every image whose `src` doesn't
   start with `data:` is `visibility: hidden` (keeps its space, as Mail does).
 - The web view (`MailWebView`): content JavaScript off, non-persistent data store, light appearance. It reloads only

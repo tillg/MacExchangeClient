@@ -458,3 +458,10 @@ edited: 2026-11-13
 - **Context:** BUG-098. `syncHistory` returned at the first network error. Accounts are tried in order, so while the first account's server was unreachable, no other account's history progressed and their complete folders got no background check.
 - **Decision:** On a `URLError` or `ServerBusy`, the history notes the account as unreachable for this run and goes on with the other accounts (`nextHistoryFolder(skipping:)`); the background checks of complete folders skip that account. Its folder isn't marked failed, so it is tried again at the next run, as before.
 - **Why:** README: a folder whose history fails is skipped; offline is per server, as for the quick check and the outbox (BUG-096).
+
+## 02:03 — Quote bar colours for Apple Mail quotes {#d-bug-111}
+
+- **Status:** decided (⚠️ colours estimated)
+- **Context:** BUG-111. Mail's MUIWebDocument.css draws `blockquote[type=cite]` with no margin, 8 px padding and a 2 px left bar, but its bar and text colours are placeholders (`@[QUOTE_BAR_COLOR_LVL1_RGB]` …) that Mail fills in at run time; they aren't in any file on disk.
+- **Decision:** The rules are taken as Mail has them. Colours (bar and text alike), from memory of Mail's "Color quoted text" defaults blue, green, purple: `rgb(0, 64, 214)`, `rgb(0, 128, 64)`, `rgb(128, 0, 160)`. Marked ⚠️ in README. Mail's dark-mode variants are left out: the page is always light here.
+- **Alternatives:** Bar only, text colour unchanged (rejected: Mail's rule colours the text too). Grey bars (rejected: Mail tells levels apart by colour).

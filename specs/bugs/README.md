@@ -67,7 +67,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [108](BUG-108-measure-ignores-body-padding-and-out-of-flow.md) | P3 | HTMLPage | Height counts only the wrapper's box: body padding and absolutely positioned content are cut off |
 | [109](BUG-109-height-not-remeasured-after-page-changes.md) | P3 | HTMLPage | The body's height is never re-measured when the page grows after load (lazy images, <details>, interactive mail): the end is cut off |
 | [110](BUG-110-viewport-relative-heights-feed-back.md) | P3 | HTMLPage | Mail with window-relative heights (MailChimp height="100%" table, 100vh) is measured against the view's own height: after widening the window it never gets shorter, and 100vh blocks push the end out |
-| [111](BUG-111-apple-mail-quotes-without-quote-bar.md) | P3 | HTMLPage | Apple Mail quotes (<blockquote type="cite">) show as a plain 40px indent instead of Mail's quote bar |
 | [112](BUG-112-apple-mail-pictures-overflow-window.md) | P3 | HTMLPage | Pictures sent from Apple Mail (img.Apple-web-attachment) show at full pixel width, far wider than the window |
 | [113](BUG-113-combining-character-after-file-mark-breaks-placement.md) | P4 | Models | A combining character right after a placed file breaks the file marks: pictures change place, a stray U+FFFC is sent, Exclude removes the wrong file |
 | [114](BUG-114-rtl-lines-sent-left-to-right-in-html.md) | P4 | Models | Hebrew/Arabic lines turn left-to-right (left-aligned, punctuation on the wrong side) once a placed picture makes the mail HTML |
