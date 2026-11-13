@@ -54,7 +54,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [211](BUG-211-colon-in-attachment-name-shows-as-slash.md) | P4 | attachments | ⚠️ An attachment with ":" in its name (attached message "Re: Budget") is saved as "Re/ Budget.eml" in the Finder |
 | [212](BUG-212-attachment-named-original-cant-be-saved.md) | P4 | attachments | An attachment named "Original" can't be saved once an app has changed the opened copy |
 | [213](BUG-213-invisible-characters-kept-in-address.md) | P4 | compose / recipients | An address pasted with a BOM or word joiner around it keeps the invisible character and goes to an address that doesn't exist |
-| [217](BUG-217-flag-or-read-on-deleted-appointment-refused.md) | P3 | ews | Flagging or marking read a deleted appointment in Trash is refused and undone (UpdateItem lacks SendMeetingInvitationsOrCancellations) |
 | [220](BUG-220-list-date-weekday-for-future-and-week-old.md) | P3 | MessageListView | Message list shows only a weekday for a date in the future, and for last week's same weekday after the current time |
 | [221](BUG-221-toggle-flag-scans-all-messages-per-selected.md) | P3 | MailStore | Toggle Flag (⇧⌘L, toolbar Flag button) on a selection of ~140 messages freezes the window for seconds: each selected message is looked up by a scan of all messages |
 | [222](BUG-222-conversation-view-rebuilds-list-twice-on-open.md) | P3 | MailStore | With conversations on (the default), opening the next unread message in a large mailbox rebuilds the list twice: 0.37-0.94 s per click in Archive (30,000) |

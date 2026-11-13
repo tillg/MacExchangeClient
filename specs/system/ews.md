@@ -62,7 +62,7 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
 
 | Call | EWS request |
 |---|---|
-| `setRead` | `UpdateItem` `SetItemField message:IsRead`, `SaveOnly`, `AlwaysOverwrite` (no change key), `SuppressReadReceipts` |
+| `setRead` | `UpdateItem` `SetItemField message:IsRead`, `SaveOnly`, `AlwaysOverwrite` (no change key), `SuppressReadReceipts`, `SendMeetingInvitationsOrCancellations="SendToNone"` (required for deleted appointments in Trash, BUG-217) |
 | `setFlagged` | The same with `item:Flag` / `FlagStatus` `Flagged` or `NotFlagged` |
 | `move` | `MoveItem` with `ReturnNewItemIds`; new IDs are paired with old ones by response order |
 | `delete` | `DeleteItem DeleteType="SoftDelete" SendMeetingCancellations="SendToNone" AffectedTaskOccurrences="AllOccurrences" SuppressReadReceipts="true"` (into Recoverable Items; no "not read" receipt, BUG-214; the two attributes let deleted appointments and tasks be erased too, BUG-216) |
