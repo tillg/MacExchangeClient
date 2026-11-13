@@ -206,7 +206,7 @@ edited: 2026-11-13
 
 ## 00:31 — Bug hunts 2 and 3: `file://` fixture responses and WebKit probes are allowed {#d-hunt-harness}
 
-- **Status:** decided (the user may veto)
+- **Status:** decided (the user may veto). Partly superseded: the scripted servers in `EWSFlowTests` and `MailStoreRaceTests` now answer over loopback HTTP instead of named pipes (see [d-test-harness-loopback](#d-test-harness-loopback)). Plain `file://` response files are still used elsewhere.
 - **Context:** The CLAUDE.md rule is "never mock without permission". EWS flows (sync, send, errors) can't be tested without a server.
 - **Decision:** Probes and regression tests may point the real `EWSClient`/`EWSBackend` at a `file://` URL that holds a hand-written Exchange XML response. No class is replaced and there is no network. The tests are marked `// file:// fixture`, so they are easy to find and remove. Real `WKWebView` rendering probes are also allowed.
 - **Why:** It is a recorded response read through the real transport, not a test double. Without it, the error paths found in round 2 (for example `ErrorInvalidSyncStateData` never being reset) can't be proven.
