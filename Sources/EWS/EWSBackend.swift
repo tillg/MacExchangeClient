@@ -532,8 +532,9 @@ public struct EWSBackend: MailBackend {
     static func folderTree(_ folders: [XMLNode], known: [RemoteFolder], skip: Set<String>) -> [RemoteFolder] {
         struct F { let id: String, parent: String, name: String, count: Int, mail: Bool }
         // `Folder` elements only: CalendarFolder, ContactsFolder, TasksFolder and SearchFolder are other tags.
+        var ids = Set<String>()  // overlapping pages can list a folder twice: the first one counts
         let all = folders.compactMap { f -> F? in
-            guard let id = f.child("FolderId")?.attr("Id") else { return nil }
+            guard let id = f.child("FolderId")?.attr("Id"), ids.insert(id).inserted else { return nil }
             let cls = f.text("FolderClass")
             let hidden = f.child("ExtendedProperty")?.text("Value")?.lowercased() == "true"
             return F(id: id, parent: f.child("ParentFolderId")?.attr("Id") ?? "", name: f.text("DisplayName") ?? "",

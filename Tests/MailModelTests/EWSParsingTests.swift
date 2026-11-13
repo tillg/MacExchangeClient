@@ -366,6 +366,13 @@ struct EWSParsingTests {
         #expect(a == nil, "Archive role given to \(a?.id ?? "")")
     }
 
+    /// Overlapping FindFolder pages can list a folder twice; it shows once.
+    @Test func folderTreeDeduplicatesRepeatedFolders() throws {
+        let f = "<t:Folder><t:FolderId Id=\"P\"/><t:ParentFolderId Id=\"R\"/><t:DisplayName>Projects</t:DisplayName></t:Folder>"
+        let d = try doc("<m:Folders>" + f + f + "</m:Folders>")
+        #expect(EWSBackend.folderTree(d.all("Folder"), known: [], skip: []).count == 1)
+    }
+
     @Test func getFolderSkipsMissingFolders() throws {
         let ok = #"<m:GetFolderResponseMessage ResponseClass="Success"><m:Folders><t:Folder><t:FolderId Id="X"/><t:TotalCount>7</t:TotalCount></t:Folder></m:Folders></m:GetFolderResponseMessage>"#
         let bad = #"<m:GetFolderResponseMessage ResponseClass="Error"><m:ResponseCode>ErrorFolderNotFound</m:ResponseCode></m:GetFolderResponseMessage>"#
