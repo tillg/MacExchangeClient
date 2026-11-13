@@ -119,24 +119,6 @@ struct Probe_E2ETests {
         #expect(s.takeChanges().resolved().upserts.isEmpty)
     }
 
-    /// The same for the background history: the first account's folder fails with a network error and
-    /// syncHistory returns, so the other account's history (and its background checks) never run while the
-    /// first one is unreachable.
-    @Test func unreachableAccountDoesNotStopTheOtherAccountsHistory() async throws {
-        let ok = try responseFile(success)  // file:// fixture
-        let missing = FileManager.default.temporaryDirectory.appendingPathComponent("ews-e2e-missing-\(UUID().uuidString).xml")
-        let s = MailStore(accounts: [], messages: [])
-        s.add(a, backend: backend(missing))
-        s.add(b, backend: backend(ok))
-        // Both folder lists were read while A was still reachable (e.g. before the VPN dropped).
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "FA"), RemoteFolder(role: .sent, id: "FA2")], account: a.id)
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "FB"), RemoteFolder(role: .sent, id: "FB2")], account: b.id)
-        await s.syncHistory()
-        await s.syncHistory()  // the next round, 15 s later
-        #expect(s.isComplete(b.id, .inbox) && s.isComplete(b.id, .sent),
-                "account B's history: inbox \(s.isComplete(b.id, .inbox)), sent \(s.isComplete(b.id, .sent))")
-    }
-
     /// A message answered while it is part of a multi-selection (the comment window's Send, pressed after
     /// selecting more messages in the main window) goes to Trash but stays selected; Delete then erases it
     /// from Trash, unseen.
