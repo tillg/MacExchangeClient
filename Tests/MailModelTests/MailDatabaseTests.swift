@@ -564,6 +564,16 @@ struct MailDatabaseTests {
         #expect(Set(try db.search("shared", accounts: nil)) == [w.id, h.id])
     }
 
+    /// BUG-171: Thai (like Lao, Khmer, Myanmar) and half-width katakana are written without spaces: a word inside
+    /// such a sentence is found, as for Chinese and Japanese.
+    @Test func wordsInsideThaiOrHalfwidthKatakanaTextAreFound() throws {
+        let thai = mail("ประชุมวันจันทร์นี้"), kana = mail("ﾃｽﾄﾒｰﾙです"), other = mail("Lunch")
+        let (db, url) = try searchable([thai, kana, other])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        #expect(try db.search("วันจันทร์", accounts: nil) == [thai.id])
+        #expect(try db.search("ﾃｽﾄ", accounts: nil) == [kana.id])
+    }
+
     /// BUG-248: a search's own notice (the 2,000 limit) doesn't erase another notice; clearing the search brings it back.
     @Test func searchNoticeDoesNotEraseAnotherNotice() async throws {
         let msgs = (0..<2001).map { mail("Report \($0)", minutesAgo: Double($0)) }

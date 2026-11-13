@@ -261,10 +261,12 @@ public final class MailDatabase: @unchecked Sendable {
         }
     }
 
-    /// Han ideographs, hiragana and katakana: scripts written without spaces between words.
+    /// Scripts written without spaces between words: Han ideographs, hiragana and katakana (half-width too), Thai,
+    /// Lao, Khmer and Myanmar (BUG-171). A word in them is searched as a substring.
     static func isCJK(_ c: Unicode.Scalar) -> Bool {
         switch c.value {
-        case 0x3040...0x30FF, 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF, 0x20000...0x3134F: true
+        case 0x3040...0x30FF, 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF, 0x20000...0x3134F, 0xFF65...0xFF9F,
+             0x0E00...0x0EFF, 0x1000...0x109F, 0x1780...0x17FF: true
         default: false
         }
     }

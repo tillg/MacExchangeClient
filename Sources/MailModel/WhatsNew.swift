@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Search finds words inside Thai text and in older Japanese mail with half-width characters.",
             "A forward whose original was deleted meanwhile now asks before going out without the original's files.",
             "Mail moved into a folder that was then deleted on the server comes back where it was, and a deleted Archive folder takes its mail with it.",
             "When Exchange asks the app to slow down, it now waits for the whole account instead of asking again folder by folder.",
