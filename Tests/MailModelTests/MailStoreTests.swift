@@ -1826,4 +1826,17 @@ struct MailStoreTests {
         #expect(s.visibleMessages.map(\.subject) == ["Lunch"])
         #expect(s.status?.contains("broken") == true)
     }
+
+    /// BUG-183: favourites are All Inboxes, VIPs, Flagged and each account's Inbox; only the first nine get ⌘1–⌘9.
+    /// The tenth asked for the key "10", which crashed the app with 7 or more accounts.
+    @Test func favoriteMailboxShortcutsStopAtNine() {
+        let accounts = (1...7).map { Account(name: "A\($0)", address: "a\($0)@x.com") }
+        let s = MailStore(accounts: accounts, messages: [])
+        #expect(s.favoriteMailboxes.count == 10)
+        #expect(s.favoriteMailboxes.prefix(3) == [.smart(.allInboxes), .smart(.vip), .smart(.flagged)])
+        #expect(s.favoriteMailboxes.last == .account(accounts[6].id, .inbox))
+        #expect(MailStore.favoriteKey(at: 0) == "1")
+        #expect(MailStore.favoriteKey(at: 8) == "9")
+        #expect(MailStore.favoriteKey(at: 9) == nil)
+    }
 }

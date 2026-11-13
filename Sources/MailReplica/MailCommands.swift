@@ -49,9 +49,9 @@ struct MailCommands: Commands {
             Divider()
             Button("Mark All Messages as Read") { store.markAllRead(in: store.selectedMailbox) }
             Divider()
-            ForEach(Array(favorites.enumerated()), id: \.offset) { i, ref in
+            ForEach(Array(store.favoriteMailboxes.enumerated()), id: \.offset) { i, ref in
                 Button(label(ref)) { store.selectedMailbox = ref }
-                    .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")))
+                    .keyboardShortcut(MailStore.favoriteKey(at: i).map { KeyboardShortcut(KeyEquivalent($0)) })
             }
         }
         CommandMenu("Message") {
@@ -84,11 +84,6 @@ struct MailCommands: Commands {
             Button("Delete") { store.deleteSelection() }
                 .keyboardShortcut(.delete).disabled(!hasSelection)
         }
-    }
-
-    /// ⌘1…⌘9 go to favourite mailboxes.
-    private var favorites: [MailboxRef] {
-        [.smart(.allInboxes), .smart(.vip), .smart(.flagged)] + store.accounts.map { .account($0.id, .inbox) }
     }
 
     private func label(_ ref: MailboxRef) -> String {

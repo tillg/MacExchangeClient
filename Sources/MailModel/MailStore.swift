@@ -142,6 +142,16 @@ public final class MailStore {
 
     public func account(_ id: UUID) -> Account? { accounts.first { $0.id == id } }
 
+    /// Mailbox ▸ Go to: All Inboxes, VIPs, Flagged, then each account's Inbox.
+    public var favoriteMailboxes: [MailboxRef] {
+        [.smart(.allInboxes), .smart(.vip), .smart(.flagged)] + accounts.map { .account($0.id, .inbox) }
+    }
+
+    /// The ⌘ key of the favourite at `index`: "1"…"9", none after the ninth (BUG-183).
+    public static func favoriteKey(at index: Int) -> Character? {
+        (0..<9).contains(index) ? Character(String(index + 1)) : nil
+    }
+
     /// Each account's folders by parent (sorted) and their names, made once per change of `folders`: the sidebar,
     /// the Move menu and the toolbar ask for them on every redraw.
     @ObservationIgnored private var folderTree: [UUID: (children: [MailboxKind?: [Folder]], names: [MailboxKind: String])] = [:]
