@@ -75,7 +75,8 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 Rows drag as `MessageDrag` (the whole selection if the row is selected). Drop targets are sidebar rows
 (`drop(_:on:)`): an account mailbox moves there (local messages also across accounts; Exchange mail is refused for
 another account); Flagged flags unflagged ones red; All Inboxes moves each message to its own account's Inbox; VIPs
-and Unread refuse drops. Messages already in the target are left out. Resting on a closed folder for 0.7 s opens it.
+and Unread refuse drops. Messages already in the target, or that the drop wouldn't change (a flagged message in
+Trash dropped on Flagged), are left out; when that leaves none, `drop` returns false. Resting on a closed folder for 0.7 s opens it.
 
 ## Message view and conversations
 

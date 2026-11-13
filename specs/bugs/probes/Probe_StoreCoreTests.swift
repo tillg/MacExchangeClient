@@ -40,15 +40,6 @@ struct Probe_StoreCoreTests {
         #expect(s.selection == [ms[3].id])
     }
 
-    // 9. drop returns false when nothing changed (doc comment): flagged message in Trash dropped on Flagged.
-    @Test func dropOnFlaggedOfAnAlreadyFlaggedTrashMessageChangesNothing() {
-        let a = msg(work, .trash, flag: .blue)
-        let s = store([a])
-        let r = s.drop([a.id], on: .smart(.flagged))
-        #expect(s.message(a.id)?.flag == .blue && s.message(a.id)?.mailbox == .trash)
-        #expect(!r, "drop reported a change although the message is unchanged")
-    }
-
     // 10. Mixed drop of the selection where a server message is blocked: it stays put, so it should stay selected.
     @Test func blockedMessagesOfADroppedSelectionStaySelected() {
         let local = msg(work, subject: "local", minutesAgo: 1), remote = msg(work, subject: "remote", minutesAgo: 2, rid: "R"),
