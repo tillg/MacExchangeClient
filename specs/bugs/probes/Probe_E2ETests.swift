@@ -119,24 +119,6 @@ struct Probe_E2ETests {
         #expect(s.takeChanges().resolved().upserts.isEmpty)
     }
 
-    /// A message answered while it is part of a multi-selection (the comment window's Send, pressed after
-    /// selecting more messages in the main window) goes to Trash but stays selected; Delete then erases it
-    /// from Trash, unseen.
-    @Test func inviteAnsweredWhileInAMultiSelectionIsNotErasedByDelete() {
-        let s = MailStore(accounts: [a], messages: [])
-        var inv = server("INV", minutes: 2)
-        inv.invite = Invite(start: Date(timeIntervalSince1970: 1_800_000_000), end: Date(timeIntervalSince1970: 1_800_003_600))
-        s.apply(page([inv, server("X", minutes: 1), server("Y", minutes: 0)]), account: a.id, mailbox: .inbox)
-        let invID = s.messages.first { $0.remoteID == "INV" }!.id, x = s.messages.first { $0.remoteID == "X" }!.id
-        s.selectedMailbox = .account(a.id, .inbox)
-        s.selection = [invID, x]
-        s.respond(InviteReply(response: .accept, comment: "ok"), to: invID)
-        #expect(s.message(invID)?.mailbox == .trash)
-        #expect(!s.selection.contains(invID), "the answered invite (now in Trash) is still selected")
-        s.deleteSelection()
-        #expect(s.message(invID) != nil, "Delete erased the answered invite from Trash")
-    }
-
     /// With the unread filter on (Trash), two selected unread messages are marked read: they leave the list
     /// but stay selected. Delete then erases them from Trash without them being on screen.
     @Test func markingAHiddenSelectionReadDoesNotLeaveItSelectedForErase() {

@@ -152,7 +152,8 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
   If the invite has left the store before Send (deleted by a sync, erased), `send` returns false: the status says
   "Couldn't send “…”: the invitation is no longer in your mailbox.", the window stays open with the comment and
   shows it in an alert.
-- Any answer or Remove from Calendar moves the message to Trash locally at once.
+- Any answer or Remove from Calendar moves the message to Trash locally at once. An invite answered while it is one
+  of several selected messages leaves the selection (`keepingSelectionVisible`), so Delete can't erase it unseen.
 
 ## Settings, menus, help
 
