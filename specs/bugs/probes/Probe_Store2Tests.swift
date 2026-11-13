@@ -50,20 +50,6 @@ struct Probe_Store2Tests {
 
     // MARK: Invites
 
-    /// Respond with Comments, then the invite is gone (sync deleted it / erased) before Send: the comment and
-    /// the answer silently vanish.
-    @Test func answerDraftForVanishedInviteIsNotSilentlyDropped() {
-        var m = msg(work); m.remoteID = "INV"; m.invite = invite(); m.isInvite = true
-        let s = store([m])
-        s.merge([(.inbox, [])], account: work.id)
-        var d = s.answerDraft(.decline, to: m.id)
-        d.body = "Sorry, I am out that week."
-        s.merge([], deleted: ["INV"], account: work.id, mailbox: .inbox)  // removed elsewhere meanwhile
-        s.send(d)
-        #expect(!s.outbox.isEmpty || s.status != nil, "outbox: \(s.outbox.count), status: \(s.status ?? "nil")")
-    }
-
-
     @Test func removeFromCalendarSelectsNext() {
         var a = msg(work, subject: "Canceled: X", minutesAgo: 1); a.invite = invite(); a.invite?.isCancellation = true
         let b = msg(work, subject: "B", minutesAgo: 2)

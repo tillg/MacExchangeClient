@@ -142,6 +142,9 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
 - With Comments / Propose open a compose window to the organizer with subject "Accepted: …", "Tentative: …",
   "Declined: …" or "New Time Proposed: …"; its text becomes the comment. A proposal needs both a start and an end
   ("The proposed meeting needs both a start and an end.") and must end after it starts; otherwise nothing is queued.
+  If the invite has left the store before Send (deleted by a sync, erased), `send` returns false: the status says
+  "Couldn't send “…”: the invitation is no longer in your mailbox.", the window stays open with the comment and
+  shows it in an alert.
 - Any answer or Remove from Calendar moves the message to Trash locally at once.
 
 ## Settings, menus, help
