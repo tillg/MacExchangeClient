@@ -101,6 +101,9 @@ public final class MailStore {
     private var flushTask: Task<Void, Never>?
     /// Accounts whose server asked to wait (throttling): their changes aren't sent before then.
     @ObservationIgnored private var busyUntil: [UUID: Date] = [:]
+    /// Notices about an account's connection (its failed check, offline, busy), by account. Only that account's next
+    /// successful check clears them; other notices ("Couldn't send …", a refused change) stay until replaced.
+    @ObservationIgnored private var connectionNotices: [UUID: String] = [:]
     /// Writes the changes to disk and returns once they are written; called before a send goes out, so its
     /// `inFlight` mark is saved first. Nil with sample data and in tests that don't save.
     @ObservationIgnored public var saveBeforeSending: (() async -> Void)?
@@ -1019,14 +1022,14 @@ public final class MailStore {
                 if case .send = p.change { failed(p, e.localizedDescription); continue }
                 if case .respond = p.change { failed(p, e.localizedDescription); continue }
                 if case .reply = p.change { failed(p, e.localizedDescription); continue }
-                status = "Offline – changes will be sent to Exchange later"
+                connectionNotice("Offline – changes will be sent to Exchange later", account: p.account)
                 unreachable.insert(p.account)
             } catch let e as ServerBusy {
                 // Not refused, just not now. A send or an answer may still have gone out; never repeat it.
                 if case .send = p.change { failed(p, e.localizedDescription); continue }
                 if case .respond = p.change { failed(p, e.localizedDescription); continue }
                 if case .reply = p.change { failed(p, e.localizedDescription); continue }
-                status = "Exchange is busy – changes will be sent later"
+                connectionNotice("Exchange is busy – changes will be sent later", account: p.account)
                 unreachable.insert(p.account)
                 if let wait = e.retryAfter { busyUntil[p.account] = Date.now.addingTimeInterval(wait) }
             } catch let e as PartlyRefused {
@@ -1042,6 +1045,11 @@ public final class MailStore {
             }
         }
         prune()
+    }
+
+    private func connectionNotice(_ text: String, account acct: UUID) {
+        connectionNotices[acct] = text
+        status = text
     }
 
     private func canSend(_ p: PendingChange) -> Bool {
@@ -1371,10 +1379,11 @@ public final class MailStore {
                         merge(try await backend.newest(in: folder, limit: Self.firstScreen), account: acct, mailbox: role)
                     }
                 }
-                status = historyError
+                // Only this account's own connection notice goes; another account's or "Couldn't send" stays.
+                if let notice = connectionNotices.removeValue(forKey: acct), status == notice { status = historyError }
             } catch where pauseIfSignInFailed(error, account: acct) {
             } catch {
-                status = "\(account(acct)?.name ?? "Account"): \(error.localizedDescription)"
+                connectionNotice("\(account(acct)?.name ?? "Account"): \(error.localizedDescription)", account: acct)
             }
         }
         if history { startHistory() }

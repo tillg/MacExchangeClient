@@ -687,4 +687,60 @@ struct MailStoreSyncTests {
         #expect(s.isComplete(home.id, .inbox) && s.isComplete(home.id, .sent))
         #expect(!s.isComplete(work.id, .inbox))
     }
+
+    func failing(_ code: String) -> String {  // file:// fixture
+        envelope("<m:X><m:ResponseMessages>\(err("X", code))</m:ResponseMessages></m:X>")
+    }
+
+    /// "Couldn't send …" stays after the next successful check: it is the only sign the mail didn't go.
+    @Test func couldntSendNoticeSurvivesTheNextCheck() async throws {
+        let file = try responseFile(failing("ErrorInvalidRecipients"))
+        let s = MailStore(accounts: [], messages: [])
+        s.add(work, backend: backend(file))
+        s.send(Draft(accountID: work.id, to: "nobody", subject: "Quarterly report", body: "b"))
+        try await waitForOutbox(s)
+        #expect(s.status?.contains("Couldn't send") == true)
+        try Data(success.utf8).write(to: file)  // the server answers normally again
+        await s.refresh(history: false)
+        #expect(s.status?.contains("Couldn't send") == true, "status after the next check: \(s.status ?? "nil")")
+    }
+
+    /// One account's failed check isn't hidden by another account's successful one, in either order.
+    @Test func oneAccountsErrorIsNotClearedByTheOthersSuccess() async throws {
+        let ok = try responseFile(success), bad = try responseFile(failing("ErrorMailboxMoveInProgress"))
+        for _ in 0..<16 {
+            let x = Account(name: "Work", address: "me@work.com"), y = Account(name: "Club", address: "me@club.org")
+            let s = MailStore(accounts: [], messages: [])
+            s.add(x, backend: backend(bad))
+            s.add(y, backend: backend(ok))
+            await s.refresh(history: false)
+            #expect(s.status?.contains("ErrorMailboxMoveInProgress") == true, "status: \(s.status ?? "nil")")
+        }
+    }
+
+    /// An account's own check error, and its offline notice, go once that account's check works again.
+    @Test func successfulCheckClearsItsOwnAccountsError() async throws {
+        let file = try responseFile(failing("ErrorMailboxMoveInProgress"))
+        let s = MailStore(accounts: [], messages: [])
+        s.add(work, backend: backend(file))
+        await s.refresh(history: false)
+        #expect(s.status != nil)
+        try Data(success.utf8).write(to: file)
+        await s.refresh(history: false)
+        #expect(s.status == nil, "status: \(s.status ?? "nil")")
+
+        let missing = FileManager.default.temporaryDirectory.appendingPathComponent("ews-sync-missing-\(UUID().uuidString).xml")
+        let t = MailStore(accounts: [], messages: [])
+        t.add(work, backend: backend(missing))
+        t.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX")], account: work.id)
+        t.apply(page(["A"], token: "T1"), account: work.id, mailbox: .inbox)
+        t.toggleRead([id(t, "A")])
+        await t.refresh(history: false)
+        #expect(t.status != nil)
+        try Data(success.utf8).write(to: missing)  // reachable again
+        defer { try? FileManager.default.removeItem(at: missing) }
+        await t.refresh(history: false)
+        #expect(t.status == nil, "status: \(t.status ?? "nil")")
+        #expect(t.outbox.isEmpty)
+    }
 }

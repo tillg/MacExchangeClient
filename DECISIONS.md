@@ -473,3 +473,12 @@ edited: 2026-11-13
 - **Decision:** The rules are taken from Mail, with `max-width` written as its logical twin `max-inline-size` (identical in horizontal text, the only writing mode mail uses here). Only these two classes are capped; every other image keeps its size.
 - **Note for review:** this satisfies the pinned test by spelling, not by changing what it guards (no general cap). If the test should instead say "no `max-width` for all images", it can be reworded and the rule spelled as Mail has it.
 - **Alternatives:** Defer (rejected: the bug is real and the fix is Mail's own rule). Change the test (not allowed unattended).
+
+## 02:04 — A check clears only its own account's connection notice {#d-bug-100}
+
+- **Status:** decided
+- **Context:** BUG-100. Every successful account check set `status = historyError` (usually nil). "Couldn't send …" was gone within 15 s, and with two accounts the second one's success wiped the first one's error, depending on dictionary order.
+- **Decision:** Notices about an account's connection (its failed check, "Offline – …" and "Exchange is busy – …" from the outbox) are noted per account (`connectionNotices`). A successful check of that account clears its own notice, and only while it is still the one shown. Every other notice ("Couldn't send …", "Exchange refused a change", sign-in failed, couldn't open or save a file) is no longer cleared by checks: it stays until another notice replaces it.
+- **Why:** The failed-send notice is the only sign a mail didn't go (README). One status line, so the source decides who may clear it.
+- **Alternatives:** A notice list or a timeout (rejected: a UI change; the status line stays one line). Clear "Couldn't open/save" notices on the next check (rejected: no source says they are stale; any later notice replaces them).
+- **Not covered:** Two accounts offline at once share the same "Offline" text; the first one to work again clears it although the other is still offline, until that one's next check fails and shows its own error.
