@@ -18,14 +18,14 @@ public enum HTMLPage {
             : "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
         // WebKit draws a blocked image as an outlined box with its alt text. Mail shows nothing but keeps the space.
         let blocked = allowRemote ? "" : #"img:not([src^="data:" i]) { visibility: hidden; }"#
-        // Like Mail's MUIWebDocument.css, with Mail's default message font.
+        // Like Mail's MUIWebDocument.css, with Mail's default message font. No colours, as there: the sender's
+        // `<body bgcolor text>` apply, and without them the light colour scheme gives a white page and black text.
         return """
             <meta http-equiv="Content-Security-Policy" content="\(csp)">
             <meta name="color-scheme" content="light">
             <style>
-            html, body { background: #fff; }
             html { font: 14px Helvetica; }
-            body { margin: 18px 20px 22px; padding: 0; color: #000; word-wrap: break-word; word-break: break-word; }
+            body { margin: 18px 20px 22px; padding: 0; word-wrap: break-word; word-break: break-word; }
             table { word-break: normal; }
             img[src^="cid:"] { display: none; }
             \(blocked)

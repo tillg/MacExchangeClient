@@ -22,6 +22,21 @@ struct HTMLPageRenderTests {
         return v
     }
 
+    /// Runs `script` on the page as the app shows it; its result as text.
+    func eval(_ page: String, _ script: String) async -> String {
+        let v = await show(page)
+        return (try? await v.evaluateJavaScript(script)).map { "\($0)" } ?? "nil"
+    }
+
+    /// Newsletters and Outlook templates set the page colour with `<body bgcolor text>`: our page must not override it.
+    @Test func sendersBodyColoursAreKept() async {
+        let colours = "getComputedStyle(document.body).backgroundColor + '|' + getComputedStyle(document.getElementById('t')).color"
+        let font = ##"<html><body bgcolor="#000000"><font id=t color="#ffffff">White text on the sender's black page</font></body></html>"##
+        #expect(await eval(HTMLPage.document(font, allowRemote: false), colours) == "rgb(0, 0, 0)|rgb(255, 255, 255)")
+        let text = ##"<html><body bgcolor="#000000" text="#ffffff"><p id=t>Dark newsletter</p></body></html>"##
+        #expect(await eval(HTMLPage.document(text, allowRemote: false), colours) == "rgb(0, 0, 0)|rgb(255, 255, 255)")
+    }
+
     nonisolated static let blockedVectors: [String] = [
         #"<link rel="preconnect" href="BASE/preconnect">"#,
         "<link/\u{301} rel=preconnect href=BASE/preconnect-mark>",

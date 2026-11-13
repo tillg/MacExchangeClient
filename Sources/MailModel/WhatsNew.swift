@@ -15,6 +15,7 @@ public enum WhatsNew {
             "When something between you and Exchange answers with an error page instead of Exchange, a message you send is kept in Drafts instead of disappearing, and a mailbox no longer counts as fully loaded.",
             "When you mark, flag, move or erase several messages and one of them was already deleted on the server, the others keep your change.",
             "Forwarding or saving an attachment you opened and changed (for example a form filled in with Preview) uses the file as it came in the email, not your changed copy.",
+            "Emails that colour their own page, such as dark newsletters, show in their own colours instead of on a white page with unreadable text.",
             "With pictures from the internet blocked, opening an email no longer lets its sender find out through a hidden connection to their server.",
             "When one account's server can't be reached, your other accounts still send your messages and changes right away.",
             "If the app quits while a message is being sent, it is never sent a second time: it waits in Drafts and the app asks you to check Sent.",
