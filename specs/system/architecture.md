@@ -71,6 +71,10 @@ flowchart LR
   It first flushes the outbox and waits for it. Then, per account not paused: read the folder list once per session,
   and for the Inbox plus the selected mailbox of that account either sync changes (folder complete) or merge the
   newest 50 (`firstScreen`). Then it starts the history sync. A second `refresh` while one runs returns at once.
+- **Status line:** notices about an account's connection — its failed check ("Name: error"), and "Offline – …" /
+  "Exchange is busy – …" from the outbox — are noted per account (`connectionNotices`). That account's next
+  successful check clears its own notice (to `historyError`), only while it is still the one shown. Other notices
+  ("Couldn't send …", "Exchange refused a change", sign-in, files) are not cleared by checks; the next notice replaces them.
 - **History** (`syncHistory`): phase 1 fetches the newest 200 of every incomplete folder, merged in batches of
   1.5 s. Phase 2 syncs one folder at a time in pages of 512 (`MaxChangesReturned`), collecting pages for up to 1.5 s
   (`historyBatch`) and applying them in one merge; after each batch the next folder is chosen again. Order:

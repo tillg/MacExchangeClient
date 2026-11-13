@@ -218,43 +218,6 @@ struct Probe_EWSFlowTests {
         #expect(s.status == nil && server.served == 3, "status \(s.status ?? "") served \(server.served)")
     }
 
-    // MARK: What the user sees after a failure
-
-    /// A queued message fails to send during the flush at the start of a check for mail. The check then succeeds
-    /// and replaces the status, so "Couldn't send … It's in Drafts on this Mac" is never shown.
-    // file:// fixture
-    @Test func probeFailedSendDuringRefreshStaysVisible() async throws {
-        let server = FlowServer([
-            FX.resp("CreateItem", FX.err("CreateItem", "ErrorInvalidRecipients", "At least one recipient isn't valid.")),
-            FX.sync("", token: "T1", last: true),
-        ])
-        defer { server.stop() }
-        let s = store(server)
-        complete(s, .inbox)
-        s.send(Draft(accountID: acct.id, to: "bob@x.com", subject: "Quarterly report", body: "Hi"))
-        await s.refresh(history: false)
-        #expect(s.messages.contains { $0.mailbox == .drafts && $0.subject == "Quarterly report" })
-        #expect(server.served == 2)
-        #expect(s.status?.contains("Couldn't send") == true, "status after the check: \(String(describing: s.status))")
-    }
-
-    /// The same for a change Exchange refuses (README: "it is undone and the reason shows under the window title").
-    // file:// fixture
-    @Test func probeRefusedChangeDuringRefreshStaysVisible() async throws {
-        let server = FlowServer([
-            FX.resp("UpdateItem", FX.err("UpdateItem", "ErrorAccessDenied", "Access is denied.")),
-            FX.sync("", token: "T1", last: true),
-        ])
-        defer { server.stop() }
-        let s = store(server)
-        complete(s, .inbox)
-        s.merge([serverMessage("A")], account: acct.id, mailbox: .inbox)
-        s.toggleRead(Set(s.messages.map(\.id)))
-        await s.refresh(history: false)
-        #expect(s.messages.first?.isRead == false)
-        #expect(s.status?.contains("refused") == true, "status after the check: \(String(describing: s.status))")
-    }
-
     // MARK: Folder list
 
     /// GetFolder answers each standard folder with an error (mailbox store unavailable, e.g. during a mailbox move).
@@ -494,29 +457,6 @@ struct Probe_EWSFlowTests {
         #expect(status != nil || second > 0, "status \(String(describing: status)); requests: first check \(afterFirst), second check \(second)")
     }
 
-    /// Two Exchange accounts; one can't be checked (SOAP fault). Whether its error is shown depends on which account
-    /// the check happens to visit last: the other account's success clears it.
-    // file:// fixture
-    @Test func probeOneAccountsErrorNotHiddenByAnother() async throws {
-        var hidden = 0
-        for _ in 0..<12 {
-            let bad = FlowServer([], fallback: FX.fault("ErrorMailboxStoreUnavailable", "The mailbox database is temporarily unavailable."))
-            let good = FlowServer([], fallback: FX.sync("", token: "T1", last: true))
-            defer { bad.stop(); good.stop() }
-            let a = Account(name: "Work", address: "a@work.com"), b = Account(name: "Lab", address: "b@lab.com")
-            let s = MailStore(accounts: [], messages: [])
-            s.add(a, backend: EWSBackend(client: EWSClient(url: bad.url, username: "u", password: "p")))
-            s.add(b, backend: EWSBackend(client: EWSClient(url: good.url, username: "u", password: "p")))
-            for x in [a, b] {
-                s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX")], account: x.id)
-                s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], token: "T0", more: false), account: x.id, mailbox: .inbox)
-            }
-            await s.refresh(history: false)
-            if s.status == nil { hidden += 1 }
-        }
-        #expect(hidden == 0, "Work's error was not shown after \(hidden) of 12 checks")
-    }
-
     /// A cancellation: open it, Remove from Calendar (control).
     // file:// fixture
     @Test func controlCancellationRemoveFromCalendar() async throws {
@@ -579,26 +519,6 @@ struct Probe_EWSFlowTests {
     // MARK: Batch 4
 
     // file:// fixture (FIFO)
-    /// A send fails on its own (the status says so, control), then the next check for mail (every 15 s) succeeds
-    /// and clears the notice, although the message now only exists in Drafts on this Mac.
-    // file:// fixture
-    @Test func probeFailedSendNoticeSurvivesNextCheck() async throws {
-        let server = FlowServer([
-            FX.resp("CreateItem", FX.err("CreateItem", "ErrorInvalidRecipients", "At least one recipient isn't valid.")),
-            FX.sync("", token: "T1", last: true),
-        ])
-        defer { server.stop() }
-        let s = store(server)
-        complete(s, .inbox)
-        s.send(Draft(accountID: acct.id, to: "bob@x.com", subject: "Quarterly report", body: "Hi"))
-        try await waitFor { s.outbox.isEmpty }
-        let before = s.status
-        #expect(before?.contains("Couldn't send") == true)
-        await s.refresh(history: false)
-        let after = s.status
-        #expect(after == before, "before the check: \(String(describing: before)); after: \(String(describing: after))")
-    }
-
     /// file:// fixture (plain file, as round 2): the quick check's paging loop against a server that repeats
     /// "more" with the same SyncState.
     // file:// fixture
@@ -722,21 +642,6 @@ struct Probe_EWSFlowTests {
         s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .drafts, id: "DRAFTS"),
                             RemoteFolder(role: .trash, id: "DEL")], account: acct.id)
         return (s, url)
-    }
-
-    // file:// fixture
-    /// R3-EWSFlow-01 on a plain response file: the send fails, the notice shows; the next check succeeds and clears it.
-    @Test func probeFailedSendNoticeSurvivesNextCheckStaticFile() async throws {
-        let (s, url) = try fileStore(FX.resp("CreateItem", FX.err("CreateItem", "ErrorInvalidRecipients", "At least one recipient isn't valid.")))
-        complete(s, .inbox)
-        s.send(Draft(accountID: acct.id, to: "bob@x.com", subject: "Quarterly report", body: "Hi"))
-        try await waitFor { s.outbox.isEmpty }
-        let before = s.status
-        #expect(before?.contains("Couldn't send") == true)
-        try Data(FX.sync("", token: "T1", last: true).utf8).write(to: url)
-        await s.refresh(history: false)
-        let after = s.status
-        #expect(after == before, "before the check: \(String(describing: before)); after: \(String(describing: after))")
     }
 
     // file:// fixture

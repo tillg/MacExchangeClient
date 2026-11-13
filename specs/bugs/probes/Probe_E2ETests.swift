@@ -260,37 +260,6 @@ struct Probe_E2ETests {
         for _ in 0..<500 where !cond() { try await Task.sleep(for: .milliseconds(10)) }
     }
 
-    /// A send Exchange refuses is kept in Drafts with "Couldn't send …" under the window title. The next
-    /// quick check (at most 15 s later, also one already running) replaces the notice with nil.
-    @Test func couldntSendNoticeSurvivesTheNextCheck() async throws {
-        let file = try responseFile(error("ErrorInvalidRecipients"))  // file:// fixture
-        let s = MailStore(accounts: [], messages: [])
-        s.add(a, backend: backend(file))
-        s.send(Draft(accountID: a.id, to: "nobody", subject: "Quarterly report", body: "b"))
-        try await waitUntil { s.outbox.isEmpty }
-        #expect(s.status?.contains("Couldn't send") == true)
-        try Data(success.utf8).write(to: file)  // the server answers normally again
-        await s.refresh(history: false)  // the next 15-second check
-        #expect(s.status?.contains("Couldn't send") == true, "status after the next check: \(s.status ?? "nil")")
-    }
-
-    /// Two accounts: the first one's check fails, the second one's succeeds and clears the error, so nothing
-    /// says the first account wasn't checked. Run over several account pairs: the order follows the dictionary.
-    @Test func oneAccountsErrorIsNotClearedByTheOthersSuccess() async throws {
-        let ok = try responseFile(success)  // file:// fixture
-        let bad = try responseFile(error("ErrorMailboxMoveInProgress"))
-        var cleared = 0
-        for _ in 0..<32 {
-            let x = Account(name: "Work", address: "me@work.com"), y = Account(name: "Club", address: "me@club.org")
-            let s = MailStore(accounts: [], messages: [])
-            s.add(x, backend: backend(bad))
-            s.add(y, backend: backend(ok))
-            await s.refresh(history: false)
-            if s.status == nil { cleared += 1 }
-        }
-        #expect(cleared == 0, "the failing account's error was gone after \(cleared) of 32 checks")
-    }
-
     /// Select All ▸ Archive on an Inbox of 2,870 messages (README's size), half of them opened: the queued move
     /// holds a full copy of every message, bodies and HTML included, and every later change to the outbox
     /// (one more flag, one batch sent) rewrites all of it on the next save.
