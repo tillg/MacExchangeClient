@@ -5,52 +5,32 @@ import Testing
 
 // MARK: - Harness
 
-/// file:// fixture (FIFO): a named pipe at a `file://` URL stands in for the EWS endpoint. The real EWSClient opens
-/// the pipe for every request and reads the next scripted response. With `hold`, a request waits until a response is
-/// pushed, so the test decides when the server's answer arrives. No network, no fake classes.
+/// A scripted server (see `LoopbackEndpoint`): each request of the real EWSClient gets the next scripted response.
+/// With `hold`, a request waits until a response is pushed, so the test decides when the server's answer arrives.
+/// No fake classes.
 final class RaceServer: @unchecked Sendable {
     let url: URL
-    private let path: String
+    private let endpoint: LoopbackEndpoint
     private let lock = NSLock()
     private var script: [String]
-    private var stopped = false
     private let hold: Bool
-    private var _served = 0
-    var served: Int { lock.withLock { _served } }
+    var served: Int { endpoint.served }
 
     init(_ script: [String], hold: Bool = false) {
         self.hold = hold
-        path = FileManager.default.temporaryDirectory.appendingPathComponent("race-fifo-\(UUID().uuidString).xml").path
-        mkfifo(path, 0o600)
-        url = URL(fileURLWithPath: path)
         self.script = script
-        Thread { [self] in loop() }.start()
+        endpoint = LoopbackEndpoint()
+        url = endpoint.url
+        endpoint.start { [self] in
+            lock.withLock {
+                if !self.script.isEmpty { return self.script.removeFirst() }
+                return self.hold ? nil : RX.fault("ErrorScriptExhausted", "No scripted response left")
+            }
+        }
     }
 
     func push(_ xml: String) { lock.withLock { script.append(xml) } }
-    func stop() { lock.withLock { stopped = true } }
-
-    private func loop() {
-        signal(SIGPIPE, SIG_IGN)
-        while true {
-            if lock.withLock({ stopped }) { unlink(path); return }
-            if lock.withLock({ hold && script.isEmpty }) { usleep(500); continue }
-            let fd = open(path, O_WRONLY | O_NONBLOCK)
-            if fd < 0 { usleep(500); continue }
-            _ = fcntl(fd, F_SETFL, 0)
-            let xml = lock.withLock { script.isEmpty ? RX.fault("ErrorScriptExhausted", "No scripted response left") : script.removeFirst() }
-            let bytes = Array(xml.utf8)
-            var off = 0
-            while off < bytes.count {
-                let n = bytes[off...].withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
-                if n <= 0 { break }
-                off += n
-            }
-            lock.withLock { _served += 1 }
-            close(fd)
-            usleep(300_000)
-        }
-    }
+    func stop() { endpoint.stop() }
 }
 
 /// Hand-written Exchange responses. // file:// fixture
@@ -145,20 +125,22 @@ struct MailStoreRaceTests {
                 remoteID: rid, serverPreview: preview, bodyLoaded: false)
     }
 
+    /// Waits up to `timeout` for `cond`; a step that took longer than 100 ms counts as 100 ms (see EWSFlowTests.waitFor).
     func waitFor(_ timeout: Duration = .seconds(5), _ cond: () -> Bool) async throws {
-        let end = ContinuousClock.now + timeout
-        while !cond() && ContinuousClock.now < end { try await Task.sleep(for: .milliseconds(10)) }
+        var left = timeout
+        while !cond() && left > .zero {
+            let start = ContinuousClock.now
+            try await Task.sleep(for: .milliseconds(10))
+            left -= min(start.duration(to: .now), .milliseconds(100))
+        }
     }
 
-    /// Serves `responses` of a `hold` server one at a time, each once the previous one has been read and its reader
-    /// has let go of the pipe (URLSession reads on for a while after a response; on a busy machine longer than the
-    /// server's own pause, and the next response would then end up in the previous request).
+    /// Serves `responses` of a `hold` server one at a time, each once the previous one has been read.
     func serve(_ server: RaceServer, _ responses: [String]) async throws {
         for xml in responses {
             let before = server.served
             server.push(xml)
             try await waitFor(.seconds(10)) { server.served > before }
-            try await Task.sleep(for: .seconds(1))
         }
     }
 

@@ -3,57 +3,140 @@ import Testing
 @testable import EWS
 @testable import MailModel
 
-// MARK: - file:// fixture (FIFO)
+// MARK: - Scripted server (loopback)
 
-/// A named pipe at a `file://` URL stands in for the EWS endpoint: every request the real EWSClient makes opens the
-/// pipe and reads the next hand-written response of the script, in order. No network, no fake class: the real
-/// EWSClient, EWSBackend and MailStore run unchanged. After the script, `fallback` is served (by default a SOAP
-/// fault, so a request the script didn't expect fails instead of hanging).
+/// A scripted server stands in for the EWS endpoint: every request the real EWSClient makes gets the next hand-written
+/// response of the script, in order. No fake class: the real EWSClient, EWSBackend and MailStore run unchanged, over
+/// HTTP to this process on 127.0.0.1 (nothing leaves the machine). After the script, `fallback` is served (by default
+/// a SOAP fault, so a request the script didn't expect fails instead of hanging).
 final class ScriptedServer: @unchecked Sendable {
     let url: URL
-    private let path: String
+    private let endpoint: LoopbackEndpoint
     private let lock = NSLock()
     private var script: [String]
     private var fallbackXML: String
-    private var stopped = false
-    private var _served = 0
 
-    var served: Int { lock.withLock { _served } }
+    var served: Int { endpoint.served }
 
     init(_ script: [String], fallback: String? = nil) {
-        path = FileManager.default.temporaryDirectory.appendingPathComponent("ews-fifo-\(UUID().uuidString).xml").path
-        mkfifo(path, 0o600)
-        url = URL(fileURLWithPath: path)
         self.script = script
         fallbackXML = fallback ?? EWSReply.fault("ErrorScriptExhausted", "No scripted response left")
-        let t = Thread { [self] in loop() }
-        t.start()
+        endpoint = LoopbackEndpoint()
+        url = endpoint.url
+        endpoint.start { [self] in lock.withLock { self.script.isEmpty ? fallbackXML : self.script.removeFirst() } }
     }
 
     func push(_ xml: String) { lock.withLock { script.append(xml) } }
+    func stop() { endpoint.stop() }
+}
+
+/// An HTTP endpoint on 127.0.0.1 that answers each request with the next answer, in the order the requests arrived.
+/// `next` returns nil while there is no answer yet (a held server): the request then waits, as one waits for a slow
+/// server, until there is one. A request given up meanwhile (its task cancelled) doesn't use an answer.
+///
+/// (It replaces named pipes at `file://` URLs. URLSession's file loader kept a pipe open after the end of an answer,
+/// so a next answer could end up in the previous request, and it sometimes missed the end of a pipe and waited for its
+/// 60 s time-out. Each request here has its own connection, and each answer its length.)
+final class LoopbackEndpoint: @unchecked Sendable {
+    private(set) var url: URL = URL(string: "http://127.0.0.1/")!
+    private let listener: Int32
+    private let lock = NSLock()
+    private var stopped = false
+    private var _served = 0
+    var served: Int { lock.withLock { _served } }
+
+    init() {
+        signal(SIGPIPE, SIG_IGN)
+        listener = socket(AF_INET, SOCK_STREAM, 0)
+        var yes: Int32 = 1
+        setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, socklen_t(MemoryLayout<Int32>.size))
+        var addr = sockaddr_in()
+        addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+        addr.sin_port = 0  // any free port
+        var len = socklen_t(MemoryLayout<sockaddr_in>.size)
+        withUnsafeMutablePointer(to: &addr) { p in
+            p.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+                _ = bind(listener, sa, len)
+                _ = listen(listener, 16)
+                _ = getsockname(listener, sa, &len)
+            }
+        }
+        url = URL(string: "http://127.0.0.1:\(UInt16(bigEndian: addr.sin_port))/EWS/Exchange.asmx")!
+    }
+
+    func start(_ next: @escaping () -> String?) {
+        let t = Thread { [self] in loop(next) }
+        t.start()
+    }
+
     func stop() { lock.withLock { stopped = true } }
 
-    private func loop() {
-        signal(SIGPIPE, SIG_IGN)
-        while true {
-            if lock.withLock({ stopped }) { return }
-            let fd = open(path, O_WRONLY | O_NONBLOCK)  // fails until a request opens the pipe
-            if fd < 0 { usleep(500); continue }
-            _ = fcntl(fd, F_SETFL, 0)
-            let xml = lock.withLock { script.isEmpty ? fallbackXML : script.removeFirst() }
-            let bytes = Array(xml.utf8)
-            var off = 0
-            while off < bytes.count {
-                let n = bytes[off...].withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
-                if n <= 0 { break }
-                off += n
+    private func loop(_ next: () -> String?) {
+        var reading: [Int32: [UInt8]] = [:]  // connections whose request isn't complete yet
+        var waiting: [Int32] = []  // connections whose request is read, oldest first
+        while !lock.withLock({ stopped }) {
+            var fds = [pollfd(fd: listener, events: Int16(POLLIN), revents: 0)]
+                + reading.keys.map { pollfd(fd: $0, events: Int16(POLLIN), revents: 0) }
+            if poll(&fds, nfds_t(fds.count), waiting.isEmpty ? 10 : 1) > 0 {
+                if fds[0].revents != 0 {
+                    let c = accept(listener, nil, nil)
+                    if c >= 0 { _ = fcntl(c, F_SETFL, O_NONBLOCK); reading[c] = [] }
+                }
+                for f in fds.dropFirst() where f.revents != 0 {
+                    var buf = [UInt8](repeating: 0, count: 65536)
+                    let n = read(f.fd, &buf, buf.count)
+                    if n <= 0 { reading[f.fd] = nil; close(f.fd); continue }
+                    reading[f.fd]! += buf[0..<n]
+                    if Self.isComplete(reading[f.fd]!) { reading[f.fd] = nil; waiting.append(f.fd) }
+                }
             }
-            lock.withLock { _served += 1 }
-            close(fd)
-            // URLSession's file loader keeps reading the pipe for a while after the end of the response. Serving
-            // the next response before it lets go would hand it to this request, so wait until no reader is left.
-            usleep(300_000)
+            while let c = waiting.first {
+                guard isOpen(c) else { close(c); waiting.removeFirst(); continue }
+                guard let xml = next() else { break }
+                waiting.removeFirst()
+                respond(c, xml)
+                lock.withLock { _served += 1 }
+            }
         }
+        (Array(reading.keys) + waiting).forEach { close($0) }
+        close(listener)
+    }
+
+    /// Whether `data` holds a whole request: its head and a body as long as its Content-Length says.
+    private static func isComplete(_ data: [UInt8]) -> Bool {
+        guard let end = data.indices.dropLast(3).first(where: {
+            data[$0] == 13 && data[$0 + 1] == 10 && data[$0 + 2] == 13 && data[$0 + 3] == 10
+        }) else { return false }
+        let head = String(decoding: data[..<end], as: UTF8.self).lowercased()
+        let line = head.split(separator: "\r\n").first { $0.hasPrefix("content-length:") }
+        let length = line.flatMap { Int($0.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)) } ?? 0
+        return data.count - (end + 4) >= length
+    }
+
+    /// Whether the client still waits on this connection (a cancelled request closes it).
+    private func isOpen(_ c: Int32) -> Bool {
+        var p = pollfd(fd: c, events: Int16(POLLIN), revents: 0)
+        guard poll(&p, 1, 0) > 0 else { return true }
+        var byte: UInt8 = 0
+        return recv(c, &byte, 1, MSG_PEEK | MSG_DONTWAIT) > 0
+    }
+
+    private func respond(_ c: Int32, _ xml: String) {
+        _ = fcntl(c, F_SETFL, 0)  // blocking: the whole answer is written
+        let body = Array(xml.utf8)
+        let head = "HTTP/1.1 200 OK\r\nContent-Type: text/xml; charset=utf-8\r\nContent-Length: \(body.count)\r\n"
+            + "Connection: close\r\n\r\n"
+        let bytes = Array(head.utf8) + body
+        var off = 0
+        while off < bytes.count {
+            let n = bytes[off...].withUnsafeBytes { write(c, $0.baseAddress, $0.count) }
+            if n <= 0 { break }
+            off += n
+        }
+        shutdown(c, SHUT_WR)
+        close(c)
     }
 }
 
@@ -142,9 +225,15 @@ struct EWSFlowTests {
         s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], token: token, more: false), account: acct.id, mailbox: box)
     }
 
+    /// Waits up to `timeout` for `cond`. A step that took longer than 100 ms (another suite held the main actor for
+    /// seconds, or the machine is busy) counts as 100 ms, so that doesn't use up the wait.
     func waitFor(_ timeout: Duration = .seconds(5), _ cond: () -> Bool) async throws {
-        let end = ContinuousClock.now + timeout
-        while !cond() && ContinuousClock.now < end { try await Task.sleep(for: .milliseconds(10)) }
+        var left = timeout
+        while !cond() && left > .zero {
+            let start = ContinuousClock.now
+            try await Task.sleep(for: .milliseconds(10))
+            left -= min(start.duration(to: .now), .milliseconds(100))
+        }
         #expect(cond(), "timed out")
     }
 
