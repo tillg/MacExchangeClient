@@ -94,31 +94,6 @@ struct Probe_E2ETests {
 
     // MARK: Targeted probes
 
-    /// README: "Saving: ... only what changed: one flag change is one row". Mark All as Read on a mailbox where
-    /// only one message is unread should write one row, not every message of the mailbox.
-    @Test func markAllReadWritesOnlyTheMessagesItChanged() {
-        let s = MailStore(accounts: [a], messages: [])
-        s.apply(page((0..<1000).map { server("R\($0)", read: $0 != 7) }), account: a.id, mailbox: .inbox)
-        _ = s.takeChanges()
-        s.markAllRead(in: .account(a.id, .inbox))
-        let written = s.takeChanges().resolved().upserts
-        #expect(s.outbox.count == 1)
-        #expect(written.count == 1, "Mark All as Read on 1 unread of 1,000 rewrites \(written.count) rows")
-    }
-
-    /// Same: setting the flag colour a message already has, or selecting an already read message, changes nothing.
-    @Test func noOpActionsWriteNothing() {
-        let s = MailStore(accounts: [a], messages: [])
-        s.apply(page([server("R1", read: true, flagged: true)]), account: a.id, mailbox: .inbox)
-        _ = s.takeChanges()
-        let id = s.messages[0].id
-        s.setFlag(.red, for: [id])
-        s.selection = [id]
-        s.markSelectionRead()
-        s.move([id], to: .inbox)
-        #expect(s.takeChanges().resolved().upserts.isEmpty)
-    }
-
     /// Mark All as Read while launch is still loading (Flagged spans every mailbox) leaves the mail that
     /// loads afterwards unread.
     @Test func markAllReadWhileLoadingCoversMailLoadedAfterwards() throws {

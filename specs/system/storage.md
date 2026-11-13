@@ -88,7 +88,8 @@ columns changed. U+001E/U+001F are word breaks for the tokenizer. How it is quer
   every column (not `INSERT OR REPLACE`, which wouldn't fire the delete trigger). Removed IDs are deleted. `sync`,
   `folders` and `outbox`, when present in the batch, are replaced entirely. Any error rolls the batch back.
 - What goes in a batch: `MailStore.takeChanges()` — IDs changed or added since the last batch (picked from a snapshot
-  off the main thread), removed IDs, and sync/folders/outbox if they changed. Failed batches are re-marked
+  off the main thread; a local action marks only the messages it actually changed, so Mark All as Read on a mailbox
+  with one unread message writes one row, and setting a state a message already has writes none), removed IDs, and sync/folders/outbox if they changed. Failed batches are re-marked
   (`retry`) and go with the next one.
 
 ## Reading
