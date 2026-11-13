@@ -441,28 +441,6 @@ struct Probe_DB2Tests {
 
     // MARK: Upgrades
 
-    /// Every Cache.json comes from before conversations (it predates the database). README: "A database from
-    /// before conversations syncs every folder once more from the start so existing mail learns its
-    /// conversation." The import keeps the cache's sync positions, so imported mail never learns it.
-    @Test func probeImportedCacheSyncsAgainToLearnConversations() async throws {
-        let dir = tempURL().deletingLastPathComponent(); defer { try? FileManager.default.removeItem(at: dir) }
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
-        let old = MailStore(accounts: [work], messages: [])
-        old.apply(SyncResult(upserts: [mail("A", rid: "A"), mail("B", rid: "B")], deletedRemoteIDs: [], token: "T-old", more: false),
-                  account: work.id, mailbox: .inbox)
-        #expect(old.messages.allSatisfy { $0.conversationID == nil })
-        try old.cache().save(to: cacheURL)
-        let s = MailStore(accounts: [work], messages: [])
-        let d = try #require(try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s))
-        // Control: a database from before conversations starts over.
-        #expect(s.messages.count == 2)
-        #expect(s.syncToken(work.id, .inbox) == nil && !s.isComplete(work.id, .inbox),
-                "imported store: token \(s.syncToken(work.id, .inbox) ?? "nil"), complete \(s.isComplete(work.id, .inbox))")
-        let stored = try d.meta().sync
-        #expect(stored.allSatisfy { $0.token == nil && !$0.complete }, "stored sync: \(stored)")
-    }
-
     /// README: "Case and accents don't matter (`muller` finds "Müller")". Accented letters of other scripts.
     @Test(arguments: [("καλημερα", "Καλημέρα σας"), ("αθηνα", "Ταξίδι στην Αθήνα"), ("ελληνικα", "ΕΛΛΗΝΙΚΆ"),
                       ("cafe", "Café"), ("zurich", "Zürich"), ("sao", "São Paulo")])

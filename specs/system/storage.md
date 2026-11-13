@@ -116,6 +116,8 @@ Runs when `Mail.sqlite` doesn't exist (`MailDatabase.importCache`); the sidebar 
    old cache couldn't be read and names the kept file. Mail is then downloaded again from the server.
    Caches from builds whose attachments were plain names decode (see `Attachment` in [domain-model.md](domain-model.md)).
 3. `store.restore(cache)`: messages (skipping known `remoteID`s), sync tokens, outbox, complete folders, folder trees.
+   Then `forgetSyncPositions()`: the cache predates conversations, so, as for an older database, every folder syncs
+   once more from the start and the imported mail learns its conversation.
 4. Write everything into `Mail.sqlite.importing` (old leftovers removed first) and check the row count.
 5. Refuse if `Mail.sqlite` exists meanwhile; else move the temp file into place and reopen it.
 6. Rename `Cache.json` to `Cache.json.imported`. Interrupted before that, the next launch imports again.
