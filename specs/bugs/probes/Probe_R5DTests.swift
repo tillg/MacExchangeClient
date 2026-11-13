@@ -30,21 +30,6 @@ struct Probe_R5D_Compose {
         #expect(to == "me@work.com", "Reply All To is \(to.debugDescription)")
     }
 
-    /// R5D-03: a U+FFFC in the original's text is quoted text, not a file mark: the forwarded original's picture
-    /// must not be placed (sent inline) at the quoted character, and Exclude Attachments must not cut the quote.
-    @Test func objectReplacementCharInQuoteIsNotAFileMark() async {
-        let m = msg(body: "Look \u{FFFC} here", attachments: [MailModel.Attachment(name: "a.png", size: 4, contentType: "image/png")])
-        let s = store([m])
-        s.downloadsFolder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        s.setAttachmentData([Data([1, 2, 3, 4])], for: m.id)
-        var d = s.draft(.forward, to: m.id)
-        await s.includeOriginalAttachments(in: &d)
-        #expect(d.attachments.count == 1)
-        #expect(d.placedPictures == [], "the original's picture is placed at the quoted U+FFFC: \(d.placedPictures)")
-        d.excludeOriginalAttachments()
-        #expect(d.body.contains("> Look \u{FFFC} here"), "Exclude Attachments changed the quoted text: \(d.body.debugDescription)")
-    }
-
     /// R5D-11: RFC 5322 §3.4 group syntax and a trailing comment are parsed to the real addresses.
     @Test func recipientGroupAndCommentSyntax() {
         let group = Contact.parseList("Team: a@x.com, b@y.com;").map(\.email)

@@ -116,6 +116,7 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
 - Reply rules (`draft(_:to:)`). Toolbar, menu bar and context menu go through `loadedDraft`, which first fetches the
   body of a message never opened (a server summary has names without addresses and no text), so the draft has the
   addresses and the quote; without a connection the draft is built from the summary.
+  - The quoted or forwarded text has U+FFFC (a draft's file mark) replaced by U+FFFD (BUG-188).
   - Subject gets "Re: " or "Fwd: ". A leading prefix of the same kind — `Re:`/`AW:` for replies, `Fwd:`/`Fw:`/`WG:`
     for forwards, any case, with or without one space after the colon — is replaced by it, not stacked. A prefix of
     the other kind stays (`FW: x` → `Re: FW: x`).
