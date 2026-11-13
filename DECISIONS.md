@@ -311,3 +311,12 @@ edited: 2026-11-13
 - **Why:** README: the upgrade sync is meant to refresh; a from-scratch SyncFolderItems pass enumerates every item in the folder, so anything it doesn't list is gone.
 - **Limit:** The noted IDs live in memory only. If the app quits in the middle of a from-scratch pass, the pass resumes from its saved token after relaunch and removes nothing at the end (ghosts from that window stay). Persisting the set (up to one ID per message) for a one-off upgrade wasn't worth a new table; restarting the pass from scratch on every relaunch could keep a big Sent folder from ever finishing.
 - **Alternatives:** Restart an interrupted pass from scratch (rejected, see above). Persist the ID set in a new table (rejected for now: size and write cost for a rare case).
+
+## 01:12 — A rejected sync token is dropped and the folder syncs from the start once {#d-bug-054}
+
+- **Status:** decided
+- **Context:** BUG-054. When Exchange answers SyncFolderItems with `ErrorInvalidSyncStateData`, the store kept the token and the `complete` mark, so every check of that folder failed the same way and it never got new mail.
+- **Decision:** `EWSBackend.sync` reports `ErrorInvalidSyncStateData` for a request that carried a token as `SyncTokenRejected` (a backend-neutral error next to `AuthenticationError`). The quick check, the history and the background checks of complete folders then forget that folder's token and `complete` mark. The folder syncs again from the start, and the BUG-053 rule removes what the complete pass doesn't list. A sync without a token is never reported as rejected, so a folder whose fresh sync also fails goes to the history's failed list for the session as before; there is no loop.
+- **`ErrorSyncFolderNotFound`:** not handled the same way. It means the folder itself is gone; syncing it again from the start fails the same way. That case belongs to the removed-folder bug (BUG-077).
+- **Why:** Microsoft's guidance for an invalid sync state is to sync again without one (⚠️ recalled).
+- **Alternatives:** Reset on any sync error (rejected: a network or throttling error would throw away a good token and re-download whole folders).

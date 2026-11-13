@@ -136,6 +136,13 @@ public struct SyncProgress: Equatable, Sendable {
     public init(text: String, fraction: Double?) { self.text = text; self.fraction = fraction }
 }
 
+/// The server no longer accepts a folder's sync token (expired or corrupt, e.g. after a mailbox move or restore).
+/// The store then forgets it, and the folder syncs again from the start.
+public struct SyncTokenRejected: Error, LocalizedError {
+    public init() {}
+    public var errorDescription: String? { "The server no longer accepts this folder's sync position" }
+}
+
 /// The server rejected the credentials. Backends throw this so the store stops retrying: repeated
 /// wrong passwords lock domain accounts.
 public struct AuthenticationError: Error, LocalizedError {

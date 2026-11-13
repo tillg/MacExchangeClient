@@ -54,11 +54,16 @@ public struct EWSBackend: MailBackend {
 
     public func sync(_ folder: RemoteFolder, token: String?) async throws -> SyncResult {
         let state = token.map { "<m:SyncState>\(xmlEscape($0))</m:SyncState>" } ?? ""
-        let doc = try await client.call("""
-            <m:SyncFolderItems>\(Self.summaryShape)\
-            <m:SyncFolderId><t:FolderId Id="\(xmlEscape(folder.id))"/></m:SyncFolderId>\(state)\
-            <m:MaxChangesReturned>512</m:MaxChangesReturned></m:SyncFolderItems>
-            """)
+        let doc: XMLDocument
+        do {
+            doc = try await client.call("""
+                <m:SyncFolderItems>\(Self.summaryShape)\
+                <m:SyncFolderId><t:FolderId Id="\(xmlEscape(folder.id))"/></m:SyncFolderId>\(state)\
+                <m:MaxChangesReturned>512</m:MaxChangesReturned></m:SyncFolderItems>
+                """)
+        } catch let e as EWSError where token != nil && e.code == "ErrorInvalidSyncStateData" {
+            throw SyncTokenRejected()  // expired or corrupt: the store syncs the folder again from the start
+        }
         return Self.parseSync(doc)
     }
 

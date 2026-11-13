@@ -642,6 +642,13 @@ public final class MailStore {
         if complete { prune() }
     }
 
+    /// The server rejected the folder's token: it is forgotten and the folder syncs again from the start. That
+    /// happens once: a sync without a token can't be rejected for it. The complete pass then removes what is gone.
+    private func resetSync(_ account: UUID, _ mailbox: MailboxKind) {
+        syncTokens[key(account, mailbox)] = nil
+        complete.remove(key(account, mailbox))
+    }
+
     /// Removes what a completed from-scratch pass didn't list: deleted or moved away on the server meanwhile.
     /// A message with a change still queued stays until that change is done (`drain` calls this again).
     private func prune() {
@@ -1219,11 +1226,15 @@ public final class MailStore {
                 for role in quickCheckRoles(acct) {
                     guard let folder = remoteFolders[acct]?.first(where: { $0.role == role }) else { continue }
                     if isComplete(acct, role) {
-                        var more = true
-                        while more {
-                            let r = try await backend.sync(folder, token: syncToken(acct, role))
-                            apply(r, account: acct, mailbox: role)
-                            more = r.more
+                        do {
+                            var more = true
+                            while more {
+                                let r = try await backend.sync(folder, token: syncToken(acct, role))
+                                apply(r, account: acct, mailbox: role)
+                                more = r.more
+                            }
+                        } catch is SyncTokenRejected {
+                            resetSync(acct, role)
                         }
                     } else {
                         merge(try await backend.newest(in: folder, limit: Self.firstScreen), account: acct, mailbox: role)
@@ -1325,6 +1336,9 @@ public final class MailStore {
                     token = r.token
                 } while pages.last?.more == true && start.duration(to: .now) < Self.historyBatch
             } catch where pauseIfSignInFailed(error, account: acct) {
+            } catch is SyncTokenRejected {
+                pages = []  // the pass starts over; nothing of the old one is applied
+                resetSync(acct, folder.role)
             } catch is URLError {
                 return
             } catch {
@@ -1345,6 +1359,8 @@ public final class MailStore {
                         apply(r, account: acct, mailbox: role)
                         more = r.more
                     }
+                } catch is SyncTokenRejected {
+                    resetSync(acct, role)  // synced from the start by the next history run
                 } catch {
                     if pauseIfSignInFailed(error, account: acct) || error is URLError { break }
                 }

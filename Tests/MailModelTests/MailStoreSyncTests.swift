@@ -151,4 +151,51 @@ struct MailStoreSyncTests {
         #expect(inbox(s) == ["A"])
         #expect(s.selection.isEmpty)
     }
+
+    // MARK: A sync token the server rejects (BUG-054)
+
+    func syncError(_ code: String) -> String {  // file:// fixture
+        envelope("<m:SyncFolderItemsResponse><m:ResponseMessages><m:SyncFolderItemsResponseMessage ResponseClass=\"Error\">"
+                 + "<m:MessageText>\(code) text</m:MessageText><m:ResponseCode>\(code)</m:ResponseCode>"
+                 + "<m:DescriptiveLinkKey>0</m:DescriptiveLinkKey></m:SyncFolderItemsResponseMessage></m:ResponseMessages>"
+                 + "</m:SyncFolderItemsResponse>")
+    }
+
+    func store(answering xml: String) throws -> MailStore {
+        let s = MailStore(accounts: [], messages: [])
+        s.add(work, backend: backend(try responseFile(xml)))  // file:// fixture
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .sent, id: "SENT")], account: work.id)
+        return s
+    }
+
+    /// The backend reports a rejected token as `SyncTokenRejected`, not as any server error.
+    @Test func rejectedSyncStateIsReportedAsSuch() async throws {
+        let b = backend(try responseFile(syncError("ErrorInvalidSyncStateData")))  // file:// fixture
+        await #expect(throws: SyncTokenRejected.self) { _ = try await b.sync(RemoteFolder(role: .inbox, id: "INBOX"), token: "OLD") }
+        // Without a token there is nothing to reject: the server's error comes through as it is.
+        await #expect(throws: EWSError.self) { _ = try await b.sync(RemoteFolder(role: .inbox, id: "INBOX"), token: nil) }
+    }
+
+    /// The quick check of a complete folder whose token Exchange rejects drops it, so the folder syncs again from
+    /// the start instead of failing on every check.
+    @Test func rejectedSyncStateIsDroppedByTheQuickCheck() async throws {
+        let s = try store(answering: syncError("ErrorInvalidSyncStateData"))
+        s.apply(page(["A"], token: "OLD"), account: work.id, mailbox: .inbox)
+        await s.refresh(history: false)
+        await s.refresh(history: false)
+        #expect(s.syncToken(work.id, .inbox) == nil, "status: \(s.status ?? "")")
+        #expect(!s.isComplete(work.id, .inbox))
+        #expect(inbox(s) == ["A"], "mail stays until the new pass is complete")
+    }
+
+    /// The same in the history (a folder in the middle of its sync) and in the background checks of complete
+    /// folders. Once the token is gone the history doesn't retry the same failure forever.
+    @Test(.timeLimit(.minutes(1))) func rejectedSyncStateIsDroppedByTheHistory() async throws {
+        let s = try store(answering: syncError("ErrorInvalidSyncStateData"))
+        s.apply(page(["A"], token: "MID", more: true), account: work.id, mailbox: .inbox)
+        s.apply(page(["S"], token: "OLD"), account: work.id, mailbox: .sent)
+        await s.syncHistory()
+        #expect(s.syncToken(work.id, .inbox) == nil)
+        #expect(s.syncToken(work.id, .sent) == nil && !s.isComplete(work.id, .sent))
+    }
 }

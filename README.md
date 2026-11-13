@@ -92,7 +92,7 @@ Messages are still all held in memory, and the list and counts work on that, as 
 
 What's on screen comes first:
 
-1. **Quick check:** every 15 seconds, and at once when you select a mailbox. It covers only the Inbox and the selected mailbox. A fully synced folder is asked only for changes, one small request of about 0.05s. A folder still syncing gets its newest 50 messages, about 0.1s.
+1. **Quick check:** every 15 seconds, and at once when you select a mailbox. It covers only the Inbox and the selected mailbox. A fully synced folder is asked only for changes, one small request of about 0.05s. If Exchange no longer accepts the folder's sync position (`ErrorInvalidSyncStateData`, e.g. after a mailbox move), the folder syncs once more from the start. A folder still syncing gets its newest 50 messages, about 0.1s.
 2. **Bodies:** loaded when you open a message.
 3. **History, in the background:** first the newest 200 messages of every folder. Then each folder's full contents, one page of 512 at a time. The selected mailbox goes first, your own folders come after the standard ones, and Sent comes last. While it runs, the sidebar shows "Synchronizing “Exchange”" with a progress bar based on the server's message counts. It never holds up the quick check.
 
