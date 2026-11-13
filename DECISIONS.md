@@ -18,6 +18,7 @@ edited: 2026-11-13
   - [14:40 — BUG-194 deferred: its fix contradicts an existing test](#run-2026-11-13-1235-8)
   - [14:38 — Keychain items keyed "user@host", old username-only items still read](#run-2026-11-13-1235-9)
   - [14:48 — The compose wishes get their own change spec, in four shippable parts](#run-2026-11-13-1235-10)
+  - [15:24 — The daily app bundle holds a debug build; not rebuilt or relaunched by the run](#run-2026-11-13-1235-11)
 
 # 2026-11-12 23:16 — Unattended bug-fix run {#run-2026-11-12-2316}
 
@@ -1009,3 +1010,12 @@ edited: 2026-11-13
 - **Why:** a different window and code; one spec per feature keeps each reviewable. Building them wasn't asked for, and part 4 reverses README's "Not planned: rich-text compose", which the user should see first.
 - **Alternatives:** one combined spec (mixes unrelated work); start building part 1/2 now (not asked).
 - **Consequences:** the user reviews both specs; `/spec:apply` can build them later.
+
+## 15:24 — The daily app bundle holds a debug build; not rebuilt or relaunched by the run {#run-2026-11-13-1235-11}
+
+- **Status:** open
+- **Context:** at 13:35 a compile check used `./run.sh build`, which copied a debug binary into `.build/MailReplica.app`, the bundle the user's running app (a release build, started earlier) came from. The running process kept working.
+- **Question:** rebuild the release bundle now, or leave it?
+- **Decision:** leave it; no relaunch, no `./run.sh release` by the run (it would also launch the app against the real account). Compile checks since then use `swift build --product MailReplica` only; CLAUDE.md now says so.
+- **Why:** launching the app connects to the user's real Exchange account; that's the user's call.
+- **Consequences:** the user runs `./run.sh release` when back. The first launch adds the `reply_to` column and marks loaded bodies to be fetched once more when opened (BUG-186), and stores new passwords per server (BUG-252; the old item is still read).
