@@ -664,10 +664,12 @@ public final class MailStore {
     private func keepingSelectionVisible(_ ids: Set<Message.ID>, selectNext: Bool = true, _ body: () -> Void) {
         guard !selection.isDisjoint(with: ids) else { body(); return }
         // A selected message is on screen through its conversation row, which may stand for a newer message (BUG-155).
+        // The rows from before the action (already built) are enough: the message is still on screen if it or the
+        // message its row stood for is still listed. Rebuilding the rows here would slow every action.
         let list = visibleMessages.map(\.id), before = selection, rowBefore = threads.rowOf
         body()
-        let remaining = Set(visibleMessages.map(\.id)), rowAfter = threads.rowOf
-        let gone = before.intersection(ids).filter { !remaining.contains(rowAfter[$0] ?? $0) }
+        let remaining = Set(visibleMessages.map(\.id))
+        let gone = before.intersection(ids).filter { !remaining.contains($0) && !remaining.contains(rowBefore[$0] ?? $0) }
         guard !gone.isEmpty, selection == before else { return }
         let rows = Set(before.map { rowBefore[$0] ?? $0 })
         selection = gone == before && selectNext ? Self.following(rows, in: list, remaining: remaining) ?? [] : before.subtracting(gone)
