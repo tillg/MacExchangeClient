@@ -1346,7 +1346,8 @@ public final class MailStore {
             self.messages[i].invite?.reply = reply
             self.messages[i].mailbox = .trash
         }
-        if selection == [id] { actOnSelection(apply) } else { apply([id]) }
+        // One of several selected: it leaves the selection with its move, so Delete can't erase it from Trash unseen.
+        if selection == [id] { actOnSelection(apply) } else { keepingSelectionVisible([id]) { apply([id]) } }
         guard let rid = old.remoteID else { return }
         outbox.append(PendingChange(account: old.accountID, change: change(rid), previous: [old]))
         scheduleFlush()

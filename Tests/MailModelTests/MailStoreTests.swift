@@ -1035,6 +1035,24 @@ struct MailStoreTests {
         #expect(s.status?.contains("no longer set up") == true, "status: \(s.status ?? "nil")")
     }
 
+    /// An invite answered while it is one of several selected messages (Send in the comment window after selecting
+    /// more in the main window) leaves the selection with its move to Trash, so Delete can't erase it unseen (BUG-099).
+    @Test func inviteAnsweredInAMultiSelectionLeavesTheSelection() {
+        var inv = remote("INV", minutesAgo: 2)
+        inv.invite = Invite(start: .now, end: .now.addingTimeInterval(1800))
+        let s = store([])
+        s.apply(SyncResult(upserts: [inv, remote("X", minutesAgo: 1), remote("Y")], deletedRemoteIDs: [], token: "t", more: false),
+                account: work.id, mailbox: .inbox)
+        let invID = id(s, "INV"), x = id(s, "X")
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.selection = [invID, x]
+        s.respond(InviteReply(response: .accept, comment: "ok"), to: invID)
+        #expect(s.message(invID)?.mailbox == .trash)
+        #expect(s.selection == [x])
+        s.deleteSelection()
+        #expect(s.message(invID)?.mailbox == .trash, "Delete erased the answered invite from Trash")
+    }
+
     /// Inline images can be megabytes: only the message on screen keeps them, in memory, never in the cache.
     @Test func inlineImagesAreKeptForTheShownMessageOnly() {
         let s = store([msg(work), msg(work)])
