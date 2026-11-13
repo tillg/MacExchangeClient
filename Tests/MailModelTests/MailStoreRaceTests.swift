@@ -444,5 +444,20 @@ struct MailStoreRaceTests {
         #expect(s.previewItem?.lastPathComponent == "b.txt" && s.previewItems.map(\.lastPathComponent) == ["b.txt"],
                 "previewItems \(s.previewItems.map(\.lastPathComponent))")
     }
+
+    /// BUG-223: Settings ▸ Accounts ▸ Sign In again after a wrong password lifts the pause (`add`, d-bug-056), and the
+    /// next check works; the status line still says sign-in failed and nothing is sent until relaunch.
+    @Test func signingInAgainClearsTheSignInFailedNotice() async throws {
+        let server = RaceServer([RX.sync("", token: "T1")])
+        defer { server.stop() }
+        let s = store(server)
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], token: "T0", more: false), account: acct.id, mailbox: .inbox)
+        _ = s.pauseIfSignInFailed(AuthenticationError(), account: acct.id)  // what a 401 at a check does
+        let notice = try #require(s.status)
+        s.add(acct, backend: EWSBackend(client: EWSClient(url: server.url, username: "u", password: "p")))  // AccountsSettings.signIn → AppSetup.connect
+        await s.refresh(history: false)  // AccountsSettings.signIn then checks
+        try #require(!s.isPaused(acct.id) && server.served == 1, "check didn't run: \(server.served)")
+        #expect(s.status != notice, "after signing in again and a successful check the status still says: \(s.status ?? "nil")")
+    }
 }
 }

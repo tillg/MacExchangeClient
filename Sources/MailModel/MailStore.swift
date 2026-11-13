@@ -1498,8 +1498,9 @@ public final class MailStore {
     func pauseIfSignInFailed(_ error: Error, account acct: UUID) -> Bool {
         guard error is AuthenticationError else { return false }
         paused.insert(acct)
-        status = "Sign-in to “\(account(acct)?.name ?? "")” failed. Update the password in the Keychain "
-            + "(MailReplica-EWS), then relaunch. Nothing is sent until then."
+        // A connection notice of the account, so a successful check after signing in again clears it (BUG-223).
+        connectionNotice("Sign-in to “\(account(acct)?.name ?? "")” failed. Update the password in the Keychain "
+            + "(MailReplica-EWS), then relaunch. Nothing is sent until then.", account: acct)
         return true
     }
 
