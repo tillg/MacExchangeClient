@@ -670,6 +670,7 @@ public final class MailStore {
     /// while it has no backend (no password).
     public func removeLocalAccounts() {
         let local = Set(accounts.filter { !$0.isServer && backends[$0.id] == nil }.map(\.id))
+        guard !local.isEmpty else { return }  // nothing to remove: the view stays as it is
         accounts.removeAll { local.contains($0.id) }
         messages.removeAll { local.contains($0.accountID) && $0.remoteID == nil }
         selection = []

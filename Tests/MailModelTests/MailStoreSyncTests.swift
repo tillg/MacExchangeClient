@@ -288,6 +288,18 @@ struct MailStoreSyncTests {
         #expect(s.messages.allSatisfy { m in s.accounts.contains { $0.id == m.accountID } })
     }
 
+    /// Signing in a further account when no sample account is left keeps the mailbox and message being read (BUG-088).
+    @Test func removeLocalAccountsWithNothingLocalKeepsTheView() {
+        let s = MailStore(accounts: [exchange], messages: [])
+        var r = remote("R1"); r.mailbox = .sent
+        s.merge([r], account: exchange.id, mailbox: .sent)
+        s.selectedMailbox = .account(exchange.id, .sent)
+        s.selection = [s.messages[0].id]
+        s.removeLocalAccounts()
+        #expect(s.selectedMailbox == .account(exchange.id, .sent))
+        #expect(s.selection == [s.messages[0].id])
+    }
+
     /// Its draft kept after a failed send stays too.
     @Test func removeLocalAccountsKeepsTheDraftsOfAnExchangeAccountWithoutPassword() {
         let s = MailStore(accounts: [exchange, home], messages: [])

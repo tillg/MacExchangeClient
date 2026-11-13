@@ -816,3 +816,9 @@ edited: 2026-11-13
 - **Decision:** `searchHits` also keeps the scope it was asked for, and the list filters the hits by that scope until the next answer. For about 150 ms plus the query, the list still shows the previous account's results.
 - **Why:** fast-search spec §4: keep the previous results while the next answer is on its way, never flash an empty list.
 - **Alternatives:** show the new mailbox's normal content meanwhile (rejected: a flash of other content, and "No Results" when it's empty).
+
+## 06:45 — Signing in another account keeps the view when no sample account goes {#d-bug-088}
+
+- **Status:** decided
+- **Context:** BUG-088. `removeLocalAccounts()` reset the selection and jumped to All Inboxes even when there was no sample account to remove.
+- **Decision:** With nothing to remove it returns at once; when sample accounts go, the reset stays as before (their messages and mailboxes are gone).
