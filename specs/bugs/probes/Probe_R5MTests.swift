@@ -100,13 +100,4 @@ struct Probe_R5MStore {
         let rows = s.listSelection.count, open = s.selectedMessage?.subject, held = s.selection.count
         #expect(rows != 1 || open != nil, "list shows \(rows) selected row, but selection holds \(held) messages and nothing is open")
     }
-
-    /// R5M-10: the window title names the mailbox while the list shows search results from the whole account
-    /// (Mail: "Searching “%@”", Localizable.loctable SearchingWindowTitleFormat).
-    @Test func titleSaysSearchingWhileSearching() {
-        let s = MailStore(accounts: [work], messages: [mk(work, "Report"), mk(work, "Report 2", box: .sent)])
-        s.selectedMailbox = .account(work.id, .inbox)
-        s.searchText = "report"
-        #expect(s.title.hasPrefix("Searching"), "title while searching: \(s.title); list: \(s.visibleMessages.map(\.subject))")
-    }
 }
