@@ -215,7 +215,7 @@ Labels used in the chapters:
 - **Priority:** HIGH
 - **Who has it:** Mail (View ▸ Bcc Address Field, ⌥⌘B) · Outlook (Bcc field in the compose window)
 - **What it is (ELI5):** "Bcc" is a secret copy. Everyone in To and Cc sees each other, but nobody sees who is in Bcc. Useful when you write to many people who shouldn't see each other's addresses.
-- **What we have today:** Only To and Cc. There is no way to send a hidden copy. (Mail also has a **Reply-To** field, View ▸ Reply-To Address Field, ⌥⌘R, to ask answers to go to another address; we don't have that either.)
+- **What we have today:** Only To and Cc. There is no way to send a hidden copy. *Specced:* [`compose-like-mail`](../specs/changes/compose-like-mail/README.md) part 2. (Mail also has a **Reply-To** field, View ▸ Reply-To Address Field, ⌥⌘R, to ask answers to go to another address; we don't have that either.)
 - **Picture:**
 
   ```
@@ -229,7 +229,7 @@ Labels used in the chapters:
 - **Priority:** HIGH
 - **Who has it:** Mail (Format menu: Bold ⌘B, Italic ⌘I, Underline ⌘U, Lists, Alignment, Indentation, fonts and colors; Edit ▸ Add Link… ⌘K; Format ▸ Make Rich Text ⇧⌘T) · Outlook (the formatting ribbon)
 - **What it is (ELI5):** Making words **bold**, *slanted*, coloured or bigger, adding bullet lists and clickable links, like in a word processor. It helps people see what is important.
-- **What we have today:** Plain text only. Pictures can go in the text, but no bold, lists or links. *Not planned* for now (README: "rich-text compose").
+- **What we have today:** Plain text only. Pictures can go in the text, but no bold, lists or links. The README says *Not planned* ("rich-text compose"), but the user asked for it on 2026-11-13: *Specced:* [`compose-like-mail`](../specs/changes/compose-like-mail/README.md) part 4.
 - **Picture:**
 
   ```
@@ -803,7 +803,7 @@ Labels used in the chapters:
 - **Priority:** MEDIUM
 - **Who has it:** Mail (click a name: address, Add to Contacts, Add to VIPs, Copy Address, New Email ⚠️; Settings ▸ Viewing: Use Smart Addresses) · Outlook (contact card with phone, office, manager ⚠️)
 - **What it is (ELI5):** Click on a sender's name to see who they are: email address, phone, job title, and buttons like "write a new mail" or "copy address".
-- **What we have today:** The header is text you can select and copy, but a name can't be clicked: no card, no buttons.
+- **What we have today:** The header is text you can select and copy, but a name can't be clicked: no card, no buttons. Showing names from Contacts while writing is *specced:* [`compose-like-mail`](../specs/changes/compose-like-mail/README.md) part 3.
 - **Picture:**
 
   ```

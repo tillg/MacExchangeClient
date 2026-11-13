@@ -1,8 +1,19 @@
 # Bug list
 
-Found 2026-11-12 by probe tests. Each bug file has its repro test and the failure output. All probes are in `probes/`. To run them, copy them into `Tests/MailModelTests/` and run with `--filter Probe_`. Each bug cites at least one failing probe; a few passing probes are controls. They stay out of the main suite.
+Open bugs, each with its repro and the failure output. Found by probe tests: round 4 on 2026-11-12, round 5 on
+2026-11-13 (BUG-154…255, 102 bugs from 14 hunters in areas: conversations, EWS sync and requests, search and storage,
+rendering and compose, UI snapshots, the view layer, scale and races, dates and zones, text and encoding, attachments,
+folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are removed from this list; see git log
+(`git log --grep BUG-`) and DECISIONS.md.
 
-Limits: results are store-level only, and the app wasn't run. Mail.app expectations marked ⚠️ are recalled, not checked. Some EWS items use response shapes not confirmed on the live server. Sync with the server is untested: there is no backend double and mocks aren't allowed.
+- **Probes** are in `probes/` (`Probe_R5*Tests.swift` for round 5). To run them, copy one into `Tests/MailModelTests/`
+  and run with `--filter Probe_R5…`; they stay out of the main suite. A few passing probes are controls.
+- **View-layer bugs** use the harness in `probes-views/` (`run-harness.sh build`, then a scenario), which runs the
+  app's real views with sample data, no account and no network.
+- **UI-only bugs** cite a `tools/snapshot.sh` command and a PNG in `png/`.
+- Priorities: P1 data loss/crash/security, P2 wrong in everyday use, P3 visible edge case, P4 cosmetic or rare.
+  Expectations marked ⚠️ are recalled, not checked. Sync is tested over a loopback server with scripted EWS answers
+  (no mocks); some response shapes are not confirmed on a live server.
 
 | # | Priority | Area | Title |
 |---|---|---|---|
