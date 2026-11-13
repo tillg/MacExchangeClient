@@ -584,3 +584,11 @@ edited: 2026-11-13
 - **Why:** README: local changes are shown at once and written to Exchange; the server's state after the write equals the local one, so no answer older than the write may undo it. A counter, not a clock: the order of events on the main actor is what matters.
 - **Not covered:** `written` is kept for the session (one small entry per written message and property; a Mark All as Read of 70,000 adds 70,000) and not saved; an answer in flight while the app quits doesn't matter, since it is lost too.
 - **Alternatives:** Keep protection for a fixed time after the write (rejected: guesses at network timing). Drop answers that overlap any write (rejected: on a busy account the quick check would rarely apply).
+
+## 02:49 — A cloud attachment opens as a web location {#d-bug-145}
+
+- **Status:** decided
+- **Context:** BUG-145. A `ReferenceAttachment` (OneDrive/SharePoint link) was listed as a file whose every open failed with "no content". ⚠️ The client asks for Exchange 2013 SP1, so an on-prem server may never return one.
+- **Decision:** It is listed as "Name.webloc"; its content is an Internet location file (`URL` = `AttachLongPathName`), so double-click opens the link in the browser, and Save/Forward/drag give a link file. Only http/https links; anything else stays "no content".
+- **Why:** the smallest behaviour that is honest and useful, with no UI change: the file's name and icon say it is a link.
+- **Alternatives:** Leave it out of the list (rejected: the user wouldn't know it exists). A status "This is a link to a cloud file" (rejected: a dead end again).

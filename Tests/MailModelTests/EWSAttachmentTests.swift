@@ -89,6 +89,38 @@ struct EWSAttachmentTests {
         #expect(m.hasAttachments)
     }
 
+    /// A cloud attachment (ReferenceAttachment, a OneDrive/SharePoint link) opens as an Internet location file,
+    /// which takes the user to the link, instead of failing with "no content".
+    @Test func referenceAttachmentOpensItsLink() async throws {
+        func item(_ link: String) -> String {
+            """
+            <t:Message><t:ItemId Id="M" ChangeKey="CK"/><t:Body BodyType="Text">Hi</t:Body><t:Attachments>\
+            <t:ReferenceAttachment><t:AttachmentId Id="AT1"/><t:Name>Budget.xlsx</t:Name><t:Size>0</t:Size>\
+            <t:IsInline>false</t:IsInline><t:AttachLongPathName>\(link)</t:AttachLongPathName>\
+            <t:ProviderType>OneDrivePro</t:ProviderType></t:ReferenceAttachment></t:Attachments></t:Message>
+            """
+        }
+        let s = try fileStore(getItem(item("https://contoso.sharepoint.com/Budget.xlsx")))
+        s.merge([Message(accountID: acct.id, mailbox: .inbox, from: Contact(name: "Ann", email: "ann@x.com"),
+                         to: [Contact(name: "Me", email: "me@work.com")], subject: "S M", body: "",
+                         date: Date(timeIntervalSince1970: 1_000_000), remoteID: "M", hasAttachments: true)],
+                account: acct.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        await s.loadBody(id)
+        #expect(s.message(id)?.attachments.map(\.name) == ["Budget.xlsx.webloc"])
+        let url = try #require(await s.attachmentFile(0, of: id), "open: \(s.status ?? "")")
+        let plist = try PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: String]
+        #expect(plist?["URL"] == "https://contoso.sharepoint.com/Budget.xlsx")
+
+        // Only web links: anything else (a file:// or app link) is not made into something that opens.
+        func content(_ link: String) throws -> Data? {
+            EWSBackend.parseAttachmentContent(try doc("<m:Attachments><t:ReferenceAttachment><t:AttachLongPathName>"
+                + link + "</t:AttachLongPathName></t:ReferenceAttachment></m:Attachments>"))
+        }
+        #expect(try content("https://x.example/a") != nil)
+        #expect(try content("file:///Applications/Calculator.app") == nil)
+    }
+
     /// Files listed only now (inline non-pictures, unnamed ones) come after the others, so the positions stored
     /// with earlier bodies still fetch the same files.
     @Test func newlyListedFilesComeLast() throws {

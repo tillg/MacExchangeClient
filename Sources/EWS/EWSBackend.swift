@@ -145,6 +145,10 @@ public struct EWSBackend: MailBackend {
                 let ext = isMessage ? nil : type.flatMap { UTType(mimeType: $0)?.preferredFilenameExtension }
                 name = "Attachment" + (ext.map { "." + $0 } ?? "")
             }
+            // A cloud file (OneDrive, SharePoint) is a link: it opens as an Internet location, in the browser.
+            if a.localName == "ReferenceAttachment" {
+                return (a.child("AttachmentId")?.attr("Id"), Attachment(name: name + ".webloc", contentType: nil))
+            }
             let file = isMessage && !name.lowercased().hasSuffix(".eml") ? name + ".eml" : name
             return (a.child("AttachmentId")?.attr("Id"),
                     Attachment(name: file, size: a.text("Size").flatMap { Int($0) }, contentType: type))
@@ -161,10 +165,18 @@ public struct EWSBackend: MailBackend {
     /// the files or messages attached inside an attached message.
     static func parseAttachmentContent(_ doc: XMLDocument) -> Data? {
         guard let a = doc.first("Attachments")?.elementChildren.first else { return nil }
+        if a.localName == "ReferenceAttachment" { return a.text("AttachLongPathName").flatMap(webloc) }
         let b64 = a.localName == "ItemAttachment"
             ? a.elementChildren.lazy.compactMap { $0.child("MimeContent")?.stringValue }.first
             : a.child("Content")?.stringValue
         return b64.flatMap { Data(base64Encoded: $0, options: .ignoreUnknownCharacters) }
+    }
+
+    /// An Internet location file (.webloc) for a web link; nil for any other kind of link.
+    static func webloc(_ link: String) -> Data? {
+        guard let url = URL(string: link.trimmingCharacters(in: .whitespacesAndNewlines)),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+        return try? PropertyListSerialization.data(fromPropertyList: ["URL": url.absoluteString], format: .xml, options: 0)
     }
 
     static func attachmentRequest(_ ids: [String]) -> String {
