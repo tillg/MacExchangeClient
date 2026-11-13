@@ -193,6 +193,32 @@ struct EWSParsingTests {
         #expect(EWSBackend.listedAttachments(item).map(\.id) == ["A1", "A3"])
     }
 
+    /// An attachment Exchange flags inline that the body never shows (text body, no cid: reference) is listed,
+    /// so it can be seen and saved.
+    @Test func inlineAttachmentNotReferencedIsListed() throws {
+        let d = try doc("""
+            <t:Message><t:ItemId Id="A"/><t:Body BodyType="Text">See the attached scan.</t:Body>
+            <t:Attachments><t:FileAttachment><t:AttachmentId Id="AT1"/><t:Name>scan.pdf</t:Name>
+            <t:ContentType>application/pdf</t:ContentType><t:ContentId>3A1F@apple</t:ContentId><t:Size>1234</t:Size>
+            <t:IsInline>true</t:IsInline></t:FileAttachment></t:Attachments></t:Message>
+            """)
+        let b = EWSBackend.parseBody(d.first("Message")!)
+        #expect(b.attachments.map(\.name) == ["scan.pdf"])
+    }
+
+    /// Inline files that aren't pictures come after the others, so a body stored before keeps its positions;
+    /// a generic type is judged by the name.
+    @Test func inlineFilesAreListedAfterTheOthers() throws {
+        let d = try doc("""
+            <t:Message><t:ItemId Id="A"/><t:Body BodyType="Text">Hi</t:Body><t:Attachments>
+            <t:FileAttachment><t:AttachmentId Id="I1"/><t:Name>notes.pdf</t:Name><t:ContentType>application/octet-stream</t:ContentType><t:IsInline>true</t:IsInline></t:FileAttachment>
+            <t:FileAttachment><t:AttachmentId Id="I2"/><t:Name>photo.jpg</t:Name><t:ContentType>application/octet-stream</t:ContentType><t:IsInline>true</t:IsInline></t:FileAttachment>
+            <t:FileAttachment><t:AttachmentId Id="F1"/><t:Name>report.docx</t:Name><t:IsInline>false</t:IsInline></t:FileAttachment>
+            </t:Attachments></t:Message>
+            """)
+        #expect(EWSBackend.listedAttachments(try #require(d.first("Message"))).map(\.id) == ["F1", "I1"])
+    }
+
     @Test func attachmentContentAsksForMimeAndReadsFilesAndMessages() throws {
         let req = try request(EWSBackend.attachmentContentRequest("A&1"))
         #expect(req.first("IncludeMimeContent")?.stringValue == "true")

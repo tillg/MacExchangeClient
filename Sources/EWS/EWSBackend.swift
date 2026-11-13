@@ -128,11 +128,16 @@ public struct EWSBackend: MailBackend {
         return data
     }
 
-    /// The attachments shown below a message, in order, with the IDs to fetch them. Inline ones (signature
-    /// logos and the like) are left out; an attached message is listed as a .eml file.
+    /// The attachments shown below a message, in order, with the IDs to fetch them. Inline pictures (signature
+    /// logos and the like) are left out; an attached message is listed as a .eml file. An inline file that isn't a
+    /// picture is listed too, since only pictures are placed in the body. Those come last, so the positions of the
+    /// other files stay as they were in bodies stored before.
     static func listedAttachments(_ item: XMLNode) -> [(id: String?, attachment: Attachment)] {
-        (item.child("Attachments")?.elementChildren ?? []).compactMap { a in
-            guard a.text("IsInline") != "true", let name = a.child("Name")?.stringValue else { return nil }
+        let all = item.child("Attachments")?.elementChildren ?? []
+        let inline = all.filter { $0.text("IsInline") == "true" }
+        let shown = all.filter { $0.text("IsInline") != "true" } + inline.filter { !isPicture($0) }
+        return shown.compactMap { a in
+            guard let name = a.child("Name")?.stringValue else { return nil }
             let isMessage = a.localName == "ItemAttachment"
             let file = isMessage && !name.lowercased().hasSuffix(".eml") ? name + ".eml" : name
             return (a.child("AttachmentId")?.attr("Id"),
@@ -176,6 +181,16 @@ public struct EWSBackend: MailBackend {
             images[cid] = InlineImage(contentType: type, data: data)
         }
         return images
+    }
+
+    /// A file the body can show in place: an image type, or a generic one whose name isn't of another kind.
+    static func isPicture(_ a: XMLNode) -> Bool {
+        guard a.localName == "FileAttachment" else { return false }
+        let type = a.text("ContentType")?.lowercased() ?? ""
+        if type.hasPrefix("image/") { return true }
+        guard isGeneric(type) else { return false }
+        let ext = ((a.text("Name") ?? "") as NSString).pathExtension
+        return UTType(filenameExtension: ext).map { $0.conforms(to: .image) || !$0.isDeclared } ?? true
     }
 
     /// A content type that says nothing about the content.

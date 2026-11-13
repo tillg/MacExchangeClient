@@ -544,3 +544,11 @@ edited: 2026-11-13
 - **Context:** BUG-108. Body padding and `position: absolute` content were outside the measured box. The padding case was already fixed by measuring the root box (d-bug-064).
 - **Decision:** `HTMLPage.measureScript` takes the larger of the root box's bottom and the body's top plus its `scrollHeight` and bottom margin (plus `scrollY`). Both terms are independent of the view's own height, so the view still shrinks when the window widens.
 - **Not covered:** absolutely placed content with no positioned ancestor (its containing block is the window, not the body), so the body's `scrollHeight` doesn't count it: seen in a scratch run as 84 pt measured for 316 pt drawn. `documentElement.scrollHeight` would count it but never drops below the view's height. Making the body `position: relative` would count it but shift such content by the body's margins, which Mail doesn't do.
+
+## 02:34 — Inline files that aren't pictures are listed, after the others {#d-bug-063}
+
+- **Status:** decided
+- **Context:** BUG-063. `listedAttachments` dropped everything with `IsInline` true. Only pictures are ever placed in the body (`inlineAttachmentIDs`), so an inline PDF (Apple Mail sends files inline) was neither listed nor shown. The existing tests pin that an inline picture in a text mail stays unlisted.
+- **Decision:** An inline attachment that isn't a picture (`image/` type, or generic type with an image or unknown extension) is listed. Such files come after the non-inline ones, not in server order.
+- **Why:** Attachments are fetched by position (`attachment(remoteID:index:)`) against the list stored with the body; appending keeps every stored position valid, inserting would open the wrong file for bodies loaded before.
+- **Not covered:** an inline picture the body doesn't reference (a text mail with an inline photo) stays unlisted, as the pinned tests require.
