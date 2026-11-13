@@ -40,3 +40,16 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [183](BUG-183-mailbox-menu-crash-7-accounts.md) | P2 | UI / MailCommands | With 7 or more accounts the app crashes building the Mailbox menu (⌘10 shortcut) |
 | [184](BUG-184-new-viewer-window-mirrors.md) | P3 | UI / MessageViewer | File ▸ New Viewer Window opens a second window that always shows the same mailbox and selection as the first |
 | [185](BUG-185-flagged-badge-unread.md) | P4 | UI / SidebarView | Flagged in the sidebar shows no count while flagged messages are read |
+| [186](BUG-186-reply-ignores-reply-to.md) | P2 | compose / EWS body | Reply and Reply All ignore the sender's Reply-To and go to From (e.g. noreply@) |
+| [187](BUG-187-reply-all-note-to-self-empty-to.md) | P4 | compose | Reply All to a note sent only to myself opens with an empty To |
+| [188](BUG-188-fffc-in-quoted-text-becomes-file-mark.md) | P3 | compose | A U+FFFC character in the original's text is taken for a file mark: the forwarded picture is sent inline there, Exclude Attachments deletes it from the quote |
+| [189](BUG-189-remote-content-missed-svg-imageset-base.md) | P3 | rendering / privacy | SVG <image href>, CSS image-set() and <base href> relative pictures are not seen as remote content: no banner, they can never be loaded |
+| [190](BUG-190-remote-content-missed-entity-encoded.md) | P3 | rendering / privacy | An entity-encoded web address (src="&#104;ttps://…") is not seen as remote content: no banner |
+| [191](BUG-191-video-never-loads-after-load-remote-content.md) | P4 | rendering | A web video counts as remote content, but Load Remote Content never loads it (no media-src in the policy) |
+| [192](BUG-192-overnight-invite-calendar-until-midnight.md) | P3 | invites | An invite that runs past midnight reads the calendar only until midnight: conflicts after 00:00 are never shown |
+| [193](BUG-193-attachment-filename-keeps-bidi-controls.md) | P3 | attachments / security | Attachment file names keep bidi overrides and line breaks ("invoice\u{202E}fdp.app" is shown reversed, as a .pdf) |
+| [194](BUG-194-dotfile-attachment-saved-hidden.md) | P4 | attachments | An attachment named ".something.pdf" is saved as a hidden file the user can't find |
+| [195](BUG-195-recipient-group-and-comment-syntax.md) | P4 | compose | Recipients written with RFC 5322 group syntax or a comment become invalid addresses ("Team: a@x.com", "a@x.com (Ann)") |
+| [196](BUG-196-content-id-not-a-msg-id.md) | P4 | compose / sent HTML | Placed pictures are sent with a Content-ID without "@" (bare UUID) |
+| [197](BUG-197-blocked-picture-source-broken-box.md) | P4 | rendering | With remote content blocked, <picture> with a web <source> and <input type=image> show WebKit's broken-image box |
+| [198](BUG-198-cid-in-entity-quoted-css-url.md) | P3 | rendering / inline images | An inline picture referenced as url(&quot;cid:…&quot;) (Outlook's style attributes) never shows |
