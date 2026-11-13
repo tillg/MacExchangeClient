@@ -617,6 +617,15 @@ struct EWSParsingTests {
         #expect(d.first("DeleteItem")?.attr("DeleteType") == "SoftDelete")
     }
 
+    /// BUG-216: Trash also lists deleted appointments and tasks. Exchange refuses DeleteItem for them without
+    /// SendMeetingCancellations / AffectedTaskOccurrences (optional for other items), so both are always sent;
+    /// erasing never sends a cancellation.
+    @Test func deleteWorksForAppointmentsAndTasks() throws {
+        let d = try #require(try request(EWSBackend.deleteRequest(["A"])).first("DeleteItem"))
+        #expect(d.attr("SendMeetingCancellations") == "SendToNone")
+        #expect(d.attr("AffectedTaskOccurrences") == "AllOccurrences")
+    }
+
     @Test func createRequestSendsOrSavesInSchemaOrder() throws {
         let draft = Draft(accountID: UUID(), to: "Ann <ann@x.com>, bob@x.com", cc: "c@x.com", subject: "S <1>", body: "B & C")
         let sent = try request(EWSBackend.createRequest(draft, send: true))
