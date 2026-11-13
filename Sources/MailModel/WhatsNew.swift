@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "If the server refuses to erase a message you deleted twice in a row, it comes back to Trash once, and you can erase or move it again.",
             "Exchange accounts are shown by their email address instead of all being called \"Exchange\", so you can tell two accounts apart.",
             "When Exchange can't open your Inbox for a moment, the window title says so and the app tries again at the next check, instead of not checking the Inbox until you restart.",
             "A draft changed on another device while you open it shows its new text, not the old text under the new subject.",

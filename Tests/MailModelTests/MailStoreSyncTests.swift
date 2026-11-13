@@ -940,4 +940,20 @@ struct MailStoreSyncTests {
         try d.write(s.takeChanges())
         #expect(try d.messages().compactMap(\.remoteID) == ["B"])
     }
+
+    /// Delete twice before anything is written: a move to Trash and an erase are queued. The move renames the
+    /// message; when the erase is then refused, the message comes back under its new ID, once (BUG-141).
+    @Test func refusedEraseAfterARenameBringsTheMessageBackWithItsNewID() {
+        let s = synced(["R1"])
+        let a = id(s, "R1")
+        s.delete([a])  // to Trash
+        s.delete([a])  // erase from Trash
+        #expect(s.outbox.map(\.change) == [.move(["R1"], to: .trash), .delete(["R1"])])
+        s.renameRemote(["R1": "T1"], account: work.id)  // the move's answer
+        s.failed(s.outbox[1], "Access is denied.")
+        #expect(s.message(a)?.remoteID == "T1")
+        var t1 = remote("T1"); t1.subject = "S R1"
+        s.apply(SyncResult(upserts: [t1], deletedRemoteIDs: [], token: "d1", more: false), account: work.id, mailbox: .trash)
+        #expect(s.count(.account(work.id, .trash)) == 1, "trash \(s.messages.filter { $0.mailbox == .trash }.compactMap(\.remoteID))")
+    }
 }

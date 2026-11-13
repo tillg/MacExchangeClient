@@ -1036,7 +1036,13 @@ public final class MailStore {
         for i in messages.indices where messages[i].accountID == account {
             if let rid = messages[i].remoteID, let new = map[rid] { messages[i].remoteID = new; changedIDs.insert(messages[i].id) }
         }
-        for i in outbox.indices where outbox[i].account == account { outbox[i].change = outbox[i].change.renamed(map) }
+        for i in outbox.indices where outbox[i].account == account {
+            outbox[i].change = outbox[i].change.renamed(map)
+            // The copies kept for undoing too: a refused erase puts the message back under the ID the server has now.
+            for j in outbox[i].previous.indices {
+                if let rid = outbox[i].previous[j].remoteID, let new = map[rid] { outbox[i].previous[j].remoteID = new }
+            }
+        }
     }
 
     /// The server refused a change: undo it locally. A message that couldn't be sent is kept in Drafts.
