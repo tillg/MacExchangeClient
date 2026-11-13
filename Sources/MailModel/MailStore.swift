@@ -2268,7 +2268,13 @@ public final class MailStore {
     /// added, `loadingOriginal` stays set (the message can't be sent or saved without them by accident) and
     /// `status` says which; the compose window offers to try again or to go on without them.
     public func includeOriginalAttachments(in draft: inout Draft) async {
-        guard let id = draft.loadingOriginal, let m = message(id) else { draft.loadingOriginal = nil; return }
+        guard let id = draft.loadingOriginal else { return }
+        // Gone meanwhile (deleted elsewhere): as for files that can't be loaded, the forward waits; never sent without
+        // them unasked (BUG-238).
+        guard let m = message(id) else {
+            status = "Couldn't add the original attachments: the original message is no longer available."
+            return
+        }
         if m.needsBody { await loadBody(id) }
         if Task.isCancelled { return }  // the compose window was closed: nothing to report
         guard let loaded = message(id), loaded.bodyLoaded, !(loaded.hasAttachments && loaded.attachments.isEmpty) else {

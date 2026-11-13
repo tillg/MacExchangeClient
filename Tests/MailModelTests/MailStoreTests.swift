@@ -1918,4 +1918,21 @@ struct MailStoreTests {
         s.searchText = "\u{200B}"
         #expect(Set(s.visibleMessages.map(\.id)) == [q3.id, other.id])
     }
+
+    /// BUG-238: the original of a forward goes away (deleted elsewhere) while its files load: the forward keeps
+    /// waiting for them, with a notice, so it isn't sent without them by accident (Try Again / Continue Without Them).
+    @Test func forwardOfVanishedOriginalKeepsWaitingForItsFiles() async {
+        var m = msg(work, subject: "Contract")
+        m.attachments = [Attachment(name: "contract.pdf", size: 500, contentType: "application/pdf")]
+        m.hasAttachments = true
+        let s = store([m])
+        var d = s.draft(.forward, to: m.id)
+        #expect(d.loadingOriginal == m.id)
+        s.delete([m.id]); s.delete([m.id])  // to Trash, then erased
+        #expect(s.message(m.id) == nil)
+        await s.includeOriginalAttachments(in: &d)
+        #expect(d.loadingOriginal == m.id)
+        #expect(d.attachments.isEmpty)
+        #expect(s.status?.contains("no longer available") == true)
+    }
 }
