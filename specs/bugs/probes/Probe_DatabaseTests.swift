@@ -32,25 +32,6 @@ struct Probe_DatabaseTests {
 
     // MARK: Round trips
 
-    @Test func probeSeparatorCharactersInContactNamesSurvive() throws {
-        var m = mail("sep", to: [Contact(name: "A\u{1E}B", email: "a@x.com"), Contact(name: "C", email: "c\u{1F}d@x.com")])
-        m.cc = [Contact(name: "Unit\u{1F}Sep", email: "u@x.com")]
-        let (_, url) = try db([m]); defer { cleanup(url) }
-        let back = try MailDatabase(url: url).messages()
-        #expect(back.first?.to == m.to)
-        #expect(back.first?.cc == m.cc)
-    }
-
-    @Test func probeSeparatorCharactersInAttachmentNamesSurvive() throws {
-        var m = mail("att")
-        m.attachments = [MailModel.Attachment(name: "report\u{1E}2026.pdf", size: 10, contentType: "application/pdf"),
-                         MailModel.Attachment(name: "a\u{1F}b.txt", size: 3, contentType: "text/plain")]
-        m.hasAttachments = true
-        let (_, url) = try db([m]); defer { cleanup(url) }
-        let back = try MailDatabase(url: url).messages()
-        #expect(back.first?.attachments == m.attachments)
-    }
-
     @Test func probeEveryOddFieldShapeSurvives() throws {
         var a = mail("", body: "", preview: "")
         a.to = [Contact(name: "", email: "")]; a.cc = [Contact(name: "", email: "")]

@@ -65,9 +65,12 @@ One connection, `journal_mode=WAL`, `synchronous=NORMAL`.
 ### Encodings
 
 - Contacts: `name U+001F email`, joined with `U+001E`. Decoding splits on U+001E, then on the first U+001F; a part
-  without U+001F gets an empty email. Names or addresses containing these characters are corrupted.
+  without U+001F gets an empty email.
 - Attachments: `name U+001F size U+001F contentType`, joined with U+001E; empty size or type means nil. Older rows
   hold only names.
+- Inside a name, address, file name or type, U+001D, U+001E and U+001F are written as U+001D followed by `0`, `1`
+  or `2`, and decoded back (`escape`/`unescape`); U+001D followed by anything else stays as it is. Rows written before
+  hold none of them (only a raw U+001D followed by 0–2 in an old row would read differently).
 - Text is bound and read with its byte count, so a NUL character is stored like any other. Rows written before
   this hold the text up to the first NUL and read as they did.
 
