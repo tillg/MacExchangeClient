@@ -51,7 +51,10 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
   that makes the root as tall as the view can't keep it from shrinking; percentage heights such as MailChimp's
   `height="100%"` table resolve to auto in almost-standards mode. Viewport units (`vh`, `vw`, …) resolve against the
   window's content size and the view's width (`HTMLPage.pinViewportUnits`, set in `BodyWebView.layout`), not
-  against the view, which grows to the page's height after load and on width changes; vertical scrolling goes to
+  against the view, which grows to the page's height after load, on width changes, and whenever the root or the body changes size after load (lazy pictures, an
+  opened `<details>`): `HTMLPage.resizeScript`, a `ResizeObserver` in the app's own script world (it runs with content
+  JavaScript off), posts `mailReplicaResize`, and the coordinator measures again. It is installed only when viewport
+  units can be pinned, so re-measuring can't feed a `100vh` block; vertical scrolling goes to
   the surrounding scroll view, horizontal stays in the page.
 - Navigation (`BodyNavigation`): `about:blank` is allowed only for the app's own load, from `willLoad()` (called before
   each `loadHTMLString`) until that load commits; a meta refresh or link to `about:blank` afterwards is cancelled, like

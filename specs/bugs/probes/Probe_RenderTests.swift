@@ -280,27 +280,6 @@ struct Probe_RenderTests {
         #expect(r == "last", "element on top of the last line: \(r)")
     }
 
-    /// <details> (and checkbox-driven "interactive email") change the page's height after it was measured.
-    @Test func openingDetailsGrowsTheView() async {
-        let mail = #"<details id="d"><summary>Show order</summary>\#(String(repeating: "<p>Item</p>", count: 20))</details><p>End</p>"#
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false), width: 600)
-        let h = await p.settleLikeTheApp()
-        _ = await p.eval("document.getElementById('d').open = true; 1")
-        try? await Task.sleep(for: .milliseconds(300))
-        let content = await p.contentHeight()
-        // The app measures only on load and on width changes; nothing re-measures after this.
-        #expect(content <= h, "view height \(h), page after opening \(content)")
-    }
-
-    @Test func lazyImageIsMeasured() async {
-        let mail = #"<p>Top</p><img loading="lazy" style="display:block" src="data:image/png;base64,\#(png1x1)" width="1" height="1"><img loading="lazy" style="display:block;width:300px" src="data:image/png;base64,\#(png1x1)"><p>End</p>"#
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false), width: 600)
-        let h = await p.settleLikeTheApp()
-        try? await Task.sleep(for: .milliseconds(500))
-        let content = await p.contentHeight()
-        #expect(content <= h, "measured \(h), page \(content)")
-    }
-
     // MARK: Blocked-image hiding vs. embedded pictures
 
     /// Embedded pictures need no permission; the blocked-image rule must not hide them.

@@ -523,3 +523,11 @@ edited: 2026-11-13
 - **Decision:** `merge` notes such deletions per account (`deletedWhileMoving`, in memory). A move that goes through (also the moved part of a partly refused batch) drops them: they were its own. A refused move removes the noted messages instead of moving them back.
 - **Why:** If the move failed, the move can't have caused the source's deletion, so the server's word stands.
 - **Not covered:** The note isn't saved: if the app quits between the deletion and the failed move, the message comes back as before (rare: both happen within one drain, usually seconds). A move that stays queued (offline) keeps the note until it is sent.
+
+## 02:18 — The body view re-measures on size changes {#d-bug-109}
+
+- **Status:** decided
+- **Context:** BUG-109. The body was measured only after load and on width changes, so content that grew later (lazy pictures, an opened `<details>`) was cut off.
+- **Decision:** `HTMLPage.observeResizes` adds `HTMLPage.resizeScript` to the web view's user content controller in the `.defaultClient` world: a `ResizeObserver` on the root and the body posts `mailReplicaResize`; `MailWebView.Coordinator` measures again. Checked in a real `WKWebView` that user scripts in that world run and post with content JavaScript off. The mail's own scripts still never run.
+- **Feedback guard:** it is installed only when `HTMLPage.pinViewportUnits` works (d-bug-110), and the measurement doesn't depend on the view's height (d-bug-064, 108), so a re-measure can't grow the view again; a test checks that a `100vh` mail stops re-measuring.
+- **Alternatives:** Re-measure on a timer (rejected: work for every open message and a delay). KVO on the web view's content size (rejected: no public property on macOS).
