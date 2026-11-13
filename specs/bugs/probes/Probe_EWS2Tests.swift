@@ -217,33 +217,6 @@ struct Probe_EWS2StoreTests {
         for _ in 0..<250 where !s.outbox.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
     }
 
-    /// Exchange throttling (ErrorServerBusy, with BackOffMilliseconds) is transient. The user's change must not be
-    /// undone as if Exchange had refused it.
-    @Test func probeServerBusyDoesNotUndoChange() async throws {
-        let fault = """
-            <?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>\
-            <s:Fault><faultcode xmlns:a="http://schemas.microsoft.com/exchange/services/2006/types">a:ErrorServerBusy</faultcode>\
-            <faultstring xml:lang="en-US">The server cannot service this request right now. Try again later.</faultstring>\
-            <detail><e:ResponseCode xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">ErrorServerBusy</e:ResponseCode>\
-            <e:Message xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">The server cannot service this request right now. Try again later.</e:Message>\
-            <t:MessageXml xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"><t:Value Name="BackOffMilliseconds">29774</t:Value></t:MessageXml>\
-            </detail></s:Fault></s:Body></s:Envelope>
-            """
-        let (s, _) = try store(fault, [serverMessage("A")])
-        s.toggleRead(Set(s.messages.map(\.id)))
-        try await waitForOutbox(s)
-        #expect(s.messages.first?.isRead == true, "status: \(s.status ?? "")")
-    }
-
-    /// The same for a load balancer's 503 page (HTTP.sys "Service Unavailable", not well-formed XML).
-    @Test func probeServiceUnavailablePageDoesNotUndoChange() async throws {
-        let page = "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\"\"http://www.w3.org/TR/html4/strict.dtd\">\r\n<HTML><HEAD><TITLE>Service Unavailable</TITLE>\r\n<META HTTP-EQUIV=\"Content-Type\" Content=\"text/html; charset=us-ascii\"></HEAD>\r\n<BODY><h2>Service Unavailable</h2>\r\n<hr><p>HTTP Error 503. The service is unavailable.</p>\r\n</BODY></HTML>\r\n"
-        let (s, _) = try store(page, [serverMessage("A")])
-        s.toggleRead(Set(s.messages.map(\.id)))
-        try await waitForOutbox(s)
-        #expect(s.messages.first?.isRead == true, "status: \(s.status ?? "")")
-    }
-
     /// The same sync page applied twice changes nothing the second time (idempotence, control).
     @Test func probeSamePageTwiceIsIdempotent() async throws {
         let page = Probe_EWS2Tests().helperSync("""

@@ -29,9 +29,12 @@ is made, retries, undo): [architecture.md](architecture.md). Types: [domain-mode
   domain); Basic and NTLM get the credential once; a second challenge cancels and the call throws
   `AuthenticationError`. HTTP 401 also throws it. The store then pauses the account.
 - Responses: every numeric character reference (decimal or hex) whose value isn't an XML 1.0 `Char` (C0 controls
-  except tab/LF/CR, surrogates `D800`–`DFFF`, `FFFE`, `FFFF`, past `10FFFF`) becomes `&#xFFFD;` before parsing. An unparsable body throws "Unreadable EWS response (N bytes)". A SOAP `Fault`
-  throws its `ResponseCode`/`faultstring`. An answer without any `ResponseCode` (an empty SOAP body, a proxy's
-  well-formed error page) throws "The server's answer holds no Exchange result", strict or not. With `strict` (the default), the first `ResponseCode` other than
+  except tab/LF/CR, surrogates `D800`–`DFFF`, `FFFE`, `FFFF`, past `10FFFF`) becomes `&#xFFFD;` before parsing.
+  A body that isn't an Exchange answer throws `ServerBusy` (nothing was refused): unparsable ("Unreadable EWS
+  response (N bytes, HTTP s)") or without any `ResponseCode` (an empty SOAP body, a proxy's well-formed error page:
+  "The server's answer holds no Exchange result"), strict or not. A SOAP `Fault` `ErrorServerBusy` (throttling)
+  throws `ServerBusy` with its `BackOffMilliseconds` as `retryAfter`; any other `Fault` throws its
+  `ResponseCode`/`faultstring`. With `strict` (the default), the first `ResponseCode` other than
   `NoError` throws with its `MessageText`.
 - XML access ignores namespaces. `text(name)`/`first(name)` search all descendants, `child(name)` direct children.
 - Request text is escaped with `xmlEscape` (`&`, `<`, `>`, `"`). Characters XML 1.0 forbids (U+0000–U+0008, U+000B,

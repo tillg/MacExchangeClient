@@ -118,6 +118,9 @@ flowchart LR
   - `URLError` on `send`, `respond` or `reply`: treated as refused (`failed`), never retried, since it may have gone out.
   - Any other `URLError`: status "Offline – changes will be sent to Exchange later"; the change and every later one
     of that account stay queued, in order, for the next refresh, while other accounts' changes go on.
+  - `ServerBusy` (throttling, a gateway's error page, a non-answer): like a `URLError`. A send or answer goes to
+    `failed`; other changes of that account stay queued in order (status "Exchange is busy – changes will be sent
+    later"), and with a back-off none of them is sent before it has passed (`busyUntil`, in memory, in `canSend`).
   - `PartlyRefused` (some items of a batch refused): the new IDs of the moved items are applied (`renameRemote`) and
     only the refused items go to `failed`; their `previous` messages are matched to the change's IDs by position.
   - Any other error: `failed` — a send or draft is kept as a local message in Drafts, its files stored with it. Other changes restore only

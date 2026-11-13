@@ -26,7 +26,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [050](BUG-050-reply-all-trailing-comma-for-addressless-recipient.md) | P4 | MailStore | Reply All leaves a trailing ", " (empty recipient) when the original lists a recipient without address |
 | [051](BUG-051-symlink-to-folder-cannot-be-attached.md) | P4 | MailStore | Attaching a symbolic link to a folder fails with "Couldn't attach" instead of zipping the folder |
 | [058](BUG-058-imported-cache-never-learns-conversations.md) | P3 | MailDatabase | Mail imported from Cache.json keeps the cache's sync positions, so it never learns its conversation |
-| [061](BUG-061-transient-server-errors-undo-changes.md) | P3 | MailStore | Throttling (ErrorServerBusy) or a 503 page undoes the user's change as "Exchange refused a change" instead of keeping it queued |
 | [062](BUG-062-archive-role-given-to-nested-or-deleted-folder.md) | P3 | EWS | Without a top-level Archive, any folder named "Archive" becomes the Archive mailbox, even one inside Deleted Items or deep in Inbox |
 | [063](BUG-063-inline-flagged-attachment-without-reference-invisible.md) | P3 | EWS | An attachment Exchange flags IsInline that the body doesn't show (text mail, no cid: reference) is neither listed nor shown: it can't be seen or saved |
 | [064](BUG-064-stray-closing-div-cuts-off-html-mail.md) | P3 | HTMLPage | A stray </div> in an HTML mail closes the measured wrapper, so the rest of the message is cut off |
