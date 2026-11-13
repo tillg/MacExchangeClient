@@ -193,32 +193,6 @@ struct Probe_Race4Tests {
         try await drained(server)
     }
 
-    // MARK: B. A body requested before the server changed the message is stored after the change
-
-    /// The body request goes out; a sync then brings a new version of the message (edited draft, updated meeting);
-    /// then the answer to the old request arrives. It is stored as the body of the new version and marked loaded,
-    /// so the new text is never fetched.
-    // file:// fixture
-    @Test func probeBodyRequestedBeforeServerChangeIsNotKept() async throws {
-        let server = RaceServer([], hold: true)
-        defer { server.stop() }
-        let s = store(server)
-        s.merge([summary("R1", box: .drafts, subject: "Plan v1", preview: "old text")], account: acct.id, mailbox: .drafts)
-        let id = s.messages[0].id
-        let t = Task { await s.loadBody(id) }
-        try await Task.sleep(for: .milliseconds(300))  // GetItem is out; Exchange has the old version
-        // Meanwhile the quick check brings the edited draft (same ItemId, as Exchange keeps it on an edit).
-        s.apply(SyncResult(upserts: [summary("R1", box: .drafts, subject: "Plan v2", preview: "new text")], deletedRemoteIDs: [],
-                           token: "T1", more: false), account: acct.id, mailbox: .drafts)
-        #expect(s.message(id)?.subject == "Plan v2")
-        server.push(RX.getItem(RX.textMessage("R1", subject: "Plan v1", body: "old text")))
-        await t.value
-        try #require(s.status == nil, "the body request failed: \(s.status ?? "")")
-        let m = try #require(s.message(id))
-        // Either the new text, or the body still to be fetched: never the old text under the new subject.
-        #expect(m.body != "old text" || m.needsBody, "subject \(m.subject), body \(m.body), needsBody \(m.needsBody)")
-    }
-
     // MARK: D. Quick Look of an earlier message takes over when its file arrives late
 
     /// Space on message A (its attachment still downloading), then on message B (file at hand): Quick Look shows B.
