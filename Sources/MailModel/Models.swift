@@ -424,9 +424,10 @@ public struct ComposeWindow: Hashable, Codable, Sendable {
     public init(_ draft: Draft) { id = UUID(); self.draft = draft }
 }
 
-/// Edit ▸ Include Attachments With Replies, as in Mail.
+/// Edit ▸ Include Attachments With Replies, as in Mail; cases in MainMenu.nib's menu order (tags 96–99, BUG-227).
+/// Stored by raw value, so the order doesn't change saved settings.
 public enum IncludeAttachments: String, CaseIterable, Sendable {
-    case never, ask, whenAddingRecipients, always
+    case always, never, whenAddingRecipients, ask
     public var title: String {
         switch self {
         case .never: "Never"

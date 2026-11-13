@@ -1943,4 +1943,9 @@ struct MailStoreTests {
         #expect(MailStore.mailboxSubtitle(count: 1, unread: 1) == "1 message, 1 unread")
         #expect(MailStore.mailboxSubtitle(count: 0, unread: 0) == "0 messages")
     }
+
+    /// BUG-227: Edit ▸ Include Attachments With Replies lists the choices in MainMenu.nib's order.
+    @Test func includeAttachmentsMenuOrderMatchesMail() {
+        #expect(IncludeAttachments.allCases.map(\.title) == ["Always", "Never", "When Adding Recipients", "Ask"])
+    }
 }
