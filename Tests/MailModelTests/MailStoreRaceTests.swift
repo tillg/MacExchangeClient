@@ -108,6 +108,9 @@ enum RX {
     }
 }
 
+// Nested in EWSFlowTests, whose `.serialized` then covers both suites: their pipes are read by URLSession's file
+// loader, and a request waiting on one suite's pipe held up the other's when they ran side by side.
+extension EWSFlowTests {
 /// Server answers and local changes racing each other, in a fixed order.
 @MainActor
 @Suite(.serialized)
@@ -145,6 +148,18 @@ struct MailStoreRaceTests {
     func waitFor(_ timeout: Duration = .seconds(5), _ cond: () -> Bool) async throws {
         let end = ContinuousClock.now + timeout
         while !cond() && ContinuousClock.now < end { try await Task.sleep(for: .milliseconds(10)) }
+    }
+
+    /// Serves `responses` of a `hold` server one at a time, each once the previous one has been read and its reader
+    /// has let go of the pipe (URLSession reads on for a while after a response; on a busy machine longer than the
+    /// server's own pause, and the next response would then end up in the previous request).
+    func serve(_ server: RaceServer, _ responses: [String]) async throws {
+        for xml in responses {
+            let before = server.served
+            server.push(xml)
+            try await waitFor(.seconds(10)) { server.served > before }
+            try await Task.sleep(for: .seconds(1))
+        }
     }
 
     // MARK: A server answer requested before a local change, applied after that change was written (BUG-139)
@@ -224,8 +239,8 @@ struct MailStoreRaceTests {
         s.apply(SyncResult(upserts: [summary("R1", box: .drafts, subject: "Plan v2", preview: "new text")], deletedRemoteIDs: [],
                            token: "T1", more: false), account: acct.id, mailbox: .drafts)
         #expect(s.message(id)?.subject == "Plan v2")
-        server.push(RX.getItem(RX.textMessage("R1", subject: "Plan v1", body: "old text")))
-        server.push(RX.getItem(RX.textMessage("R1", subject: "Plan v2", body: "new text")))
+        try await serve(server, [RX.getItem(RX.textMessage("R1", subject: "Plan v1", body: "old text")),
+                                 RX.getItem(RX.textMessage("R1", subject: "Plan v2", body: "new text"))])
         await t.value
         try #require(s.status == nil, "the body request failed: \(s.status ?? "")")
         let m = try #require(s.message(id))
@@ -257,33 +272,31 @@ struct MailStoreRaceTests {
 
     /// Do Not Send a Response before the folder list is read: it is read, and the invite moves to Deleted Items.
     @Test func doNotSendBeforeTheFolderListStillMovesTheInvite() async throws {
-        let server = RaceServer([RX.answered, RX.standardFolders, RX.noFolders, RX.movedInvite("M-T")])
+        let server = RaceServer([], hold: true)
         defer { server.stop() }
         let s = storeWithoutFolders(server)
         s.merge([inviteMessage("M")], account: acct.id, mailbox: .inbox)
         let id = s.messages[0].id
         s.respond(InviteReply(response: .decline, send: false), to: id)
+        try await serve(server, [RX.answered, RX.standardFolders, RX.noFolders, RX.movedInvite("M-T")])
         try await waitFor(.seconds(10)) { s.message(id)?.remoteID == "M-T" && s.outbox.isEmpty }
         #expect(s.message(id)?.remoteID == "M-T", "rid \(s.message(id)?.remoteID ?? ""), requests \(server.served), status \(s.status ?? "nil")")
         #expect(s.message(id)?.mailbox == .trash)
     }
 
-    /// Remove from Calendar queued offline last session, sent at launch before any folder list is read.
+    /// Remove from Calendar queued offline last session, sent at launch before any folder list is read. (Restored
+    /// from the old cache, which writes waiting changes like `finishLoading` but starts no history, whose requests
+    /// would take this script's answers.)
     @Test func removeFromCalendarSentAtLaunchMovesTheCancellation() async throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("race-db-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: dir) }
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let dbURL = dir.appendingPathComponent("Mail.sqlite")
         let s1 = MailStore(accounts: [acct], messages: [])  // no backend: the change stays queued
         s1.merge([inviteMessage("C", cancel: true)], account: acct.id, mailbox: .inbox)
         s1.removeFromCalendar(s1.messages[0].id)
-        try MailDatabase(url: dbURL).write(s1.takeChanges().resolved())
-        let server = RaceServer([RX.answered, RX.standardFolders, RX.noFolders, RX.movedInvite("C-T")])
+        let saved = s1.cache()
+        let server = RaceServer([], hold: true)
         defer { server.stop() }
-        let db = try MailDatabase(url: dbURL)
         let s = storeWithoutFolders(server)
-        s.restore(try db.meta())
-        s.finishLoading(try db.messages())
+        s.restore(saved)
+        try await serve(server, [RX.answered, RX.standardFolders, RX.noFolders, RX.movedInvite("C-T")])
         try await waitFor(.seconds(10)) { s.messages.first?.remoteID == "C-T" && s.outbox.isEmpty }
         let m = try #require(s.messages.first)
         #expect(m.remoteID == "C-T", "rid \(m.remoteID ?? ""), requests \(server.served), status \(s.status ?? "nil")")
@@ -292,14 +305,16 @@ struct MailStoreRaceTests {
 
     /// Exchange is busy when the follow-up move goes out: the move stays queued (the answer itself went out).
     @Test func aBusyServerKeepsTheMoveAfterAnUnsentAnswerQueued() async throws {
-        let server = RaceServer([RX.answered, RX.busy])
+        let server = RaceServer([], hold: true)
         defer { server.stop() }
         let s = store(server)
         s.merge([inviteMessage("M")], account: acct.id, mailbox: .inbox)
         let id = s.messages[0].id
         s.respond(InviteReply(response: .accept, send: false), to: id)
+        try await serve(server, [RX.answered, RX.busy])
         try await waitFor(.seconds(10)) { server.served == 2 && s.outbox.allSatisfy { if case .move = $0.change { true } else { false } } }
         #expect(s.outbox.map(\.change) == [.move(["M"], to: .trash)], "outbox \(s.outbox.map(\.change)), status \(s.status ?? "nil")")
         #expect(s.message(id)?.mailbox == .trash && s.message(id)?.invite?.reply?.response == .accept)
     }
+}
 }
