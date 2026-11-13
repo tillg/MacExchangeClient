@@ -85,7 +85,10 @@ struct MailCommands: Commands {
             Button("Delete") {
                 // ⌘⌫ is also the text system's "delete to the start of the line". In Mail, Delete goes to the first
                 // responder, so typing in a compose window or the search field never deletes mail (BUG-218).
-                if let text = (NSApp.keyWindow ?? NSApp.orderedWindows.first)?.firstResponder as? NSTextView {
+                // Only the key: Message ▸ Delete chosen with the mouse still deletes mail.
+                let mouse: [NSEvent.EventType] = [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp]
+                if !mouse.contains(NSApp.currentEvent?.type ?? .keyDown),
+                   let text = (NSApp.keyWindow ?? NSApp.orderedWindows.first)?.firstResponder as? NSTextView, text.isEditable {
                     text.deleteToBeginningOfLine(nil)
                 } else {
                     store.deleteSelection()
