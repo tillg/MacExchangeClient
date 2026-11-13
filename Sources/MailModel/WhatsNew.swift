@@ -13,6 +13,7 @@ public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
             "When Exchange is busy or briefly unavailable, your changes (read, flags, moves, deletions) wait and go out later instead of being undone.",
+            "Text in signatures and other tables in emails is no longer larger than the text around it.",
             "When something between you and Exchange answers with an error page instead of Exchange, a message you send is kept in Drafts instead of disappearing, and a mailbox no longer counts as fully loaded.",
             "When you mark, flag, move or erase several messages and one of them was already deleted on the server, the others keep your change.",
             "Forwarding or saving an attachment you opened and changed (for example a form filled in with Preview) uses the file as it came in the email, not your changed copy.",

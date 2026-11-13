@@ -37,6 +37,24 @@ struct HTMLPageRenderTests {
         #expect(await eval(HTMLPage.document(text, allowRemote: false), colours) == "rgb(0, 0, 0)|rgb(255, 255, 255)")
     }
 
+    /// Mail's 14 px default reaches text in tables (signatures, Outlook layouts): no quirks mode resetting tables to 16 px.
+    @Test func tableTextGetsTheDefaultFontSize() async {
+        let withDoctype = "<!DOCTYPE html><html><body><table><tr><td id=c>Kind regards</td></tr></table></body></html>"
+        #expect(await eval(HTMLPage.document(withDoctype, allowRemote: false),
+                           "document.compatMode + '|' + getComputedStyle(document.getElementById('c')).fontSize") == "CSS1Compat|14px")
+        let plain = "<p id=p>Hi,</p><table><tr><td id=c>Kind regards<br>Ann</td></tr></table>"
+        #expect(await eval(HTMLPage.document(plain, allowRemote: false),
+                           "getComputedStyle(document.getElementById('p')).fontSize + '|' + getComputedStyle(document.getElementById('c')).fontSize") == "14px|14px")
+    }
+
+    /// Newsletters build their layout from pictures in table cells: as in almost-standards mode, a cell holding
+    /// only a picture is as tall as the picture (full standards mode would add a gap under it).
+    @Test func pictureInATableCellLeavesNoGap() async {
+        let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        let mail = "<table cellpadding=0 cellspacing=0><tr><td id=t><img src='data:image/png;base64,\(png)' width=10 height=10></td></tr></table>"
+        #expect(await eval(HTMLPage.document(mail, allowRemote: false), "document.getElementById('t').getBoundingClientRect().height") == "10")
+    }
+
     nonisolated static let blockedVectors: [String] = [
         #"<link rel="preconnect" href="BASE/preconnect">"#,
         "<link/\u{301} rel=preconnect href=BASE/preconnect-mark>",

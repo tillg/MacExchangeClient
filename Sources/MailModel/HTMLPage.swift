@@ -3,6 +3,12 @@ import Foundation
 /// The page an HTML body is shown in. Mail is untrusted: our Content-Security-Policy comes first, so it covers
 /// everything the message brings. It allows no scripts, frames or requests, and nothing from the web unless `allowRemote`.
 public enum HTMLPage {
+    /// The page's doctype. The mail's own one lands inside our page, where the parser ignores it, so without ours
+    /// every mail would be in quirks mode, where tables don't inherit the 14 px default. HTML 4.01 Transitional with
+    /// its URL gives almost-standards mode: as in standards mode, except that a picture alone in a table cell gets no
+    /// gap under it, which newsletters built from sliced pictures rely on.
+    static let doctype = #"<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">"#
+
     /// The element whose height is the message's height.
     public static let bodyID = "mail-replica-body"
 
@@ -21,6 +27,7 @@ public enum HTMLPage {
         // Like Mail's MUIWebDocument.css, with Mail's default message font. No colours, as there: the sender's
         // `<body bgcolor text>` apply, and without them the light colour scheme gives a white page and black text.
         return """
+            \(doctype)
             <meta http-equiv="Content-Security-Policy" content="\(csp)">
             <meta name="color-scheme" content="light">
             <style>
