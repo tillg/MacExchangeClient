@@ -1871,23 +1871,34 @@ public final class MailStore {
         return true
     }
 
-    public func send(_ d: Draft) {
-        if attachmentsPending(d) { return }
+    /// Sends the draft (queued for the server, or added to Sent without one). False when it can't go out: the
+    /// caller keeps the message window open, and `status` says why.
+    @discardableResult
+    public func send(_ d: Draft) -> Bool {
+        if attachmentsPending(d) { return false }
         if let a = d.inviteAnswer {
+            // The invite left meanwhile (answered elsewhere, erased): the window keeps the comment.
+            guard message(a.messageID)?.invite != nil else {
+                status = "Couldn't send “\(d.subject)”: the invitation is no longer in your mailbox."
+                return false
+            }
             let text = d.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            return respond(InviteReply(response: a.response, comment: text.isEmpty ? nil : text,
-                                       proposedStart: a.proposedStart, proposedEnd: a.proposedEnd), to: a.messageID)
+            respond(InviteReply(response: a.response, comment: text.isEmpty ? nil : text,
+                                proposedStart: a.proposedStart, proposedEnd: a.proposedEnd), to: a.messageID)
+            return true
         }
         let acct = account(d.accountID) ?? accounts[0]
         if serverAccounts.contains(acct.id) {
             outbox.append(PendingChange(account: acct.id, change: .send(d), previous: []))
-            return scheduleFlush()
+            scheduleFlush()
+            return true
         }
         let m = Message(accountID: acct.id, mailbox: .sent, from: Contact(name: acct.name, email: acct.address),
                         to: Contact.parseList(d.to), cc: Contact.parseList(d.cc), subject: d.subject,
                         body: d.text, date: .now, isRead: true, attachments: d.attachments.map(\.attachment))
         add(m)
         if !d.attachments.isEmpty { setAttachmentData(d.attachments.map(\.data), for: m.id) }
+        return true
     }
 
     /// Saves the draft, in Drafts or queued for the server. False (and nothing kept) while a forward's original

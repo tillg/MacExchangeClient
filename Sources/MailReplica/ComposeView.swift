@@ -12,6 +12,8 @@ struct ComposeView: View {
     @State private var excluded = false
     @State private var askInclude = false
     @State private var confirmSize = false
+    /// Why Send couldn't go ahead; the window stays open with the message.
+    @State private var sendError: String?
     @FocusState private var inRecipients: Bool
     /// The draft as the window opened, to tell whether closing it loses anything.
     @State private var start: Draft?
@@ -69,10 +71,15 @@ struct ComposeView: View {
             Button("Don't Include", role: .cancel) { excluded = true }
         }
         .alert("This message is larger than your account allows.", isPresented: $confirmSize) {
-            Button("Try Sending in Email") { store.send(draft); dismiss() }
+            Button("Try Sending in Email") { sendNow() }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("\(sizeText) The server will probably refuse it. Remove some attachments, or try sending anyway.")
+        }
+        .alert("The message can't be sent.", isPresented: Binding { sendError != nil } set: { if !$0 { sendError = nil } }) {
+            Button("OK") {}
+        } message: {
+            Text(sendError ?? "")
         }
         .focusedSceneValue(\.attachFiles, draft.inviteAnswer == nil ? { attachFiles() } : nil)
         .background(Color(nsColor: .textBackgroundColor))
@@ -229,8 +236,12 @@ struct ComposeView: View {
 
     private func send() {
         if store.isOverSizeLimit(draft) { return confirmSize = true }
-        store.send(draft)
-        dismiss()
+        sendNow()
+    }
+
+    /// Sends and closes; when the message can't go out, the window stays open and says why.
+    private func sendNow() {
+        if store.send(draft) { dismiss() } else { sendError = store.status }
     }
 
     private func field(_ label: String, @ViewBuilder _ content: () -> some View) -> some View {

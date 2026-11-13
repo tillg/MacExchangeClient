@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "If an invitation disappears before you send your answer with a comment, the window stays open and tells you, so your comment isn't lost.",
             "In an invitation's day view, a 0-minute appointment no longer hides a meeting that starts at the same time.",
             "The day view of an invitation that runs past midnight starts in the morning and shows the meeting up to midnight.",
             "An all-day invitation is shown at the top of its day view instead of covering every hour.",

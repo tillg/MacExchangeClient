@@ -984,6 +984,21 @@ struct MailStoreTests {
                                                                      proposedEnd: Date(timeIntervalSince1970: 9000)))])
     }
 
+    /// Respond with Comments, then the invite is gone (a sync reports it deleted) before Send: the user is told,
+    /// and the window stays open with the comment, instead of everything vanishing without a word (BUG-069).
+    @Test func answerForAnInviteThatIsGoneIsNotSilentlyDropped() {
+        var m = remote("INV", subject: "Q4 review")
+        m.invite = Invite(start: .now, end: .now.addingTimeInterval(1800), organizer: Contact(name: "Org", email: "org@x.com"))
+        let s = store([])
+        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "t", more: false), account: work.id, mailbox: .inbox)
+        var d = s.answerDraft(.decline, to: id(s, "INV"))
+        d.body = "Sorry, I am out that week."
+        s.merge([], deleted: ["INV"], account: work.id, mailbox: .inbox)  // removed elsewhere meanwhile
+        #expect(!s.send(d), "the window stays open")
+        #expect(s.outbox.isEmpty)
+        #expect(s.status?.contains("Q4 review") == true, "status: \(s.status ?? "nil")")
+    }
+
     /// Inline images can be megabytes: only the message on screen keeps them, in memory, never in the cache.
     @Test func inlineImagesAreKeptForTheShownMessageOnly() {
         let s = store([msg(work), msg(work)])
