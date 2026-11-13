@@ -393,6 +393,15 @@ struct MailStoreTests {
         #expect(s.selection == [a.id])
     }
 
+    @Test func dropOnFlaggedOfAnAlreadyFlaggedTrashMessageChangesNothing() {
+        // Not listed in Flagged (it's in Trash), but it has a flag already: the drop changes nothing.
+        let a = msg(work, .trash, flag: .blue)
+        let s = store([a])
+        let r = s.drop([a.id], on: .smart(.flagged))
+        #expect(s.message(a.id)?.flag == .blue && s.message(a.id)?.mailbox == .trash)
+        #expect(!r)
+    }
+
     @Test func dropOnCurrentMailboxChangesNothing() {
         let m = msg(work)
         let s = store([m])

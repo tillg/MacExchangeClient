@@ -595,7 +595,21 @@ public final class MailStore {
     @discardableResult
     public func drop(_ ids: Set<Message.ID>, on ref: MailboxRef) -> Bool {
         guard canDrop(on: ref) else { return false }
-        var moving = Set(messages.filter { ids.contains($0.id) && !contains(ref, $0) }.map(\.id))
+        let change: (inout Message) -> Void = { m in
+            switch ref {
+            case .smart(.flagged): if m.flag == nil { m.flag = .red }
+            case .smart(.allInboxes): m.mailbox = .inbox
+            case let .account(acct, kind): m.accountID = acct; m.mailbox = kind
+            case .smart(.vip), .smart(.unread): break
+            }
+        }
+        // Only messages the drop changes: a flagged one in Trash isn't listed in Flagged, but has its flag already.
+        var moving = Set(messages.filter { m in
+            guard ids.contains(m.id), !contains(ref, m) else { return false }
+            var c = m
+            change(&c)
+            return c != m
+        }.map(\.id))
         if case let .account(acct, _) = ref {
             let blocked = messages.filter { moving.contains($0.id) && $0.remoteID != nil && $0.accountID != acct }
             if !blocked.isEmpty { status = "Exchange messages can't be moved to another account yet" }
@@ -603,14 +617,7 @@ public final class MailStore {
         }
         guard !moving.isEmpty else { return false }
         let apply: (Set<Message.ID>) -> Void = { ids in
-            self.keepingSelectionVisible(ids) { self.update(ids) { m in
-                switch ref {
-                case .smart(.flagged): if m.flag == nil { m.flag = .red }
-                case .smart(.allInboxes): m.mailbox = .inbox
-                case let .account(acct, kind): m.accountID = acct; m.mailbox = kind
-                case .smart(.vip), .smart(.unread): break
-                }
-            } }
+            self.keepingSelectionVisible(ids) { self.update(ids, change) }
         }
         if ids == selection { actOnSelection(apply) } else { apply(moving) }
         return true
