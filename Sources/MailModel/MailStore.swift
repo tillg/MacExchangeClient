@@ -701,7 +701,9 @@ public final class MailStore {
     }
 
     public func markAllRead(in ref: MailboxRef) {
-        update(Set(messages.filter { contains(ref, $0) }.map(\.id))) { $0.isRead = true }
+        // Selected messages it takes out of the list (unread filter, Unread) leave the selection, as for Mark as Read (BUG-154).
+        let ids = Set(messages.filter { contains(ref, $0) }.map(\.id))
+        keepingSelectionVisible(ids, selectNext: false) { update(ids) { $0.isRead = true } }
         // Launch is still loading: the mailbox's mail that isn't in memory yet is marked as it arrives.
         if isLoading { markAllReadWhenLoaded.append(ref) }
     }
