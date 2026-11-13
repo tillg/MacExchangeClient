@@ -129,7 +129,7 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
     first occurrence kept, so To wins); recipients without an address are left out. Forward: To empty.
 - Original attachments: Forward always loads them. Replies follow Edit ▸ Include Attachments With Replies (Never,
   default; Ask: an alert when the window opens; When Adding Recipients: on leaving To/Cc or Return, if an address with
-  "@" wasn't on the original; while the original's addresses aren't known, a recipient with the name of one of its
+  "@" wasn't on the original (From, To, Cc or Reply-To, BUG-239); while the original's addresses aren't known, a recipient with the name of one of its
   people counts as on it; Always). Ask and When Adding Recipients work for every reply; Always only for replies
   from the menu bar, since toolbar and context-menu replies don't pass the setting to `draft()`. The Include/Exclude Attachments button adds or removes them by hand. Send and Save are blocked
   while they load. All or none: if the original can't be loaded or one of its files can't be had, nothing is added,

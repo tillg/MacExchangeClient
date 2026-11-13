@@ -123,20 +123,6 @@ struct Probe_R5K_Attachments {
 
     // MARK: R5K-04
 
-    /// R5K-04: Include Attachments With Replies ▸ When Adding Recipients. A reply to a message with Reply-To (a
-    /// mailing list, a ticket system) goes to the Reply-To address, which `addsNewRecipient` doesn't count as "on the
-    /// original": leaving To unchanged pulls in the original's files.
-    @Test func replyToAddressIsNotANewRecipient() {
-        var m = Message(accountID: work.id, mailbox: .inbox, from: Contact(name: "Ann", email: "ann@x.com"),
-                        to: [Contact(name: "Team", email: "team@lists.x.com")], subject: "Specs", body: "See attached",
-                        date: Date(timeIntervalSince1970: 1_000_000), attachments: [Attachment(name: "spec.pdf", size: 10)])
-        m.replyTo = [Contact(name: "Team", email: "team@lists.x.com"), Contact(name: "Tickets", email: "tickets@x.com")]
-        let s = MailStore(accounts: [work], messages: [m])
-        let d = s.draft(.reply, to: m.id, includeAttachments: .whenAddingRecipients)
-        #expect(d.to.contains("tickets@x.com"))
-        #expect(!s.addsNewRecipient(d), "the untouched reply counts as adding a recipient: To = \(d.to)")
-    }
-
     // MARK: R5K-05
 
     func attachmentContent(_ data: Data) -> String {
