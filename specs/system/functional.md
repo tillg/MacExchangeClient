@@ -13,7 +13,7 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 ## Window and mailboxes
 
 - One three-column window (`MessageViewer.swift`): sidebar, message list, message view. Title is the mailbox
-  ("All Inboxes", "Inbox – Exchange", a folder name); subtitle is `status` if set, else "N messages, U unread".
+  ("All Inboxes", "Inbox – Exchange", a folder name); subtitle is `status` if set, else "N messages, U unread" ("1 message" for one, `MailStore.mailboxSubtitle`, BUG-178).
 - Toolbar: back/forward through visited mailboxes, unread filter, View Options (Show Contact Photo), New Message;
   Reply / Reply All / Forward; Archive / Delete / Junk; Move menu (every account's mailboxes, subfolders indented);
   Flag menu (click toggles red); search field.
