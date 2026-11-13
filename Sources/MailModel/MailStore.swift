@@ -1331,7 +1331,7 @@ public final class MailStore {
         let to = Calendar.current.date(byAdding: .day, value: 1, to: from) ?? from.addingTimeInterval(86400)
         do { setDayEvents(try await backend.events(from: from, to: to), for: id) } catch {
             if dayEvents[id] == nil { unavailableDays.insert(id) }
-            if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load the calendar: \(error.localizedDescription)" }
+            if !Self.wasCancelled(error), !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load the calendar: \(error.localizedDescription)" }
         }
     }
 
@@ -1412,7 +1412,7 @@ public final class MailStore {
         }
         guard let rid = m.remoteID, let backend = backends[m.accountID], !paused.contains(m.accountID) else { return }
         do { addInlineImages(try await backend.inlineImages(remoteID: rid, contentIDs: ids), for: id) } catch {
-            if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load images: \(error.localizedDescription)" }
+            if !Self.wasCancelled(error), !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load images: \(error.localizedDescription)" }
         }
     }
 
@@ -1499,7 +1499,7 @@ public final class MailStore {
             writtenFiles[url] = FileStamp(url)
             return url
         } catch {
-            if !pauseIfSignInFailed(error, account: m.accountID) {
+            if !Self.wasCancelled(error), !pauseIfSignInFailed(error, account: m.accountID) {
                 status = "Couldn't open “\(a.name)”: \(error.localizedDescription)"
             }
             return nil
@@ -1561,6 +1561,12 @@ public final class MailStore {
     /// For sample data and tests: a day of made-up calendar entries next to an invite.
     public func setDayEvents(_ events: [CalendarEvent], for id: Message.ID) { dayEvents[id] = events; unavailableDays.remove(id) }
 
+    /// The view that asked has moved on (another message was selected, the window closed): its task was cancelled,
+    /// and URLSession reports that as an error. Nothing failed, so nothing is reported.
+    static func wasCancelled(_ error: Error) -> Bool {
+        Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled
+    }
+
     /// Fetches the body of a server message the first time it is shown. If the server's version of the message changed
     /// while the body was on its way (another preview: a draft edited elsewhere), that body is the old version's: it is
     /// asked for again, up to three times.
@@ -1574,7 +1580,7 @@ public final class MailStore {
                 setBody(b, for: id)
                 return
             } catch {
-                if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load message: \(error.localizedDescription)" }
+                if !Self.wasCancelled(error), !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load message: \(error.localizedDescription)" }
                 return
             }
         }
@@ -1891,6 +1897,7 @@ public final class MailStore {
     public func includeOriginalAttachments(in draft: inout Draft) async {
         guard let id = draft.loadingOriginal, let m = message(id) else { draft.loadingOriginal = nil; return }
         if m.needsBody { await loadBody(id) }
+        if Task.isCancelled { return }  // the compose window was closed: nothing to report
         guard let loaded = message(id), loaded.bodyLoaded, !(loaded.hasAttachments && loaded.attachments.isEmpty) else {
             status = "Couldn't add the original attachments: the original message couldn't be loaded."
             return
@@ -1906,6 +1913,7 @@ public final class MailStore {
                 data: data, fromOriginal: true))
         }
         guard missing.isEmpty else {
+            if Task.isCancelled { return }
             status = "Couldn't add the original attachments: \(missing.map { "“\($0)”" }.joined(separator: ", ")) couldn't be loaded."
             return
         }

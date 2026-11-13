@@ -14,6 +14,7 @@ public enum WhatsNew {
         ChangeLogDay(date: "2026-11-13", features: [
             "A forwarded message now says who the original went to (To and Cc), and its date includes the time zone.",
             "Replies, forwards and invitation answers write a sender who has no name, such as a no-reply address, once instead of twice.",
+            "Moving on to the next message before the current one has loaded no longer shows \"Couldn't load message: cancelled\".",
             "A message that couldn't be sent is kept in Drafts with its pictures where you placed them in the text.",
             "Clicking a message that just arrived opens it faster in a large mailbox.",
             "When a draft can't be saved on the server, the message says so instead of claiming it couldn't be sent, and a message without a subject is named \"(No Subject)\".",

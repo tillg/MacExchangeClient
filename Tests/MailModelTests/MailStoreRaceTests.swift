@@ -316,5 +316,78 @@ struct MailStoreRaceTests {
         #expect(s.outbox.map(\.change) == [.move(["M"], to: .trash)], "outbox \(s.outbox.map(\.change)), status \(s.status ?? "nil")")
         #expect(s.message(id)?.mailbox == .trash && s.message(id)?.invite?.reply?.response == .accept)
     }
+
+    // MARK: A load cancelled because the user moved on is not an error (BUG-138)
+
+    /// Lets a cancelled file:// read finish on the pipe, so it doesn't hold up URLSession's file loader for later tests.
+    func drained(_ server: RaceServer) async throws {
+        try await waitFor(.seconds(2)) { server.served == 1 }
+        try await Task.sleep(for: .milliseconds(400))
+    }
+
+    /// The message view loads in `.task(id: message.id)` (body, pictures, calendar day, attachment thumbnails); selecting
+    /// the next message cancels those tasks. Each load, cancelled before its request goes out, reports nothing.
+    // file:// fixture
+    @Test func cancelledLoadsAreNotReportedAsErrors() async throws {
+        var body = summary("R1")
+        var pictures = summary("R2")
+        pictures.bodyLoaded = true; pictures.htmlChecked = true; pictures.html = "<p>Hi <img src=\"cid:logo@x\"></p>"
+        var invite = summary("R3")
+        invite.bodyLoaded = true; invite.htmlChecked = true
+        invite.invite = Invite(start: Date(timeIntervalSince1970: 1_700_000_000), end: Date(timeIntervalSince1970: 1_700_003_600),
+                               isCancellation: false)
+        var photo = summary("R4")
+        photo.bodyLoaded = true; photo.htmlChecked = true; photo.hasAttachments = true
+        photo.attachments = [Attachment(name: "photo.jpg", size: 10, contentType: "image/jpeg")]
+        let loads: [(Message, (MailStore, Message.ID) async -> Void)] = [
+            (body, { await $0.loadBody($1) }), (pictures, { await $0.loadInlineImages(for: $1) }),
+            (invite, { await $0.loadDay(for: $1) }), (photo, { _ = await $0.attachmentFile(0, of: $1) }),
+        ]
+        for (m, load) in loads {
+            let server = RaceServer([RX.fault("Unused", "for the cancelled read")])
+            defer { server.stop() }
+            let s = store(server)
+            s.merge([m], account: acct.id, mailbox: .inbox)
+            let id = s.messages[0].id
+            let t = Task { await load(s, id) }
+            t.cancel()
+            await t.value
+            #expect(s.status == nil, "\(m.remoteID ?? "")")
+            try await drained(server)
+        }
+    }
+
+    /// A forward's compose window closed while the original loads: nothing to report either.
+    // file:// fixture
+    @Test func closingAForwardWhileItsOriginalLoadsIsNotAnError() async throws {
+        let server = RaceServer([RX.fault("Unused", "for the cancelled read")])
+        defer { server.stop() }
+        let s = store(server)
+        var m = summary("R1"); m.hasAttachments = true
+        s.merge([m], account: acct.id, mailbox: .inbox)
+        let original = s.draft(.forward, to: s.messages[0].id)
+        let t = Task { var d = original; await s.includeOriginalAttachments(in: &d) }
+        t.cancel()
+        await t.value
+        #expect(s.status == nil)
+        try await drained(server)
+    }
+
+    /// The body request is out and the server hasn't answered when the user selects the next message.
+    // file:// fixture
+    @Test func zzCancelledInFlightBodyLoadIsNotAnError() async throws {
+        let server = RaceServer([], hold: true)
+        defer { server.stop() }
+        let s = store(server)
+        s.merge([summary("R1")], account: acct.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        let t = Task { await s.loadBody(id) }
+        try await Task.sleep(for: .milliseconds(300))  // the request is out, the server hasn't answered
+        t.cancel()  // the user selected the next message
+        await t.value
+        #expect(s.status == nil)
+        server.push(RX.fault("Unused", "for the cancelled read"))
+        try await drained(server)
+    }
 }
 }
