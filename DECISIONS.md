@@ -972,3 +972,5 @@ edited: 2026-11-13
 - **Why:** the failures are timeouts in code the change doesn't touch; waiting would stall fixing for up to an hour.
 - **Alternatives:** stop the hunters (loses their work); wait (idle time).
 - **Consequences:** a full-suite rerun at low load is owed; its result goes into the report. Applies to every commit made while hunters run.
+- 14:02: full suite 470/470 green at normal load (after BUG-218).
+- 14:12: BUG-219 committed with `droppingTheSelectionStaysFastAt210kMessages` over budget at load 51 (wave-4 hunters); the change doesn't touch drops.

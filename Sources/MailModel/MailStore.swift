@@ -708,6 +708,10 @@ public final class MailStore {
 
     /// Mailboxes marked all read while launch was loading, applied to the stored mail `finishLoading` brings.
     @ObservationIgnored private var markAllReadWhenLoaded: [MailboxRef] = []
+    /// Stored mail is loaded once per launch: a second load (another viewer window) would queue the outbox twice,
+    /// take a send on its way for an interrupted one and bring back mail erased since the last save (BUG-219).
+    @ObservationIgnored private var restoredMeta = false
+    @ObservationIgnored private var finishedLoading = false
 
     /// Runs `action` on the selection, then selects the message that followed it in the list – as Mail does.
     /// A selection that wasn't in the list (hidden by the unread filter or a search) isn't kept selected
@@ -1104,6 +1108,8 @@ public final class MailStore {
 
     /// Launch, step 1: sync positions, folders and waiting changes. Messages follow with the next calls.
     public func restore(_ meta: StoredMeta) {
+        guard !restoredMeta else { return }
+        restoredMeta = true
         let mine = Set(accounts.map(\.id))
         // A check that ran before this (a mailbox selected while launch loads) has newer positions: they stay.
         let fetched = Set(syncTokens.keys)
@@ -1137,6 +1143,7 @@ public final class MailStore {
 
     /// Launch, step 2: the mail of some mailboxes (the Inbox first), shown while the rest loads.
     public func restore(_ msgs: [Message], boxes: [MailboxKey]) {
+        guard !finishedLoading else { return }
         messages += notInMemory(withoutRemovedFolders(msgs))
         for b in boxes { loadedBoxes?.insert(key(b.account, b.mailbox)) }
     }
@@ -1144,6 +1151,8 @@ public final class MailStore {
     /// Launch, step 3: everything else. A message changed meanwhile keeps its version in memory.
     /// Then waiting changes go to the server and the history sync may start.
     public func finishLoading(_ rest: [Message]) {
+        guard !finishedLoading else { return }
+        finishedLoading = true
         let added = notInMemory(withoutRemovedFolders(rest))
         messages += added
         removedFolders = [:]

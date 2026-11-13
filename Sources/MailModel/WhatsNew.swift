@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Opening a second viewer window (File ▸ New Viewer Window) no longer brings back mail you just erased or says a message being sent \"may already have been sent\".",
             "⌘⌫ while typing a message or a search now deletes text, as it should, instead of deleting the selected mail.",
             "Flagging or marking a conversation you are reading after a new reply came in keeps it open, and deleting it by swipe selects the next one.",
             "A message waiting to be sent is no longer sent twice when you quit while \"Updating Mail Storage…\" is shown.",

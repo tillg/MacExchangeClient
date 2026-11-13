@@ -15,11 +15,16 @@ enum AppSetup {
 
     /// The mail database; nil with sample data, or when it couldn't be opened (nothing is saved then).
     private static var database: MailDatabase?
+    /// Stored mail is loaded once per launch, whichever viewer window asks first (BUG-219).
+    private static var loadStarted = false
+    /// A viewer window's poll loop is running (`MailReplicaApp.pollForMail`).
+    static var isPolling = false
 
     /// Loads stored mail in stages: the Inboxes first (shown at once), the rest in the background. The first
     /// launch after the update moves `Cache.json` into the database.
     static func loadMail(into store: MailStore) async {
-        guard usesServer else { return }
+        guard usesServer, !loadStarted else { return }
+        loadStarted = true
         store.progress = SyncProgress(text: "Loading Mail…", fraction: nil)
         do {
             if !FileManager.default.fileExists(atPath: MailDatabase.defaultURL.path) {

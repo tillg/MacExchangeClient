@@ -57,7 +57,14 @@ struct MailReplicaApp: App {
     /// sync runs on its own in the background. Off while taking a snapshot.
     private func pollForMail() async {
         guard ProcessInfo.processInfo.environment["MAIL_SNAPSHOT"] == nil else { return }
-        await AppSetup.loadMail(into: store)  // before the first check, so it only fetches what changed
+        // Every viewer window runs this task; one loop polls at a time. Another window takes over when the polling
+        // one closes (BUG-219).
+        while AppSetup.isPolling {
+            guard (try? await Task.sleep(for: .seconds(1))) != nil else { return }
+        }
+        AppSetup.isPolling = true
+        defer { AppSetup.isPolling = false }
+        await AppSetup.loadMail(into: store)  // before the first check, so it only fetches what changed; once per launch
         while !Task.isCancelled {
             await store.refresh()
             AppSetup.saveChanges(store)
