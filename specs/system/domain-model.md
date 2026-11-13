@@ -68,7 +68,7 @@ stored: [storage.md](storage.md). How EWS fills them: [ews.md](ews.md).
 ## Attachment
 
 `Attachment(name, size?, contentType?)`: metadata only; content is fetched when opened, by position in the list.
-`fileName` replaces `/` with `:` and removes NUL; an empty, `.` or `..` name becomes "Attachment". A name over
+`fileName` replaces `/` with `:`, removes NUL and bidi controls (U+200E/F, U+061C, U+202A–202E, U+2066–2069) and turns other control characters into a blank (BUG-193); an empty, `.` or `..` name becomes "Attachment". A name over
 255 UTF-8 bytes is cut at a whole character to fit, keeping its extension (when at most 32 bytes); saving under a free
 name ("name 2.pdf") shortens the same way (`Attachment.fileName(_:ending:)`). An attached
 message (EWS `ItemAttachment`) is listed as `<name>.eml` with type `message/rfc822`.

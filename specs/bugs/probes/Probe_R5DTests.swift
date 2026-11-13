@@ -62,18 +62,6 @@ struct Probe_R5D_Compose {
     }
 }
 
-@MainActor
-struct Probe_R5D_Attachments {
-    /// R5D-09: bidi overrides and line breaks in a sender's file name are not kept in the file written to disk.
-    @Test func fileNameDropsBidiAndControlCharacters() {
-        let spoof = MailModel.Attachment(name: "invoice\u{202E}fdp.app").fileName
-        #expect(!spoof.unicodeScalars.contains { (0x202A...0x202E).contains($0.value) || (0x2066...0x2069).contains($0.value) },
-                "\(spoof.debugDescription)")
-        let newline = MailModel.Attachment(name: "a\nb.pdf").fileName
-        let hasBreak = newline.unicodeScalars.contains { $0 == "\n" }
-        #expect(!hasBreak, "\(newline.debugDescription)")
-    }
-
     /// R5D-10: an attachment named ".invoice.pdf" is not saved as a hidden file.
     @Test func savedAttachmentIsNotHidden() async throws {
         let m = Message(accountID: UUID(), from: Contact(name: "a", email: "a@x"), to: [], subject: "s", body: "",

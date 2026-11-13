@@ -41,7 +41,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [190](BUG-190-remote-content-missed-entity-encoded.md) | P3 | rendering / privacy | An entity-encoded web address (src="&#104;ttps://…") is not seen as remote content: no banner |
 | [191](BUG-191-video-never-loads-after-load-remote-content.md) | P4 | rendering | A web video counts as remote content, but Load Remote Content never loads it (no media-src in the policy) |
 | [192](BUG-192-overnight-invite-calendar-until-midnight.md) | P3 | invites | An invite that runs past midnight reads the calendar only until midnight: conflicts after 00:00 are never shown |
-| [193](BUG-193-attachment-filename-keeps-bidi-controls.md) | P3 | attachments / security | Attachment file names keep bidi overrides and line breaks ("invoice\u{202E}fdp.app" is shown reversed, as a .pdf) |
 | [194](BUG-194-dotfile-attachment-saved-hidden.md) | P4 | attachments | An attachment named ".something.pdf" is saved as a hidden file the user can't find |
 | [195](BUG-195-recipient-group-and-comment-syntax.md) | P4 | compose | Recipients written with RFC 5322 group syntax or a comment become invalid addresses ("Team: a@x.com", "a@x.com (Ann)") |
 | [196](BUG-196-content-id-not-a-msg-id.md) | P4 | compose / sent HTML | Placed pictures are sent with a Content-ID without "@" (bare UUID) |
