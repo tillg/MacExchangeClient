@@ -16,7 +16,7 @@ cache), `Sources/MailReplica/AccountsSettings.swift` (`AppSetup`: when it is rea
 |---|---|
 | Exchange mail, sync positions, folder trees, outbox | `~/Library/Application Support/MailReplica/Mail.sqlite` (+ `-wal`, `-shm`) |
 | Accounts (email, username, server, id) | UserDefaults key `exchangeAccounts`, JSON |
-| Passwords | Keychain generic password, service `MailReplica-EWS`, account = username |
+| Passwords | Keychain generic password, service `MailReplica-EWS`, account = `<username>@<host>` (written since BUG-252); an older item with account = username is still read |
 | Settings | UserDefaults (`@AppStorage`): `showConversations`, `remoteImages`, `includeAttachmentsWithReplies`, `showContactPhoto` |
 | Opened attachments | `$TMPDIR/Mail Downloads/<message id>/<index>/<file name>`, quarantined |
 | Files of drafts kept after a failed send | `files` table of `Mail.sqlite` (sample data: memory only) |
