@@ -592,3 +592,11 @@ edited: 2026-11-13
 - **Decision:** It is listed as "Name.webloc"; its content is an Internet location file (`URL` = `AttachLongPathName`), so double-click opens the link in the browser, and Save/Forward/drag give a link file. Only http/https links; anything else stays "no content".
 - **Why:** the smallest behaviour that is honest and useful, with no UI change: the file's name and icon say it is a link.
 - **Alternatives:** Leave it out of the list (rejected: the user wouldn't know it exists). A status "This is a link to a cloud file" (rejected: a dead end again).
+
+## 02:54 — An Exchange account is named after its address {#d-bug-124}
+
+- **Status:** decided
+- **Context:** BUG-124. Every EWS account was named "Exchange": two accounts had the same sidebar sections, titles and notices.
+- **Decision:** `ExchangeAccount.account` uses the email address (trimmed) as the name; "Exchange" only if it is blank. The name is computed at each launch, so existing accounts get it without a migration. Local copies in Drafts/Sent now show the address as the sender's name instead of "Exchange".
+- **Why:** the address is what the user typed and is unique per account. The user's display name would need an extra EWS call (ResolveNames) at sign-in and a stored field; not worth it for this.
+- **Alternatives:** A description field in Settings (rejected: a UI feature). The server's display name (deferred: extra request and stored field).

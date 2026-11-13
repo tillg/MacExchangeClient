@@ -228,4 +228,17 @@ struct EWSFlowTests {
         await s.refresh(history: false)
         #expect(server.served > afterFirst)
     }
+
+    /// Two Exchange accounts are named after their addresses, so their Inboxes can be told apart.
+    @Test func twoExchangeAccountsCanBeToldApart() {
+        let one = ExchangeAccount(email: "till@work.com", username: "W\\till", server: "mail.work.com")
+        let two = ExchangeAccount(email: "till@club.org", username: "C\\till", server: "mail.club.org")
+        let s = MailStore(accounts: [one.account, two.account], messages: [])
+        s.selectedMailbox = .account(one.id, .inbox)
+        let t1 = s.title
+        s.selectedMailbox = .account(two.id, .inbox)
+        #expect(t1 != s.title, "both Inboxes are titled \(t1)")
+        #expect(one.account.name == "till@work.com")
+        #expect(ExchangeAccount(email: " ", username: "u", server: "s").account.name == "Exchange")
+    }
 }
