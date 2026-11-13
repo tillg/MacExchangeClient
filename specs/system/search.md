@@ -8,8 +8,7 @@ edited: 2026-11-13
 
 The toolbar search field (`.searchable` in `Sources/MailReplica/MessageViewer.swift`) binds to
 `MailStore.searchText`. Search is local only; nothing asks the server. There are two paths: a scan of memory and a
-query of the SQLite FTS5 index. Design history: [../change/fast-search.md](../change/fast-search.md). Index schema:
-[storage.md](storage.md#search-index).
+query of the SQLite FTS5 index. Index schema: [storage.md](storage.md#search-index).
 
 ## Which path runs
 
@@ -100,5 +99,8 @@ Junk since the last save isn't found by the index until that save.
 - At most 2,000 IDs from the index, Trash and Junk already left out; the in-memory re-check (moved since the last
   save, account) can show a few fewer.
 - No paging, no server search, no search of HTML-only text, no search tokens, scopes or suggestions.
+- Server search, when it comes, plugs in at the `searcher` closure: EWS `FindItem` + `QueryString` (AQS) per folder,
+  Shallow only, at most 250 results per query, searches bodies through the server index; its results match local
+  messages by `remoteID`, not by local ID.
 - No results: `ContentUnavailableView.search` ("No Results for …") in the list; not while `awaitingSearchResults`
   (an empty list then shows nothing).
