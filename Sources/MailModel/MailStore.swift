@@ -1585,12 +1585,16 @@ public final class MailStore {
         if !d.attachments.isEmpty { setAttachmentData(d.attachments.map(\.data), for: m.id) }
     }
 
-    public func saveDraft(_ d: Draft) {
-        if attachmentsPending(d) { return }
+    /// Saves the draft, in Drafts or queued for the server. False (and nothing kept) while a forward's original
+    /// files are still loading: the caller keeps the message open and saves once they are in.
+    @discardableResult
+    public func saveDraft(_ d: Draft) -> Bool {
+        if attachmentsPending(d) { return false }
         let acct = account(d.accountID) ?? accounts[0]
         if serverAccounts.contains(acct.id) {
             outbox.append(PendingChange(account: acct.id, change: .saveDraft(d), previous: []))
-            return scheduleFlush()
+            scheduleFlush()
+            return true
         }
         let m = Message(accountID: acct.id, mailbox: .drafts, from: Contact(name: acct.name, email: acct.address),
                         to: Contact.parseList(d.to), cc: Contact.parseList(d.cc),
@@ -1598,6 +1602,7 @@ public final class MailStore {
                         body: d.text, date: .now, isRead: true, attachments: d.attachments.map(\.attachment))
         add(m)
         if !d.attachments.isEmpty { setAttachmentData(d.attachments.map(\.data), for: m.id) }
+        return true
     }
 }
 

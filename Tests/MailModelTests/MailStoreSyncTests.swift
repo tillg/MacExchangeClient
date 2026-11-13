@@ -375,4 +375,30 @@ struct MailStoreSyncTests {
         #expect(s.message(a)?.to.map(\.name) == ["Me", "Carol"])
         #expect(s.message(a)?.needsBody == true)
     }
+
+    // MARK: Save in the close sheet while the original's files load (BUG-094)
+
+    /// `saveDraft` refuses while a forward's original files are still loading (Mail's AttachmentsPendingMessage), and
+    /// now says so, so the close sheet's Save keeps the window open and saves once the files are in: the text and
+    /// the files are kept, nothing is thrown away.
+    @Test func saveWhileOriginalFilesLoadWaitsAndThenKeepsEverything() async {
+        let original = Message(accountID: home.id, from: Contact(name: "Ann", email: "ann@x.com"),
+                               to: [Contact(name: "Me", email: home.address)], subject: "Contract", body: "Body",
+                               date: Date(timeIntervalSince1970: 1_000_000), attachments: ["contract.pdf"])
+        let s = MailStore(accounts: [work, home], messages: [original])
+        s.setAttachmentData([Data("PDF".utf8)], for: original.id)
+        s.downloadsFolder = FileManager.default.temporaryDirectory.appendingPathComponent("MailStoreSyncTests-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: s.downloadsFolder) }
+        var d = s.draft(.forward, to: original.id)
+        #expect(d.loadingOriginal == original.id)
+        d.to = "bo@x.com"
+        d.body = "Please sign by Friday." + d.body
+        #expect(s.saveDraft(d) == false, "refused while the files load")
+        #expect(!s.messages.contains { $0.mailbox == .drafts })
+        await s.includeOriginalAttachments(in: &d)  // what the open window does meanwhile
+        #expect(s.saveDraft(d))
+        let saved = s.messages.first { $0.mailbox == .drafts }
+        #expect(saved?.body.contains("Please sign") == true)
+        #expect(saved?.attachments.map(\.name) == ["contract.pdf"])
+    }
 }

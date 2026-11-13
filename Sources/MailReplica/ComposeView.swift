@@ -15,6 +15,8 @@ struct ComposeView: View {
     @FocusState private var inRecipients: Bool
     /// The draft as the window opened, to tell whether closing it loses anything.
     @State private var start: Draft?
+    /// Save was chosen while the original's files were loading: the window saves and closes once they are in.
+    @State private var closeWhenLoaded: NSWindow?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -45,6 +47,11 @@ struct ComposeView: View {
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in drop(providers) }
         .task(id: draft.loadingOriginal) { await includeOriginal() }
+        .onChange(of: draft.loadingOriginal) { _, loading in
+            guard loading == nil, let window = closeWhenLoaded else { return }
+            closeWhenLoaded = nil
+            if store.saveDraft(draft) { window.close() }
+        }
         .task(id: draft.accountID) { await store.loadMaxMessageSize(for: draft.accountID) }
         .background(WindowCloseGuard(shouldClose: shouldClose))
         .onAppear {
@@ -207,7 +214,12 @@ struct ComposeView: View {
         alert.buttons[2].keyEquivalentModifierMask = .command
         alert.beginSheetModal(for: window) { response in
             switch response {
-            case .alertFirstButtonReturn: store.saveDraft(draft); window.close()
+            case .alertFirstButtonReturn:
+                // While the original's files load, Save waits for them (`onChange` below) instead of losing the message.
+                if store.saveDraft(draft) { window.close() } else {
+                    closeWhenLoaded = window
+                    store.status = "The message is saved and closed once its attachments have loaded."
+                }
             case .alertThirdButtonReturn: window.close()
             default: break
             }

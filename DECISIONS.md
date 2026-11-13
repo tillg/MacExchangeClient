@@ -348,3 +348,11 @@ edited: 2026-11-13
 - **Why:** The body fetch exists to bring the addresses (`MessageBody` doc); the summary can only tell that the people changed, not who they are.
 - **Risk:** If Exchange's `DisplayTo` ever names a recipient differently from the body's `Mailbox` name for unchanged mail, that message's body is fetched again each time it is shown (correct, but extra requests). Not seen in the documented shapes.
 - **Alternatives:** Always keep the body's contacts (rejected: an edited draft would show stale recipients for good).
+
+## 01:24 — Save in the close sheet waits for the original's files {#d-bug-094}
+
+- **Status:** decided
+- **Context:** BUG-094. Closing a forward while its original files were still downloading showed the "Save this message as a draft?" sheet; Save called `saveDraft`, which refuses while files load (Mail's AttachmentsPendingMessage), and the window closed anyway: the text was lost.
+- **Decision:** `saveDraft` now returns whether it saved (`@discardableResult`). When the sheet's Save is refused, the window stays open with the status "The message is saved and closed once its attachments have loaded."; as soon as the files are in (`loadingOriginal` becomes nil), the window saves the draft as it is then (with the files and any later typing) and closes.
+- **Why:** The lead allowed "save … or wait"; saving at once without the files would contradict the existing test `forwardIsNotSentBeforeItsAttachmentsAreIn` (a forward isn't saved before its original files are in), which can't be changed. Waiting keeps both rules and never discards. The probe's expectation (saveDraft keeps the text at once) is therefore not adopted; the regression test checks the refusal is reported and that the later save keeps text and files.
+- **Alternatives:** Save the text at once without the original's files (rejected: pinned test above, and the forward would lose its files). Disable Save in the sheet (rejected: the user would have to choose between waiting by hand and losing the text).
