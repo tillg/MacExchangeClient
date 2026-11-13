@@ -539,3 +539,20 @@ public struct ConversationRow: Equatable, Sendable {
         return names.dropLast().joined(separator: ", ") + " & " + names.last!
     }
 }
+
+/// What the message list's date column shows for a date (`MessageListView.listDate`): the time today, "Yesterday",
+/// the weekday 2–6 calendar days back, else the date. Counted in calendar days, so last week's same weekday is a
+/// date, and a date in the future is a date too (BUG-220).
+public enum ListDate {
+    public enum Kind: Equatable, Sendable { case time, yesterday, weekday, date }
+
+    public static func kind(of d: Date, now: Date = .now, calendar: Calendar = .current) -> Kind {
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: d), to: calendar.startOfDay(for: now)).day ?? 0
+        switch days {
+        case 0: return .time
+        case 1: return .yesterday
+        case 2...6: return .weekday
+        default: return .date
+        }
+    }
+}

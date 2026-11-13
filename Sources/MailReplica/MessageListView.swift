@@ -174,13 +174,12 @@ struct MessageRow: View {
 
     /// Today → time, yesterday → "Yesterday", last 7 days → weekday, else short date.
     static func listDate(_ d: Date) -> String {
-        let cal = Calendar.current
-        if cal.isDateInToday(d) { return d.formatted(date: .omitted, time: .shortened) }
-        if cal.isDateInYesterday(d) { return "Yesterday" }
-        if let days = cal.dateComponents([.day], from: d, to: .now).day, days < 7 {
-            return d.formatted(.dateTime.weekday(.wide))
+        switch ListDate.kind(of: d) {
+        case .time: d.formatted(date: .omitted, time: .shortened)
+        case .yesterday: "Yesterday"
+        case .weekday: d.formatted(.dateTime.weekday(.wide))
+        case .date: d.formatted(date: .numeric, time: .omitted)
         }
-        return d.formatted(date: .numeric, time: .omitted)
     }
 }
 
