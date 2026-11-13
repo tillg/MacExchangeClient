@@ -910,7 +910,7 @@ edited: 2026-11-13
 - **Status:** open
 - **Context:** `docs/feature-map.md`; the task asks for screenshots "if possible". `screencapture` has no permission here, and the features don't exist in our app, so our snapshot hook can't show them.
 - **Question:** what pictures to use?
-- **Decision:** Text sketches (labelled as sketches) for 12 features where a picture helps; Microsoft support links only for the 14 pages a research agent actually fetched; no Apple or Microsoft images copied.
+- **Decision:** Text sketches (labelled as sketches) for 38 features (all HIGH ones and the visual MEDIUM ones) where a picture helps; Microsoft support links only for the 14 pages a research agent actually fetched; no Apple or Microsoft images copied.
 - **Why:** the repo has a public GitHub remote, so copying vendor screenshots into it is a copyright problem; hot-linked images break.
 - **Alternatives:** hot-link images from support sites (fragile, still someone else's images); ask the user for screenshots (nobody to ask).
 - **Consequences:** the user can add real screenshots later (e.g. `docs/feature-map/*.png`) next to the sketches.

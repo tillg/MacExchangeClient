@@ -16,11 +16,11 @@ edited: 2026-11-13
 
 Labels used in the chapters:
 
-- *Not planned:* the [README](../README.md#roadmap) says the project decided against it for now. Kept in the list, but not ranked HIGH against that decision.
+- *Not planned:* the [README](../README.md#roadmap) says the project decided against it for now. Kept in the list, and ranked MEDIUM or LOW, except rich text (chapter 5): without it, replies lose the look of the mail they answer, which hurts every day.
 - *Specced:* a change spec for it exists in [`specs/changes/`](../specs/changes/).
 - *Not possible here:* needs a service only Apple or Microsoft can offer.
 
-**Where the facts come from.** Apple Mail's menu names and shortcuts were read from its own app bundle (`/System/Applications/Mail.app/Contents/Resources`: `MainMenu.nib`, context-menu nibs, `*.loctable`). Outlook's come from the text files of Outlook for Mac (new Outlook) and from Microsoft support pages that were fetched and read; only those pages are linked. "Mail" in this file means Apple Mail.
+**Where the facts come from.** Apple Mail's menu names and shortcuts were read from its own app bundle (`/System/Applications/Mail.app/Contents/Resources`: `MainMenu.nib`, context-menu nibs, `*.loctable`). Outlook's come from the text files of Outlook for Mac (new Outlook) and from Microsoft support pages that were fetched and read; only those pages are linked. A claim marked ⚠️ is recalled, not read from either source. "Mail" in this file means Apple Mail.
 
 **About the pictures.** Real screenshots couldn't be taken: this Mac blocks screen recording, and copying Apple's or Microsoft's images into this repo isn't allowed. The pictures are **sketches** drawn in text. They show the idea, not the exact look.
 
@@ -199,9 +199,16 @@ Labels used in the chapters:
 ### 3. Company address book lookup
 
 - **Priority:** HIGH
-- **Who has it:** Outlook (Check Names…, Find in Address Book, directory search) · Mail (Exchange accounts look up the directory while you type)
+- **Who has it:** Outlook (Check Names…, Find in Address Book, directory search) · Mail (Exchange accounts look up the directory while you type ⚠️)
 - **What it is (ELI5):** Your company has one big phone book with everybody in it (Exchange calls it the Global Address List). The app can look up a colleague there by name, even if you never wrote to them before.
 - **What we have today:** No lookup. You need to know the exact address.
+- **Picture:**
+
+  ```
+  Check Names: [ schmidt          ] [Search]
+    Anna Schmidt     Sales      anna.schmidt@example.com
+    Bernd Schmidt    IT         b.schmidt@example.com
+  ```
 
 ### 4. Bcc field
 
@@ -209,6 +216,13 @@ Labels used in the chapters:
 - **Who has it:** Mail (View ▸ Bcc Address Field, ⌥⌘B) · Outlook (Bcc field in the compose window)
 - **What it is (ELI5):** "Bcc" is a secret copy. Everyone in To and Cc sees each other, but nobody sees who is in Bcc. Useful when you write to many people who shouldn't see each other's addresses.
 - **What we have today:** Only To and Cc. There is no way to send a hidden copy. (Mail also has a **Reply-To** field, View ▸ Reply-To Address Field, ⌥⌘R, to ask answers to go to another address; we don't have that either.)
+- **Picture:**
+
+  ```
+  To:   team@example.com
+  Cc:   boss@example.com
+  Bcc:  me@example.com        ← nobody else sees this line
+  ```
 
 ### 5. Rich text formatting
 
@@ -234,13 +248,30 @@ Labels used in the chapters:
 - **Who has it:** Mail (Settings ▸ Composing: "Respond using the same message format as the original") · Outlook (replies quote the original with its formatting)
 - **What it is (ELI5):** When you reply to a nicely laid-out mail (with tables, colours, logos), the quoted original below your answer should still look the same, so the reader can follow the thread.
 - **What we have today:** Replies and forwards quote only the plain text of the original. Tables, pictures and colours of the original are lost in the quote.
+- **Picture:**
+
+  ```
+  Thanks, see below!
+  ┌ On Monday, Anna wrote: ───────────────┐
+  │ ┌──────────┬──────────┐               │
+  │ │ Q1       │ 12,000 € │  ← table and  │
+  │ │ Q2       │ 15,500 € │    colours    │
+  │ └──────────┴──────────┘    kept       │
+  └───────────────────────────────────────┘
+  ```
 
 ### 7. Undo for delete and move
 
 - **Priority:** HIGH
-- **Who has it:** Mail (Edit ▸ Undo, ⌘Z, after Delete, Move, Archive, Flag) · Outlook (Edit ▸ Undo)
+- **Who has it:** Mail (Edit ▸ Undo, ⌘Z, after Delete, Move, Archive, Flag ⚠️) · Outlook (Edit ▸ Undo ⚠️)
 - **What it is (ELI5):** You deleted the wrong mail by accident. Press ⌘Z and it's back where it was, like the "oops" button in every text editor.
 - **What we have today:** No undo for actions on messages. A deleted mail must be found in Trash and moved back by hand.
+- **Picture:**
+
+  ```
+  Edit ▸ Undo Delete Message   ⌘Z
+       Redo                    ⇧⌘Z
+  ```
 
 ### 8. Undo Send
 
@@ -265,6 +296,15 @@ Labels used in the chapters:
 - **Who has it:** Mail (Settings ▸ General: New message notifications) · Outlook (Preferences ▸ Notifications: show subject and preview)
 - **What it is (ELI5):** When a new mail arrives, a little box pops up in the corner of the screen, even if you are in another app: "Anna: Lunch today?". You don't have to keep looking at the mail window.
 - **What we have today:** No notifications. You only see new mail when you look at the app.
+- **Picture:**
+
+  ```
+                           ┌──────────────────────────────┐
+                           │ ✉ Mail                  now  │
+                           │ Anna Schmidt                 │
+                           │ Lunch today?                 │
+                           └──────────────────────────────┘
+  ```
 
 ### 10. Unread count on the Dock icon
 
@@ -283,7 +323,7 @@ Labels used in the chapters:
 ### 11. Instant new mail
 
 - **Priority:** HIGH
-- **Who has it:** Mail (Exchange accounts: push) · Outlook (always connected to Exchange)
+- **Who has it:** Mail (Exchange accounts: push ⚠️) · Outlook (always connected to Exchange ⚠️)
 - **What it is (ELI5):** The server taps the app on the shoulder the moment a new mail arrives, so it shows up within a second, instead of the app asking "anything new?" over and over.
 - **What we have today:** The app asks the server every 15 seconds. New mail can take up to 15 seconds to appear. On the [roadmap](../README.md#roadmap) (EWS notifications).
 
@@ -293,6 +333,13 @@ Labels used in the chapters:
 - **Who has it:** Mail (Mailbox ▸ New Mailbox…, Rename…, Delete…; the same in the sidebar's right-click menu) · Outlook (New Folder, Rename, Move, Delete in the folder's right-click menu)
 - **What it is (ELI5):** Folders are drawers for your mail. You should be able to make a new drawer ("Project X"), give it another name, or throw it away, right in the app.
 - **What we have today:** Folders made elsewhere show up after a relaunch, but you can't make, rename or delete one here. *Specced:* [`create-sub-inbox`](../specs/changes/create-sub-inbox.md).
+- **Picture:**
+
+  ```
+  Right-click "Projects" ▸ New Mailbox…
+                          Rename Mailbox…
+                          Delete Mailbox…
+  ```
 
 ### 13. Out of Office replies
 
@@ -320,20 +367,44 @@ Labels used in the chapters:
 - **Who has it:** Mail (Settings ▸ Accounts: description, full name, server settings, enable/disable, remove with −) · Outlook (Preferences ▸ Accounts)
 - **What it is (ELI5):** If your password, server or name changes, or you leave a job, you should be able to fix or delete the account in Settings.
 - **What we have today:** Accounts can only be added. Changing or removing one isn't possible in the app, and every account is named after its email address.
+- **Picture:**
+
+  ```
+  ┌ Settings ▸ Accounts ─────────────────────────┐
+  │ ● Exchange   │ Description: [ Work         ] │
+  │ ● Private    │ Full Name:   [ Till Example ] │
+  │              │ Server:      [ mail.example ] │
+  │  [+]  [−]    │ [✓] Enable this account        │
+  └──────────────────────────────────────────────┘
+  ```
 
 ### 15. Search on the server
 
 - **Priority:** HIGH
-- **Who has it:** Mail (Exchange and IMAP search on the server for mail not on this Mac) · Outlook (search Current Folder / Current Mailbox / All Mailboxes, including the Online Archive)
+- **Who has it:** Mail (Exchange and IMAP search on the server for mail not on this Mac ⚠️) · Outlook (search Current Folder / Current Mailbox / All Mailboxes, including the Online Archive)
 - **What it is (ELI5):** Your mailbox on the server may hold years of mail that isn't on this Mac yet. Server search asks the server to look through all of it, not just what was downloaded.
 - **What we have today:** Search looks only at mail stored on this Mac, and only in the text that was loaded. Mail whose text was never opened is searched by subject, people and preview only. See [search.md](../specs/system/search.md).
+- **Picture:**
+
+  ```
+  🔍 invoice 2019
+    On this Mac (12)
+    On the server (240)   ← years of mail not downloaded
+  ```
 
 ### 16. Find text inside a message
 
 - **Priority:** HIGH
 - **Who has it:** Mail (Edit ▸ Find ▸ Find… ⌘F, Find Next ⌘G, Find Previous ⇧⌘G) · Outlook (Find in the message)
 - **What it is (ELI5):** In a very long mail, press ⌘F, type "price", and the app jumps to every place where "price" is written, marked in yellow.
-- **What we have today:** No find inside the opened message.
+- **What we have today:** No find inside the opened message; the Edit menu has no Find (checked: a SwiftUI app's default Edit menu has none).
+- **Picture:**
+
+  ```
+  ┌ 🔍 price          2 of 5  [<] [>]  Done ┐
+   … the total price is 400 € and the price for …
+                ^^^^^           ^^^^^ (yellow)
+  ```
 
 ### 17. Print a message
 
@@ -341,6 +412,15 @@ Labels used in the chapters:
 - **Who has it:** Mail (File ▸ Print… ⌘P; Print button for the toolbar) · Outlook (Print…, Page Setup)
 - **What it is (ELI5):** Put the mail on paper, or into a PDF through the print window, e.g. a ticket or an invoice.
 - **What we have today:** No Print in the menu. ⌘P does nothing.
+- **Picture:**
+
+  ```
+  File ▸ Print…   ⌘P
+       ┌ Print ───────────────────┐
+       │ Printer: [Office ▾]      │
+       │ [PDF ▾]  [Cancel] [Print]│
+       └──────────────────────────┘
+  ```
 
 ### 18. Sort the message list
 
@@ -364,9 +444,18 @@ Labels used in the chapters:
 ### 19. Ask before quitting with unsent messages
 
 - **Priority:** HIGH
-- **Who has it:** Mail (quitting with open compose windows asks to save them as drafts) · Outlook (the same)
+- **Who has it:** Mail (quitting with open compose windows asks to save them as drafts ⚠️) · Outlook (the same ⚠️)
 - **What it is (ELI5):** If you quit the app while a half-written mail is open, the app first asks "Save this as a draft?", so your writing isn't lost.
 - **What we have today:** Closing one compose window asks. Quitting the whole app doesn't, so unsaved text can be lost.
+- **Picture:**
+
+  ```
+  ┌──────────────────────────────────────────┐
+  │ You have 2 unsent messages.              │
+  │ Do you want to review them before quit?  │
+  │      [Review…]  [Discard & Quit] [Cancel]│
+  └──────────────────────────────────────────┘
+  ```
 
 ### 20. Be the default email app
 
@@ -374,20 +463,41 @@ Labels used in the chapters:
 - **Who has it:** Mail (Settings ▸ General: Default email reader) · Outlook (sets itself as the default)
 - **What it is (ELI5):** When you click an email link on a website ("mailto:"), or choose Share ▸ Email in another app, the Mac opens a new mail in *your* mail app. That only works if the app can be chosen as the default.
 - **What we have today:** The app can't open `mailto:` links, so it can't be the default mail app; those clicks open Apple Mail or Outlook.
+- **Picture:**
+
+  ```
+  Settings ▸ General
+    Default email reader: [ MailReplica ▾ ]
+  ```
 
 ### 21. Spell checking while typing
 
 - **Priority:** HIGH
 - **Who has it:** Mail (Edit ▸ Spelling and Grammar; Settings ▸ Composing: Check spelling As I Type / When I Click Send / Never) · Outlook (spelling and grammar, AutoCorrect)
 - **What it is (ELI5):** Words with a typo get a red wavy line under them while you write. Right-click shows the right spelling.
-- **What we have today:** The compose window doesn't turn spell checking on, and there is no setting or Spelling menu for it.
+- **What we have today:** The compose text has spell checking off, and the Edit menu has no Spelling and Grammar item to turn it on (checked: a SwiftUI app's default Edit menu has none), and there is no setting.
+- **Picture:**
+
+  ```
+  Ich freu mich auf das Treffn.
+                        ~~~~~~~ ← red wave, right-click: "Treffen"
+  ```
 
 ### 22. Shared mailboxes
 
 - **Priority:** HIGH
-- **Who has it:** Outlook (File ▸ Open ▸ Shared Mailbox… and Other User's Folder…) · Mail (Exchange accounts, limited)
+- **Who has it:** Outlook (File ▸ Open ▸ Shared Mailbox… and Other User's Folder…) · Mail (Exchange accounts, limited ⚠️)
 - **What it is (ELI5):** A team inbox like "support@company.com" that several people can read and answer. It shows up in the sidebar next to your own mailbox.
 - **What we have today:** Only your own mailbox. Team mailboxes can't be opened.
+- **Picture:**
+
+  ```
+  ▾ Exchange
+      Inbox
+      Sent
+  ▾ Support (shared)       ← team mailbox
+      Inbox            12
+  ```
 
 ### 23. Send from another address or on behalf of someone
 
@@ -395,6 +505,13 @@ Labels used in the chapters:
 - **Who has it:** Outlook (From picker; "on behalf of"; send as a shared mailbox) · Mail (From picker; Settings ▸ Accounts: Edit Email Addresses…)
 - **What it is (ELI5):** Choose which address a mail comes from: your own, your team address, or your boss's (if you are allowed). The reader then sees e.g. "Ben on behalf of Anna".
 - **What we have today:** Mail always goes from the account's own address. There is no From picker.
+- **Picture:**
+
+  ```
+  From: [ Till Example <till@example.com>      ▾ ]
+           Support Team <support@example.com>
+           Anna Schmidt (on behalf of)
+  ```
 
 ## MEDIUM priority
 
@@ -428,6 +545,16 @@ Labels used in the chapters:
 - **What it is (ELI5):** A flag that says *when* you must deal with a mail: "Tomorrow". The mail then shows up in your to-do list for that day and the app can remind you.
 - **What we have today:** Seven flag colours, without dates or reminders. On Exchange the colour stays on this Mac.
 - **Learn more:** [Outlook for Mac keyboard shortcuts](https://support.microsoft.com/en-us/accessibility/outlook/mac/keyboard-shortcuts-in-outlook-for-mac) (Follow Up shortcuts)
+- **Picture:**
+
+  ```
+  Follow Up ▸ Today
+              Tomorrow
+              This Week
+              Next Week
+              Custom Date…
+              Mark as Complete
+  ```
 
 ### 27. Rules
 
@@ -450,6 +577,15 @@ Labels used in the chapters:
 - **Who has it:** Mail (Mailbox ▸ New Smart Mailbox…, Edit Smart Mailbox…, New Smart Mailbox Folder…) · Outlook (Smart Folders, Search Folders)
 - **What it is (ELI5):** A "magic folder" that collects mail by a rule you set, without moving it: "all mail from Anna with attachments from the last 30 days". It always stays up to date.
 - **What we have today:** Only the built-in ones (All Inboxes, VIPs, Flagged, Unread). You can't make your own.
+- **Picture:**
+
+  ```
+  Smart Mailbox Name: [ Anna with files ]
+  Contains messages that match [all ▾] of:
+    [From ▾]            [contains ▾]  anna
+    [Contains attachments ▾]
+    [Date Received ▾]   [is in the last ▾] 30 days
+  ```
 
 ### 29. Save a search
 
@@ -462,22 +598,27 @@ Labels used in the chapters:
 ### 30. Search filters
 
 - **Priority:** MEDIUM
-- **Who has it:** Mail (search suggestions: People, Subject, Attachments; date words) · Outlook (Advanced Search ⇧⌘F with criteria rows; `hasattachments:yes`, `from:`)
+- **Who has it:** Mail (search suggestions: People, Subject, Attachments; date words ⚠️) · Outlook (Advanced Search ⇧⌘F with criteria rows; `hasattachments:yes`, `from:`)
 - **What it is (ELI5):** Tell the search *what* you mean: "from Anna" (not mails that just mention Anna), "has attachment", "last week". Like the filters in an online shop.
 - **What we have today:** Every word must match somewhere (subject, sender, To, Cc, text). You can't say which field or limit by date or attachments.
 - **Learn more:** [Search refiners in Outlook](https://support.microsoft.com/topic/86fe4399-fba1-42e1-8057-6a5d7f99a230)
+- **Picture:**
+
+  ```
+  🔍 [From: Anna ×] [Has attachment ×] budget▌
+  ```
 
 ### 31. Search in this mailbox only
 
 - **Priority:** MEDIUM
-- **Who has it:** Mail (search bar scope: All or the selected mailbox) · Outlook (Current Folder / Current Mailbox / All Mailboxes)
+- **Who has it:** Mail (search bar scope: All or the selected mailbox ⚠️) · Outlook (Current Folder / Current Mailbox / All Mailboxes)
 - **What it is (ELI5):** Look only in the folder you are in ("only in Project X"), instead of everywhere.
 - **What we have today:** Search always covers the whole account. Settings to include Trash and Junk (Mail: "When searching all mailboxes, include results from Trash / Junk") are missing too.
 
 ### 32. Highlight search words in the message
 
 - **Priority:** MEDIUM
-- **Who has it:** Mail (search hits are marked in the opened message) · Outlook (search terms highlighted)
+- **Who has it:** Mail (search hits are marked in the opened message ⚠️) · Outlook (search terms highlighted ⚠️)
 - **What it is (ELI5):** You searched for "invoice". When you open a result, the word "invoice" is coloured yellow, so you see at once why this mail was found.
 - **What we have today:** Results open without any marking.
 
@@ -529,9 +670,16 @@ Labels used in the chapters:
 ### 38. Manage VIPs
 
 - **Priority:** MEDIUM
-- **Who has it:** Mail (click the star next to a sender, or Add to VIPs / Remove from VIPs; each VIP gets its own mailbox under VIPs)
+- **Who has it:** Mail (click the star next to a sender ⚠️, or Add to VIPs / Remove from VIPs; each VIP gets its own mailbox under VIPs)
 - **What it is (ELI5):** Mark the most important people (your boss, your partner) with a star. Their mails get a star in the list and their own folder, so you never miss them.
 - **What we have today:** A VIPs mailbox and stars exist, but you can't add or remove a VIP.
+- **Picture:**
+
+  ```
+  ☆ Anna Schmidt   ← click the star: she becomes a VIP
+  ★ VIPs
+      Anna Schmidt     3
+  ```
 
 ### 39. Block a sender
 
@@ -539,6 +687,13 @@ Labels used in the chapters:
 - **Who has it:** Mail (Block Sender / Unblock Sender in the message menu; Settings ▸ Junk Mail ▸ Blocked: mark as blocked, or move to Trash) · Outlook (Block Sender)
 - **What it is (ELI5):** Someone keeps sending you mail you don't want. Block them, and their mails go straight to the bin from then on.
 - **What we have today:** Only Move to Junk for single mails.
+- **Picture:**
+
+  ```
+  ┌───────────────────────────────────────────┐
+  │ ⛔ This message is from a blocked sender.  │
+  └───────────────────────────────────────────┘
+  ```
 
 ### 40. Junk mail settings and safe senders
 
@@ -572,7 +727,7 @@ Labels used in the chapters:
 ### 43. Always load pictures from a trusted sender
 
 - **Priority:** MEDIUM
-- **Who has it:** Outlook ("Automatically download pictures from the Internet: in all messages / from my contacts / never"; per sender "Always download from this sender") · Mail (Settings ▸ Privacy)
+- **Who has it:** Outlook ("Automatically download pictures from the Internet: in all messages / from my contacts / never"; per sender "Always download from this sender" ⚠️) · Mail (Settings ▸ Privacy)
 - **What it is (ELI5):** Pictures from outside are blocked to protect you. For senders you trust, you want to say "always show pictures from this one", once.
 - **What we have today:** Load Remote Content works for one mail at a time. Settings has Always / My organisation / Ask, but nothing per sender or for your contacts.
 
@@ -583,6 +738,15 @@ Labels used in the chapters:
 - **What it is (ELI5):** Write the mail now, but let it go out tomorrow at 9:00. Useful so you don't send work mail at midnight.
 - **What we have today:** Send goes out at once.
 - **Learn more:** [Schedule send for Outlook on Mac](https://support.microsoft.com/en-us/office/schedule-send-for-outlook-on-mac-a02097de-76c2-4895-9557-0818ef229024) · [Delay or schedule sending](https://support.microsoft.com/en-us/office/delay-or-schedule-sending-email-messages-026af69f-c287-490a-a72f-6c65793744ba)
+- **Picture:**
+
+  ```
+  [ Send ▾ ]
+      Send Now
+      Send 9:00 PM Tonight
+      Send 8:00 AM Tomorrow
+      Send Later…
+  ```
 
 ### 45. Forgotten attachment reminder
 
@@ -590,6 +754,14 @@ Labels used in the chapters:
 - **Who has it:** Outlook ("You might have forgotten to attach a file.")
 - **What it is (ELI5):** You wrote "please find attached" but attached nothing. When you press Send, the app asks: "Did you forget the attachment?"
 - **What we have today:** No check.
+- **Picture:**
+
+  ```
+  ┌──────────────────────────────────────────────┐
+  │ You wrote "attached" but there is no file.   │
+  │                 [Send Anyway]  [Add File…]   │
+  └──────────────────────────────────────────────┘
+  ```
 
 ### 46. Recipient warnings
 
@@ -597,6 +769,14 @@ Labels used in the chapters:
 - **Who has it:** Outlook (MailTips: recipient is outside the company, recipient has an automatic reply on, very large audience)
 - **What it is (ELI5):** Before you send, the app warns you: "Anna is on holiday until Monday" or "Ben is outside your company". So you don't send something to the wrong person or wait for an answer that can't come.
 - **What we have today:** Only the size limit from MailTips (Message Size in red). No other warnings.
+- **Picture:**
+
+  ```
+  ┌─────────────────────────────────────────────────┐
+  │ ℹ Anna Schmidt: automatic reply: away until 6/1 │
+  │ ⚠ ben@other.org is outside your organisation    │
+  └─────────────────────────────────────────────────┘
+  ```
 
 ### 47. Priority of a message
 
@@ -604,6 +784,12 @@ Labels used in the chapters:
 - **Who has it:** Mail (Message ▸ Set Priority ▸ Low / Normal / High; View ▸ Priority Field in compose) · Outlook (Importance: High / Normal / Low)
 - **What it is (ELI5):** Mark a mail as "urgent" (a red !) or "not urgent" (a blue arrow). The receiver sees the sign in their list.
 - **What we have today:** Priority isn't shown on received mail and can't be set when writing.
+- **Picture:**
+
+  ```
+  ! Anna Schmidt     10:42   ← high priority
+  ↓ Newsletter       09:00   ← low priority
+  ```
 
 ### 48. Read receipts
 
@@ -615,9 +801,19 @@ Labels used in the chapters:
 ### 49. Contact card for a sender
 
 - **Priority:** MEDIUM
-- **Who has it:** Mail (click a name: address, Add to Contacts, Add to VIPs, Copy Address, New Email; Settings ▸ Viewing: Use Smart Addresses) · Outlook (contact card with phone, office, manager)
+- **Who has it:** Mail (click a name: address, Add to Contacts, Add to VIPs, Copy Address, New Email ⚠️; Settings ▸ Viewing: Use Smart Addresses) · Outlook (contact card with phone, office, manager ⚠️)
 - **What it is (ELI5):** Click on a sender's name to see who they are: email address, phone, job title, and buttons like "write a new mail" or "copy address".
 - **What we have today:** The header is text you can select and copy, but a name can't be clicked: no card, no buttons.
+- **Picture:**
+
+  ```
+  ┌ Anna Schmidt ────────────────────┐
+  │ anna.schmidt@example.com         │
+  │ Sales · +49 89 000000            │
+  │ [New Email] [Add to VIPs]        │
+  │ [Copy Address] [Add to Contacts] │
+  └──────────────────────────────────┘
+  ```
 
 ### 50. Add sender to Contacts
 
@@ -660,6 +856,13 @@ Labels used in the chapters:
 - **Who has it:** Outlook (Preferences ▸ Reading: "When selection changes", "When viewed in the reading pane for N seconds", "Only when opened in a separate window", "Never") · Mail (Settings ▸ Viewing: Mark as read)
 - **What it is (ELI5):** Decide when a mail stops being "new": as soon as you click it, after you looked at it for 5 seconds, or only when you say so. Then clicking through the list doesn't hide what you haven't really read.
 - **What we have today:** A mail is marked read the moment you select it.
+- **Picture:**
+
+  ```
+  Mark as read: (•) When selected
+                ( ) After [5] seconds
+                ( ) Never
+  ```
 
 ### 56. Choose the window layout
 
@@ -764,7 +967,7 @@ Labels used in the chapters:
 - **Priority:** LOW
 - **Who has it:** Outlook (View ▸ Focused Inbox: Focused / Other) · Mail (View ▸ Show Mail Categories: Primary ⌥⌘1, Transactions ⌥⌘2, Updates ⌥⌘3, Promotions ⌥⌘4, All Mail ⌥⌘5; Show Priority Messages)
 - **What it is (ELI5):** The app sorts your Inbox into "important" and "everything else" (shops, newsletters, receipts), so you see real mail from people first.
-- **What we have today:** One Inbox. Outlook's Focused Inbox depends on Microsoft 365; Mail's sorting works on this Mac.
+- **What we have today:** One Inbox. Outlook's Focused Inbox depends on Microsoft 365 ⚠️; Mail's sorting works on this Mac.
 
 ### 69. Quick Steps
 
@@ -785,7 +988,7 @@ Labels used in the chapters:
 ### 71. Clean Up Conversation
 
 - **Priority:** LOW
-- **Who has it:** Outlook for Windows (Clean Up)
+- **Who has it:** Outlook for Windows (Clean Up ⚠️)
 - **What it is (ELI5):** In a long back-and-forth, each reply repeats the earlier ones. Clean Up deletes the older mails whose text is already quoted in a newer one, so nothing is lost but the folder is tidier.
 - **What we have today:** Nothing.
 
@@ -813,7 +1016,7 @@ Labels used in the chapters:
 ### 75. Resend a message
 
 - **Priority:** LOW
-- **Who has it:** Outlook (Message ▸ Resend) · Mail (Send Again, from Sent)
+- **Who has it:** Outlook (Message ▸ Resend) · Mail (Send Again, from Sent ⚠️)
 - **What it is (ELI5):** Open a mail you already sent as a new mail with the same text and people, change it if needed, and send it again.
 - **What we have today:** Nothing.
 
@@ -850,7 +1053,7 @@ Labels used in the chapters:
 ### 80. Sensitivity and protection labels
 
 - **Priority:** LOW
-- **Who has it:** Outlook (Sensitivity: Normal, Personal, Private, Confidential; sensitivity labels; Restrict Permissions / Do Not Forward)
+- **Who has it:** Outlook (Sensitivity: Normal, Personal, Private, Confidential ⚠️; sensitivity labels; Restrict Permissions / Do Not Forward)
 - **What it is (ELI5):** Stamp a mail "Confidential". With protection, the receiver can't forward, copy or print it.
 - **What we have today:** Nothing. Labels and protection need Microsoft 365 services.
 
@@ -866,7 +1069,7 @@ Labels used in the chapters:
 - **Priority:** LOW
 - **Who has it:** Outlook (Message ▸ React: 👍 ❤️ 😄 …)
 - **What it is (ELI5):** Answer with a thumbs-up instead of writing "OK, thanks", like in a chat app.
-- **What we have today:** Nothing. Reactions need Microsoft 365.
+- **What we have today:** Nothing. Reactions likely need Microsoft 365 ⚠️.
 
 ### 83. Translate a message
 
@@ -936,7 +1139,7 @@ Labels used in the chapters:
 
 - **Priority:** LOW
 - **Who has it:** Mail (Settings ▸ Accounts: Send large attachments with Mail Drop; "Use Mail Drop" when a mail is too big)
-- **What it is (ELI5):** Apple's version of cloud links: big files go to iCloud for 30 days and the mail carries a download link.
+- **What it is (ELI5):** Apple's version of cloud links: big files go to iCloud for a limited time (30 days ⚠️) and the mail carries a download link.
 - **What we have today:** *Not possible here:* Mail Drop needs an Apple Account sign-in and has no API for other apps (README).
 
 ### 93. Hide My Email
@@ -956,7 +1159,7 @@ Labels used in the chapters:
 ### 95. Save a message as a file
 
 - **Priority:** LOW
-- **Who has it:** Mail (File ▸ Save As… ⇧⌘S: Rich Text, Plain Text, Raw Message Source; drag a mail to the Finder) · Outlook (Save As…; drag to the desktop as .eml)
+- **Who has it:** Mail (File ▸ Save As… ⇧⌘S: Rich Text Format; Plain Text and Raw Message Source ⚠️; drag a mail to the Finder ⚠️) · Outlook (Save As…; drag to the desktop as .eml)
 - **What it is (ELI5):** Keep a mail as a file in a folder on your Mac, e.g. next to the project's documents.
 - **What we have today:** Not possible.
 
@@ -1133,11 +1336,11 @@ Labels used in the chapters:
 - **Priority:** LOW
 - **Who has it:** Outlook (Read Aloud, Immersive Reader on Windows; Speech on Mac) · Mail (Edit ▸ Speech)
 - **What it is (ELI5):** The computer reads the mail to you out loud.
-- **What we have today:** Nothing in the menus (macOS Spoken Content may still read selected text).
+- **What we have today:** No Speech item in the Edit menu (checked: a SwiftUI app's default Edit menu has none). macOS Spoken Content may still read selected text.
 
 ### 121. Tabs
 
 - **Priority:** LOW
 - **Who has it:** Mail (File ▸ New Viewer Tab ⇧⌥⌘N)
 - **What it is (ELI5):** Several mail views as tabs in one window, like tabs in a web browser: one for the Inbox, one for a project folder.
-- **What we have today:** A second window (File ▸ New Viewer Window ⌥⌘N), but no tabs.
+- **What we have today:** A second window (File ▸ New Viewer Window ⌥⌘N), but no New Viewer Tab command. macOS may still offer to merge the windows into tabs ⚠️.
