@@ -61,7 +61,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [091](BUG-091-moving-placed-picture-not-a-change.md) | P4 | Models | Moving a picture to another place in the text doesn't count as a change, so closing the window discards it without asking |
 | [092](BUG-092-refresh-before-restore-duplicates-inbox.md) | P4 | MailStore | A refresh that runs before launch has restored the stored Inbox duplicates Inbox messages |
 | [093](BUG-093-server-deletion-keeps-queued-changes.md) | P4 | MailStore | Changes queued for a message that the server reports deleted stay in the outbox and are sent anyway |
-| [094](BUG-094-save-while-original-files-load-discards-message.md) | P2 | MailStore | Closing a forward while its original files are still loading: Save in the sheet throws the message away |
 | [095](BUG-095-send-in-flight-at-quit-sent-again-after-relaunch.md) | P2 | MailStore | A send that is on its way when the app quits (or crashes) is sent again at the next launch |
 | [096](BUG-096-unreachable-account-blocks-other-accounts-outbox.md) | P2 | MailStore | One unreachable account holds up every other account's changes and sends |
 | [097](BUG-097-preconnect-reaches-sender-server.md) | P2 | HTMLPage | <link rel="preconnect"> in a blocked mail opens a connection to the sender's server, so opening the mail is reported although remote content is blocked |

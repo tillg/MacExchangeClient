@@ -115,7 +115,8 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
 - Size: estimated size above the account's MailTips limit shows red "(maximum …)"; Send then asks first (Try
   Sending in Email / Cancel).
 - Closing a window with user changes (not the original's files) asks "Save this message as a draft?" (Save / Cancel
-  / Don't Save). Invite answers close without asking.
+  / Don't Save). Invite answers close without asking. `saveDraft` returns false while a forward's original files
+  load; the sheet's Save then keeps the window open and saves and closes it once they are in (`closeWhenLoaded`).
 - Send on an Exchange account queues `send`; without a server the message is added to Sent. Save Draft likewise
   queues `saveDraft` or adds a local Drafts message (with To and Cc).
 

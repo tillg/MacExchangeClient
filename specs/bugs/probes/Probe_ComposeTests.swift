@@ -197,29 +197,6 @@ struct Probe_ComposeTests {
 
     // MARK: Save / send without a server and while files load
 
-    /// Closing a forward whose original files are still downloading: the window's sheet offers Save, which calls
-    /// `saveDraft` and closes the window. `saveDraft` refuses while files load, so the text typed is lost.
-    @Test func saveDraftWhileOriginalFilesLoadKeepsTheText() {
-        let original = msg(home, subject: "Contract")
-        let s = store([original])
-        var d = s.draft(.forward, to: original.id)
-        d.loadingOriginal = original.id  // still downloading
-        d.to = "bo@x.com"
-        d.body = "Please sign by Friday." + d.body
-        s.saveDraft(d)
-        #expect(s.messages.contains { $0.mailbox == .drafts && $0.body.contains("Please sign") },
-                "drafts: \(s.messages.filter { $0.mailbox == .drafts }.map(\.subject)), status: \(s.status ?? "nil")")
-        // Same on Exchange: nothing is queued either.
-        let x = store([])
-        x.merge([(.inbox, [msg(work, subject: "Contract")])], account: work.id)
-        var e = x.draft(.forward, to: x.messages[0].id)
-        e.loadingOriginal = x.messages[0].id
-        e.to = "bo@x.com"; e.body = "Please sign by Friday." + e.body
-        x.saveDraft(e)
-        #expect(!x.outbox.isEmpty || x.messages.contains { $0.mailbox == .drafts },
-                "Exchange: outbox \(x.outbox.count), drafts \(x.messages.filter { $0.mailbox == .drafts }.count), status: \(x.status ?? "nil")")
-    }
-
     /// README: "Changes to Exchange mail show at once and are then written to the server … Send and Save Draft."
     @Test func savedDraftOnExchangeShowsAtOnce() {
         let s = store([])
