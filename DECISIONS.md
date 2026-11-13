@@ -17,6 +17,7 @@ edited: 2026-11-13
   - [13:58 — Commit while timing and WebKit tests fail under the hunters' load](#run-2026-11-13-1235-7)
   - [14:40 — BUG-194 deferred: its fix contradicts an existing test](#run-2026-11-13-1235-8)
   - [14:38 — Keychain items keyed "user@host", old username-only items still read](#run-2026-11-13-1235-9)
+  - [14:48 — The compose wishes get their own change spec, in four shippable parts](#run-2026-11-13-1235-10)
 
 # 2026-11-12 23:16 — Unattended bug-fix run {#run-2026-11-12-2316}
 
@@ -996,3 +997,13 @@ edited: 2026-11-13
 - **Why:** the user's existing account keeps working with no new sign-in; a new sign-in writes the per-server item.
 - **Alternatives:** `kSecClassInternetPassword` with `kSecAttrServer` (cleaner, but a different item class: the old item would need copying and a new "Always Allow").
 - **Consequences:** until an account signs in again, it can still read a stale shared old item; the README's live-test note (account = username) still works through the fallback. Rollback: revert the commit, the old items are untouched.
+
+## 14:48 — The compose wishes get their own change spec, in four shippable parts {#run-2026-11-13-1235-10}
+
+- **Status:** open
+- **Context:** during the run the user asked for a change spec for Mail's buttons over the message (`specs/changes/message-hover-actions/`), then: "Maybe extend your feature description" with four compose-window wishes (left-aligned labels, Bcc, names from Contacts, formatting bar) and a comparison screenshot.
+- **Question:** extend the hover-buttons spec, or write a new one?
+- **Decision:** a new spec, `specs/changes/compose-like-mail/` (screenshot next to it), split into four parts that ship one by one (labels, Bcc, names, formatting); the hover spec is unchanged. Neither is built in this run.
+- **Why:** a different window and code; one spec per feature keeps each reviewable. Building them wasn't asked for, and part 4 reverses README's "Not planned: rich-text compose", which the user should see first.
+- **Alternatives:** one combined spec (mixes unrelated work); start building part 1/2 now (not asked).
+- **Consequences:** the user reviews both specs; `/spec:apply` can build them later.
