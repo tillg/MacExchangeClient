@@ -242,6 +242,10 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
         let quote = #"(?:["']|&quot;|&apos;|&#0*3[49];|&#x0*2[27];)?"#
         let remote = #"(src|background|poster)\s*=\s*["']?\s*https?:|srcset\s*=\s*["']?[^"'>]*https?:"#
             + #"|<link\b[^>]*\bhref\s*=\s*["']?\s*https?:|url\(\s*"# + quote + #"\s*https?:|@import\s*"# + quote + #"\s*https?:"#
+            // SVG <image>/<feImage> href, CSS image-set() with a quoted address, and a web <base> (relative pictures
+            // then load from the web) (BUG-189).
+            + #"|<(image|feImage)\b[^>]*\bhref\s*=\s*["']?\s*https?:|image-set\(\s*"# + quote + #"\s*https?:"#
+            + #"|<base\b[^>]*\bhref\s*=\s*["']?\s*https?:"#
         func found(_ s: String) -> Bool { s.range(of: remote, options: [.regularExpression, .caseInsensitive]) != nil }
         // The browser decodes character references first: "&#104;ttp://" is a web address too (BUG-190).
         return found(html) || (html.contains("&#") && found(HTMLPage.decodingCharacterReferences(html)))

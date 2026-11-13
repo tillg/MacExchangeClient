@@ -28,6 +28,16 @@ struct MessageTests {
         #expect(message("Hi\r\n> quoted\r\n\nBye ").preview == "Hi Bye")
     }
 
+    /// BUG-189: SVG images, CSS image-set() and a web <base> (which makes relative pictures load from the web).
+    @Test func svgImageImageSetAndBaseAreRemoteContent() {
+        func html(_ h: String) -> Message { var m = message(""); m.html = h; return m }
+        #expect(html(#"<svg><image href="https://t.example/a.png"/></svg>"#).hasRemoteContent)
+        #expect(html(#"<svg><image xlink:href='https://t.example/a.png'/></svg>"#).hasRemoteContent)
+        #expect(html(#"<div style="background-image: image-set('https://t.example/a.png' 1x)">x</div>"#).hasRemoteContent)
+        #expect(html(#"<base href="https://t.example/"><img src="a.png">"#).hasRemoteContent)
+        #expect(!html(#"<a href="https://t.example/">link</a>"#).hasRemoteContent)
+    }
+
     /// BUG-190: a web address written with character references (as the browser decodes them) is remote content too.
     @Test func entityEncodedWebAddressIsRemoteContent() {
         func html(_ h: String) -> Message { var m = message(""); m.html = h; return m }
