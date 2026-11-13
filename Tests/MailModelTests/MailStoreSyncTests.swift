@@ -378,6 +378,20 @@ struct MailStoreSyncTests {
         #expect(s.draft(.replyAll, to: a).cc == "bob@y.com")
     }
 
+    /// BUG-186 follow-up: a later summary (which has no Reply-To) keeps the loaded body's Reply-To, so replies still
+    /// go there after the next sync.
+    @Test func laterSummaryKeepsTheReplyToOfALoadedBody() {
+        let sum = remote("A")
+        let s = MailStore(accounts: [work], messages: [])
+        s.apply(SyncResult(upserts: [sum], deletedRemoteIDs: [], token: "t0", more: false), account: work.id, mailbox: .inbox)
+        let a = id(s, "A")
+        s.setBody(MessageBody(text: "Full", attachments: [], from: sum.from,
+                              to: sum.to, cc: sum.cc, replyTo: [Contact(name: "Support", email: "support@shop.example")]), for: a)
+        s.apply(SyncResult(upserts: [sum], deletedRemoteIDs: [], token: "t1", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.needsBody == false)
+        #expect(s.draft(.reply, to: a).to == "support@shop.example")
+    }
+
     /// The same through the newest-50 lookup, which merges the same summaries on every check of a folder still syncing.
     @Test func newestLookupKeepsTheRecipientAddressesOfALoadedBody() {
         let s = MailStore(accounts: [work], messages: [])
