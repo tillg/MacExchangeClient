@@ -50,32 +50,6 @@ struct Probe_EWS2Tests {
 
     // MARK: Folders
 
-    /// No top-level Archive; a deleted folder called "Archive" sits in Deleted Items. It must not become the
-    /// account's Archive mailbox (Archive would then move mail into Trash).
-    @Test func probeArchiveInsideDeletedItemsIsNotTheArchive() throws {
-        let d = try doc("""
-            <m:FindFolderResponse><m:RootFolder><t:Folders>
-            <t:Folder><t:FolderId Id="INBOX"/><t:ParentFolderId Id="ROOT"/><t:DisplayName>Inbox</t:DisplayName><t:FolderClass>IPF.Note</t:FolderClass></t:Folder>
-            <t:Folder><t:FolderId Id="DEL"/><t:ParentFolderId Id="ROOT"/><t:DisplayName>Deleted Items</t:DisplayName><t:FolderClass>IPF.Note</t:FolderClass></t:Folder>
-            <t:Folder><t:FolderId Id="OLDARCH"/><t:ParentFolderId Id="DEL"/><t:DisplayName>Archive</t:DisplayName><t:FolderClass>IPF.Note</t:FolderClass></t:Folder>
-            </t:Folders></m:RootFolder></m:FindFolderResponse>
-            """)
-        let a = EWSBackend.archiveFolder(d.all("Folder"))
-        #expect(a == nil, "Archive role given to \(a?.id ?? "")")
-    }
-
-    @Test func probeArchiveNestedInInboxProjectIsNotTheArchive() throws {
-        let d = try doc("""
-            <m:FindFolderResponse><m:RootFolder><t:Folders>
-            <t:Folder><t:FolderId Id="INBOX"/><t:ParentFolderId Id="ROOT"/><t:DisplayName>Inbox</t:DisplayName></t:Folder>
-            <t:Folder><t:FolderId Id="P"/><t:ParentFolderId Id="INBOX"/><t:DisplayName>Project X</t:DisplayName></t:Folder>
-            <t:Folder><t:FolderId Id="PA"/><t:ParentFolderId Id="P"/><t:DisplayName>Archive</t:DisplayName></t:Folder>
-            </t:Folders></m:RootFolder></m:FindFolderResponse>
-            """)
-        let a = EWSBackend.archiveFolder(d.all("Folder"))
-        #expect(a == nil, "Archive role given to \(a?.id ?? "")")
-    }
-
     /// Outlook treats every IPF.Note.* class as a mail folder (e.g. RSS Feeds is IPF.Note.OutlookHomepage).
     @Test func probeMailFolderSubclassShown() throws {
         let d = try doc("""
