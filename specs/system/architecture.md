@@ -148,6 +148,9 @@ flowchart LR
   `send` goes out it is marked `inFlight` and `saveBeforeSending` writes the changes to disk and is awaited
   (`AppSetup.saveAndWait`). At launch `restore(meta)` keeps a send still marked in flight in Drafts on this Mac
   instead of queueing it, with a status to check Sent.
+  - A refused read, flag or move change undoes only while its value still holds; when a later queued change of the
+    same kind overwrote it, that change's undo copy takes this one's old value, so two refusals end in the server's
+    state (BUG-167).
   - A move whose folder list can't be read first (the list isn't known yet and GetFolder fails) counts as
     `ServerBusy`: it stays queued, it isn't undone as refused (BUG-166).
   - `AuthenticationError`: the account is paused until relaunch (or signing in again); nothing more is sent or

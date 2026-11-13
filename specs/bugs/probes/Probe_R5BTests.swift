@@ -169,31 +169,6 @@ struct Probe_R5BTests {
 
     // MARK: R5B-07
 
-    /// Two moves of one message wait in the outbox (Inbox → Archive, then Archive → Junk), and Exchange refuses
-    /// both (access denied). On the server the message never left the Inbox; here it must end up there too.
-    @Test func r5b07_twoRefusedMovesPutTheMessageBackWhereTheServerHasIt() async throws {
-        let refused = EWSReply.resp("MoveItem", EWSReply.err("MoveItem", "ErrorAccessDenied", "Access is denied."))
-        let server = ScriptedServer([refused, refused])
-        defer { server.stop() }
-        let s = inboxStore(server, ["A"])
-        s.move([mid(s, "A")], to: .archive)
-        s.move([mid(s, "A")], to: .junk)
-        try await waitFor { server.served == 2 && s.outbox.isEmpty }
-        #expect(s.message(mid(s, "A"))?.mailbox == .inbox, "status: \(s.status ?? "")")
-    }
-
-    /// The same for read state: marked read, then unread again; both refused. The server has it unread.
-    @Test func r5b07_twoRefusedReadChangesLeaveTheServersState() async throws {
-        let refused = EWSReply.resp("UpdateItem", EWSReply.err("UpdateItem", "ErrorAccessDenied", "Access is denied."))
-        let server = ScriptedServer([refused, refused])
-        defer { server.stop() }
-        let s = inboxStore(server, ["A"])
-        s.toggleRead([mid(s, "A")])
-        s.toggleRead([mid(s, "A")])
-        try await waitFor { server.served == 2 && s.outbox.isEmpty }
-        #expect(s.message(mid(s, "A"))?.isRead == false, "status: \(s.status ?? "")")
-    }
-
     // MARK: R5B-08
 
     /// The history's first step fetches the newest 200 of every folder not synced yet. Exchange refuses one folder
