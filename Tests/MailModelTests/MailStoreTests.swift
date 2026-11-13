@@ -315,6 +315,21 @@ struct MailStoreTests {
         #expect(s.inlineImages(for: kept!.id)[cid ?? ""] == InlineImage(contentType: "image/png", data: Data([1, 2])))
     }
 
+    /// A sender without a display name (Exchange gives the address as the name) is written once, also with no name at all.
+    @Test func replyAndForwardShowAnAddressWithoutNameOnce() {
+        var m = msg(work), n = msg(work, subject: "N")
+        m.from = Contact(name: "noreply@shop.com", email: "noreply@shop.com")
+        n.from = Contact(name: "", email: "bot@shop.com")
+        m.invite = Invite(start: Date(timeIntervalSince1970: 2_000_000), end: Date(timeIntervalSince1970: 2_003_600),
+                          organizer: Contact(name: "org@x.com", email: "org@x.com"))
+        let s = store([m, n])
+        let f = s.draft(.forward, to: m.id).body, r = s.draft(.reply, to: m.id).body
+        #expect(f.contains("From: noreply@shop.com\n") && !f.contains("<noreply@shop.com>"), "forward: \(f.debugDescription)")
+        #expect(r.contains(", noreply@shop.com wrote:") && !r.contains("<noreply@shop.com>"), "reply: \(r.debugDescription)")
+        #expect(s.draft(.forward, to: n.id).body.contains("From: bot@shop.com\n"))
+        #expect(s.answerDraft(.accept, to: m.id).to == "org@x.com")
+    }
+
     @Test func replyDraftQuotesOriginal() {
         let m = msg(work, subject: "Plans", from: "Ann")
         let s = store([m])

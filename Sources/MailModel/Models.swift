@@ -115,6 +115,15 @@ public struct Contact: Hashable, Codable, Sendable {
         return parts.compactMap { $0.first.flatMap { String($0).uppercased().first } }.map(String.init).joined()
     }
 
+    /// As written in a reply's attribution, a forward's header or a recipient field: "Name <addr>"; the address
+    /// alone when there is no name of its own (Exchange gives the address as the name); the name alone while the
+    /// address isn't known.
+    public var formatted: String {
+        if email.isEmpty { return name }
+        let n = name.trimmingCharacters(in: .whitespaces)
+        return n.isEmpty || n.caseInsensitiveCompare(email) == .orderedSame ? email : "\(name) <\(email)>"
+    }
+
     /// Parses "a@b.com, Name <c@d.com>; \"Doe, John\" <e@f.com>". Commas and semicolons separate recipients,
     /// except inside double quotes or `<>`; the quotes around a name are removed. A piece without an address
     /// followed by one with `<…>` is a name with a comma written without quotes (Outlook's `Last, First <addr>`).

@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Replies, forwards and invitation answers write a sender who has no name, such as a no-reply address, once instead of twice.",
             "A message that couldn't be sent is kept in Drafts with its pictures where you placed them in the text.",
             "Clicking a message that just arrived opens it faster in a large mailbox.",
             "When a draft can't be saved on the server, the message says so instead of claiming it couldn't be sent, and a message without a subject is named \"(No Subject)\".",

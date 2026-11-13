@@ -1787,7 +1787,7 @@ public final class MailStore {
         let quoted = m.body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map { "> \($0)" }
             .joined(separator: "\n")
         // A summary not loaded yet has names without addresses: no empty "<>".
-        let sender = m.from.email.isEmpty ? m.from.name : "\(m.from.name) <\(m.from.email)>"
+        let sender = m.from.formatted
         let header = kind == .forward
             ? "\n\nBegin forwarded message:\n\nFrom: \(sender)\nSubject: \(m.subject)\nDate: \(df.string(from: m.date))\n\n"
             : "\n\nOn \(df.string(from: m.date)), \(sender) wrote:\n\n"
@@ -1928,7 +1928,7 @@ public final class MailStore {
     }
 
     static func organizer(_ invite: Invite) -> String {
-        invite.organizer.map { $0.email.isEmpty ? $0.name : "\($0.name) <\($0.email)>" } ?? ""
+        invite.organizer?.formatted ?? ""
     }
 
     // MARK: Message size
