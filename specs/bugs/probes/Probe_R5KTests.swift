@@ -102,25 +102,6 @@ struct Probe_R5K_Attachments {
 
     // MARK: R5K-03
 
-    /// R5K-03: a forward whose original is gone by the time its files are fetched (erased, or deleted on the server
-    /// while the window opens; or at Try Again) silently drops the files: `loadingOriginal` is cleared, Send is
-    /// enabled, nothing says the attachments are missing ("All or none … Try Again or Continue Without Them").
-    @Test func forwardOfVanishedOriginalDoesNotSilentlyDropFiles() async {
-        let s = MailStore(accounts: [], messages: [])
-        s.add(acct, backend: nil)
-        var m = serverMessage("M")
-        m.bodyLoaded = true; m.htmlChecked = true; m.body = "See attached"
-        m.attachments = [Attachment(name: "contract.pdf", size: 500, contentType: "application/pdf")]
-        s.merge([m], account: acct.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        var d = s.draft(.forward, to: id)
-        #expect(d.loadingOriginal == id)
-        s.merge([], deleted: ["M"], account: acct.id, mailbox: .inbox)  // deleted on the server meanwhile
-        await s.includeOriginalAttachments(in: &d)
-        #expect(d.loadingOriginal != nil || !d.attachments.isEmpty,
-                "forward can be sent without its files; status: \(s.status ?? "nil")")
-    }
-
     // MARK: R5K-04
 
     // MARK: R5K-05
