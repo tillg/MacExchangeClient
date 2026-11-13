@@ -1111,6 +1111,13 @@ public final class MailStore {
                 selection.subtract(deletedOnServer)
                 forget(deletedOnServer)
             }
+            // The comment the user typed for the organizer isn't lost with the answer: kept like a failed send.
+            if case let .reply(_, r) = p.change, let comment = r.comment, let old = p.previous.first, let invite = old.invite {
+                keepInDrafts(Draft(accountID: p.account, to: Self.organizer(invite),
+                                   subject: Self.answerSubject(r.response, proposing: r.proposedStart != nil, old.subject), body: comment))
+                status = "Couldn't send your answer to “\(old.subject)”: \(error). Your comment is in Drafts on this Mac."
+                return
+            }
             status = "Exchange refused a change: \(error)"
         }
     }
@@ -1861,16 +1868,23 @@ public final class MailStore {
     /// Exchange gives it. Proposing starts from the meeting's own time.
     public func answerDraft(_ r: InviteResponse, to id: Message.ID, proposing: Bool = false) -> Draft {
         guard let m = message(id), let invite = m.invite else { return Draft(accountID: accounts[0].id) }
+        return Draft(accountID: m.accountID, to: Self.organizer(invite), subject: Self.answerSubject(r, proposing: proposing, m.subject),
+                     inviteAnswer: InviteAnswer(messageID: id, response: r, proposedStart: proposing ? invite.start : nil,
+                                                proposedEnd: proposing ? invite.end : nil))
+    }
+
+    /// "Accepted: …", "Tentative: …", "Declined: …" or "New Time Proposed: …", as Exchange titles the answer.
+    static func answerSubject(_ r: InviteResponse, proposing: Bool, _ subject: String) -> String {
         let answered = switch r {
         case .accept: "Accepted"
         case .tentative: "Tentative"
         case .decline: "Declined"
         }
-        let prefix = proposing ? "New Time Proposed" : answered
-        let to = invite.organizer.map { $0.email.isEmpty ? $0.name : "\($0.name) <\($0.email)>" } ?? ""
-        return Draft(accountID: m.accountID, to: to, subject: "\(prefix): \(m.subject)",
-                     inviteAnswer: InviteAnswer(messageID: id, response: r, proposedStart: proposing ? invite.start : nil,
-                                                proposedEnd: proposing ? invite.end : nil))
+        return "\(proposing ? "New Time Proposed" : answered): \(subject)"
+    }
+
+    static func organizer(_ invite: Invite) -> String {
+        invite.organizer.map { $0.email.isEmpty ? $0.name : "\($0.name) <\($0.email)>" } ?? ""
     }
 
     // MARK: Message size

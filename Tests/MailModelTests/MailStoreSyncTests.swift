@@ -544,6 +544,30 @@ struct MailStoreSyncTests {
         for _ in 0..<250 where !s.outbox.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
     }
 
+    /// Respond with Comments that can't reach the server: the answer is undone as before, and the comment the user
+    /// typed is kept in Drafts, to the organizer, like a failed send (BUG-102).
+    @Test func answerWithCommentIsKeptInDraftsWhenItFails() async throws {
+        let missing = FileManager.default.temporaryDirectory.appendingPathComponent("ews-sync-missing-\(UUID().uuidString).xml")
+        let s = MailStore(accounts: [], messages: [])
+        s.add(work, backend: backend(missing))  // file:// fixture (absent: offline)
+        var inv = remote("INV")
+        inv.invite = Invite(start: Date(timeIntervalSince1970: 1_800_000_000), end: Date(timeIntervalSince1970: 1_800_003_600),
+                            organizer: Contact(name: "Org", email: "org@x.com"))
+        s.merge([inv], account: work.id, mailbox: .inbox)
+        let invID = id(s, "INV")
+        let comment = "I can join for the first half hour only."
+        var d = s.answerDraft(.accept, to: invID)
+        d.body = comment
+        s.send(d)
+        try await waitForOutbox(s)
+        #expect(s.outbox.isEmpty)
+        let kept = s.messages.first { $0.mailbox == .drafts }
+        #expect(kept?.body == comment && kept?.subject == "Accepted: S INV", "drafts: \(String(describing: kept))")
+        #expect(kept?.to == [Contact(name: "Org", email: "org@x.com")])
+        #expect(s.status?.contains("Drafts") == true, "status: \(s.status ?? "nil")")
+        #expect(s.message(invID)?.mailbox == .inbox && s.message(invID)?.invite?.response == nil)
+    }
+
     /// Exchange moved A and C and reports B as gone: the new IDs of A and C come back with the refusal of B.
     @Test func moveKeepsTheNewIDsWhenOneItemIsRefused() async throws {
         let b = backend(try responseFile(response("MoveItem", movedItem("N1") + err("MoveItem", "ErrorItemNotFound") + movedItem("N3"))))
