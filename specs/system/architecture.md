@@ -81,6 +81,11 @@ flowchart LR
   doesn't drop a loaded body, attachments, invite or HTML; a message with a pending outbox change keeps its local
   read state, flag and mailbox. A deletion reported for a message with a pending move is ignored; other deletions
   win. If nothing changed, `messages` is not reassigned.
+- **Sync from the start** (no token: a new folder, after the conversation upgrade): when it begins, the store notes
+  the server IDs the folder holds (`unlisted`); each page ticks off what it lists. When the pass completes, the
+  folder's server messages it didn't list are removed (deleted or moved elsewhere meanwhile). One with a queued
+  change stays until that change is done (`drain` checks again). In memory only: a pass interrupted by quitting
+  resumes from its token and removes nothing.
 - Bodies, inline images, calendar days, attachment content and MailTips are fetched on demand by the views.
 
 ## Writing to the server: the outbox

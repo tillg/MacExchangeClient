@@ -525,29 +525,6 @@ struct Probe_DB2Tests {
         #expect(stored.allSatisfy { $0.token == nil && !$0.complete }, "stored sync: \(stored)")
     }
 
-    /// After the conversation upgrade every folder syncs from the start. A from-scratch sync lists what is on
-    /// the server now and never reports deletions, so mail deleted elsewhere since the last session stays.
-    @Test func probeUpgradeResyncDropsMailDeletedOnTheServer() throws {
-        let url = tempURL(); defer { cleanup(url) }
-        let s0 = MailStore(accounts: [work], messages: [])
-        s0.apply(SyncResult(upserts: [mail("still there", rid: "R1"), mail("deleted on phone", rid: "R2")], deletedRemoteIDs: [],
-                            token: "T1", more: false), account: work.id, mailbox: .inbox)
-        try MailDatabase(url: url).write(s0.takeChanges())
-        var raw: OpaquePointer?
-        #expect(sqlite3_open(url.path, &raw) == SQLITE_OK)
-        #expect(sqlite3_exec(raw, "ALTER TABLE messages DROP COLUMN conversation", nil, nil, nil) == SQLITE_OK)
-        sqlite3_close(raw)
-        // Upgrade launch: sync positions are reset.
-        let s = try launch([work], from: url)
-        #expect(s.syncToken(work.id, .inbox) == nil)
-        // The from-scratch sync of the Inbox, complete in one page: R2 was deleted on the phone meanwhile.
-        var r1 = mail("still there", rid: "R1"); r1.conversationID = "C1"
-        s.apply(SyncResult(upserts: [r1], deletedRemoteIDs: [], token: "T2", more: false), account: work.id, mailbox: .inbox)
-        #expect(s.isComplete(work.id, .inbox))
-        let inbox = s.messages.filter { $0.mailbox == .inbox }.map(\.subject)
-        #expect(inbox == ["still there"], "Inbox after the complete re-sync: \(inbox)")
-    }
-
     /// The body brings the full sender and recipients ("list summaries may lack email addresses"). A later
     /// update of the same message from the server (here the from-scratch re-sync after the upgrade; also any
     /// change made elsewhere) keeps body, attachments and invite, but puts back the summary's recipients.

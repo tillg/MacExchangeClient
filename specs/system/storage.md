@@ -94,7 +94,8 @@ There is no general migration framework. On open:
 1. `CREATE TABLE IF NOT EXISTS` for all tables.
 2. **Conversations:** if `messages` lacks `conversation` (checked with `pragma_table_info`), the column is added and
    every sync state is reset (`token = NULL, complete = 0`), so every folder syncs from scratch and existing messages
-   learn their conversation. Merging keeps local IDs, bodies and flag colours.
+   learn their conversation. Merging keeps local IDs, bodies and flag colours. Mail a folder's complete re-sync
+   doesn't list is removed ([architecture.md](architecture.md#reading-from-the-server)).
 3. **Search index:** `PRAGMA user_version` is the search schema version (now 1). A new database gets the index and
    version 1 at once. An older one (version 0) gets it in `prepareSearch()`, called after all mail is in memory: one
    transaction creating table, triggers and date index, `rebuild`, then `user_version = 1`. On failure it rolls back

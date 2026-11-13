@@ -32,6 +32,7 @@ Known limits of the current design, one line each. Open bugs (with repro probes 
 | Remote images load straight from the sender's server; no privacy relay | [rendering.md](rendering.md#remote-content) |
 | Attendee answers aren't shown: Exchange reports every attendee's answer as unknown on your copy | [functional.md](functional.md#meeting-invites) |
 | No rules, categories, VIP management, Remind Me, Follow Up, Mute, separate message windows or conversation grouping in the list | Root `README.md` |
+| A sync from the start that is interrupted by quitting doesn't remove mail deleted on the server meanwhile (its noted IDs are in memory only) | [architecture.md](architecture.md#reading-from-the-server) |
 | No schema migration framework: the conversation column and the search index are the only upgrades, detected ad hoc | [storage.md](storage.md#migrations) |
 | After the first sign-in (launched without accounts) the database isn't opened until relaunch: nothing is saved and search scans memory (`AppSetup.loadMail` runs once at launch) | `AccountsSettings.swift`, `MailReplicaApp.swift` |
 | Builds need the macOS 26.5 SDK for the app and a separate build folder for tests (Command Line Tools only) | `CLAUDE.md` |
