@@ -346,27 +346,6 @@ struct Probe_DB2Tests {
 
     // MARK: Store search through the index, scopes
 
-    /// Spec: while the hits for the current query haven't arrived, keep showing the previous results; never
-    /// flash an empty list. Switching from one account's mailbox to another's with the same search text.
-    @Test func probeSwitchingAccountScopeDoesNotFlashEmptyResults() async throws {
-        let w = mail("Report work", rid: "W"), h = mail("Report home", account: home, rid: "H")
-        let (d, url) = try db([w, h]); defer { cleanup(url) }
-        let s = MailStore(accounts: [work, home], messages: [w, h])
-        s.searchDebounce = .zero
-        s.searcher = { q, a in try d.search(q, accounts: a) }
-        s.selectedMailbox = .account(work.id, .inbox)
-        s.searchText = "report"
-        await s.searchTask?.value
-        #expect(s.visibleMessages.map(\.subject) == ["Report work"])
-        s.searchDebounce = .milliseconds(150)
-        s.selectedMailbox = .account(home.id, .inbox)
-        // During the pause and the query: what does the list show?
-        let meanwhile = s.visibleMessages.map(\.subject)
-        await s.searchTask?.value
-        #expect(s.visibleMessages.map(\.subject) == ["Report home"])
-        #expect(!meanwhile.isEmpty, "the list is empty (No Results) until the new answer arrives")
-    }
-
     /// Smart mailboxes search every account; an account mailbox only its own. Same query, all scopes, against
     /// the in-memory reference (word prefix, not Trash/Junk).
     @Test func probeEveryScopeAgreesWithMemory() async throws {

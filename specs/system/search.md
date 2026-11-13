@@ -48,8 +48,9 @@ query of the SQLite FTS5 index. Design history: [../change/fast-search.md](../ch
 6. Clearing the field cancels the task, drops the hits and the fallback, and clears the 2,000 notice or a "Search
    failed" notice. Any other status stays.
 
-What the list shows meanwhile: the latest answer's results (the previous query's while the next is on its way),
-also when that answer came from memory (`memoryQuery`, the query of the memory scan last shown). Before the first
+What the list shows meanwhile: the latest answer's results (the previous query's while the next is on its way,
+filtered by the scope that answer was asked for, so selecting another account's mailbox keeps them until the new
+account's answer arrives), also when that answer came from memory (`memoryQuery`, the query of the memory scan last shown). Before the first
 answer of a search — no hits, no memory results — the list shows the selected mailbox's normal content, and
 `awaitingSearchResults` is true.
 
