@@ -58,7 +58,7 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 |---|---|
 | Delete (⌘⌫) | Messages in Trash are erased (removed; server: `DeleteItem` SoftDelete); others move to the account's Trash. While a text view has the focus (compose text, a field, search), ⌘⌫ deletes to the start of the line instead (BUG-218) |
 | Archive (⌃⌘A) | Move to `.archive`, also when already there |
-| Junk (⇧⌘J) | All to Junk if any selected message is outside Junk; if all are in Junk, all to the Inbox (Not Junk) |
+| Junk (⇧⌘J) | All to Junk if any selected message is outside Junk; if all are in Junk, all to the Inbox (Not Junk); the toolbar, menu and context menu then say "Not Junk" (`isAllJunk`, BUG-182) |
 | Mark as Read/Unread (⇧⌘U) | All become read if any is unread, else all unread |
 | Toggle Flag (⇧⌘L) | Clears the flag if any selected message is flagged, else flags red (`MailStore.toggleFlag`, one pass, BUG-221) |
 | Flag ▸ colour / Clear Flag | Sets that colour on all; seven colours, red to gray |

@@ -30,7 +30,6 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [179](BUG-179-compose-from-row-centred.md) | P4 | UI / ComposeView | Compose window: the "From:" row is centred instead of lined up with To, Cc and Subject |
 | [180](BUG-180-header-date-wraps.md) | P4 | UI / MessageDetailView | Message header: the date breaks onto two lines in a narrow message pane |
 | [181](BUG-181-invite-text-squeezed.md) | P4 | UI / InviteView | Invite: the fixed 300 pt day column squeezes the message text to a few words per line |
-| [182](BUG-182-junk-button-label-in-junk.md) | P4 | UI / MessageViewer, MailCommands, MessageListView | Junk button, menu and context menu keep saying "Junk" / "Move to Junk" in the Junk mailbox, where they move mail to the Inbox |
 | [184](BUG-184-new-viewer-window-mirrors.md) | P3 | UI / MessageViewer | File ▸ New Viewer Window opens a second window that always shows the same mailbox and selection as the first (deferred) |
 | [185](BUG-185-flagged-badge-unread.md) | P4 | UI / SidebarView | Flagged in the sidebar shows no count while flagged messages are read |
 | [191](BUG-191-video-never-loads-after-load-remote-content.md) | P4 | rendering | A web video counts as remote content, but Load Remote Content never loads it (no media-src in the policy) |
