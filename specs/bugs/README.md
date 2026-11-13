@@ -18,7 +18,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [079](BUG-079-mail-of-account-no-longer-set-up-loaded-at-launch.md) | P4 | MailStore | Stored mail of an account that is no longer set up is loaded at launch and shows in All Inboxes and search (its rows are never removed) |
 | [080](BUG-080-switching-account-scope-flashes-no-results.md) | P4 | MailStore | Switching from one account's mailbox to another's during a search shows an empty list (No Results) until the new answer arrives |
 | [084](BUG-084-ipf-note-subclass-folders-hidden.md) | P4 | EWS | Mail folders whose class is a subclass of IPF.Note (e.g. IPF.Note.OutlookHomepage) are left out of the folder tree |
-| [086](BUG-086-daylayout-zero-length-events-drawn-on-top.md) | P4 | Invite | Day column: zero-length (or end-before-start) events take no room, so they are drawn on top of the event starting at the same time |
 | [087](BUG-087-save-attachment-fails-next-to-dangling-symlink.md) | P4 | MailStore | Saving an attachment fails when a broken alias/symlink with the same name is in the target folder |
 | [088](BUG-088-sign-in-resets-mailbox-and-selection.md) | P4 | MailStore | Signing in another account always jumps to All Inboxes and clears the selection, even when no sample account was removed |
 | [089](BUG-089-failed-send-status-wording.md) | P4 | MailStore | After a failed Save Draft the status says "Couldn't send …"; with no subject it reads "Couldn't send “”" |
@@ -47,9 +46,3 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [144](BUG-144-quick-look-shows-another-file.md) | P4 | MailStore | Space on an attachment that cannot be loaded opens Quick Look on a different attachment of the message |
 | [146](BUG-146-memory-search-per-keystroke-freeze.md) | P4 | MailStore | Search without the index (index build failed or still building, or "Search failed") freezes 0.6-1 s per keystroke on 180,000 messages |
 | [147](BUG-147-late-quick-look-replaces-newer.md) | P4 | MailStore | Quick Look jumps back to an earlier message’s attachment when its download finishes after you looked at another message |
-| [148](BUG-148-day-column-overnight-hours.md) | P4 | Invite | Day column of an overnight invite starts at 2 o'clock and the invite's slot is outside the grid |
-| [149](BUG-149-allday-invite-drawn-as-24h-block.md) | P4 | Invite | All-day invite is drawn in the day column as a 24-hour hatched block from 0:00 |
-| [150](BUG-150-day-column-spinner-never-stops.md) | P4 | Invite | Invite day column spins forever when the calendar can't be loaded |
-| [151](BUG-151-chosen-answer-not-highlighted.md) | P4 | Invite | Answered invite: the chosen answer button isn't highlighted (the tint has no effect) |
-| [152](BUG-152-vip-star-misaligns-sender.md) | P4 | MessageList | VIP star sits in the sender line, pushing the name out of line with subject and preview (and next to the unread dot) |
-| [153](BUG-153-list-fonts-not-13-11.md) | P4 | MessageList | README ✅ says list rows use 13 pt / 11 pt; subject, preview and date render at 12 pt |

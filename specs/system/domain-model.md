@@ -108,7 +108,10 @@ new `id` per request), so equal drafts (two New Messages, two replies to one mes
 - **`InviteResponse`**: accept, tentative, decline. **`InviteReply`**: response, `comment`, `send` (false = "Do Not
   Send a Response"), `proposedStart`/`proposedEnd`. **`InviteAnswer`**: the compose window's link to the invite.
 - **`CalendarEvent`** (subject, start, end, isAllDay, `BusyStatus`) and **`DayLayout.columns`**, which puts
-  overlapping timed events into side-by-side columns.
+  overlapping timed events into side-by-side columns. An event takes at least `DayLayout.shortest` (20 min) there,
+  so a 0-minute (or end-before-start) entry never shares a column with one starting at the same time.
+  **`DayLayout.hours(for:events:calendar:)`**: 8–18, widened to the invite (unless all-day) and the timed events;
+  a time on an earlier day counts as 0 h, on a later day as 24 h; capped at 24.
 
 ## Server changes
 

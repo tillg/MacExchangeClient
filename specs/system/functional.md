@@ -34,7 +34,8 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 - `visibleMessages`: the selected mailbox's messages, newest first. With the unread filter (⌘L) only unread ones
   (and the opened message, see below).
   While searching, the list shows search results instead and ignores the unread filter ([search.md](search.md)).
-- Row: unread dot, optional avatar, VIP star, sender (for Sent and Drafts "To: " + first recipient), date (time today,
+- Row: unread dot, or for a VIP sender a star in the same column (accent while unread, grey when read), optional
+  avatar, sender (13 pt semibold; subject, preview and date 12 pt) (for Sent and Drafts "To: " + first recipient), date (time today,
   "Yesterday", weekday within 7 days, else short date), subject, paperclip, flag, two-line preview.
 - Selecting exactly one message marks it read (one main-loop turn later), and the message view loads it.
 - A message that was unread when opened stays in the list with the unread filter and in Unread while it is selected
@@ -126,10 +127,15 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
 
 - `InviteView.swift`: required and optional attendees (first 8 + "N more"), date/time and location, then Accept,
   Tentative and Decline menus (Respond with Comments…, Respond without Comments, Do Not Send a Response) and Propose
-  New Time (with Tentative or Decline). A cancellation shows only Remove from Calendar.
+  New Time (with Tentative or Decline). The answer given is outlined in the accent colour. A cancellation shows only
+  Remove from Calendar.
 - Banners: "Please respond." or "You answered: …" (with the proposed time and "the organizer wasn't told"), and a
   yellow conflict note when timed, non-free calendar events overlap (the invite's own entry excluded).
-- Next to the text, a day column from the Exchange calendar with overlapping events side by side.
+- Next to the text, a day column from the Exchange calendar with overlapping events side by side
+  (`DayLayout`), hours from `DayLayout.hours`, the invite's slot hatched; an all-day invite is a hatched row in the
+  all-day row instead (its own all-day entry not listed again). A spinner shows until the day is loaded; when it
+  can't be (no server, account paused, an error, and no day shown yet), `MailStore.unavailableDays` holds the
+  message and the column says "Calendar not available".
 - With Comments / Propose open a compose window to the organizer with subject "Accepted: …", "Tentative: …",
   "Declined: …" or "New Time Proposed: …"; its text becomes the comment. A proposal needs both a start and an end
   ("The proposed meeting needs both a start and an end.") and must end after it starts; otherwise nothing is queued.

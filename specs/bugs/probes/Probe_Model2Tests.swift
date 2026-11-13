@@ -40,12 +40,6 @@ struct Probe_Model2Tests {
     func at(_ h: Double) -> Date { day.addingTimeInterval(h * 3600) }
     func ev(_ s: String, _ from: Double, _ to: Double) -> CalendarEvent { CalendarEvent(subject: s, start: at(from), end: at(to)) }
 
-    @Test func zeroLengthEventAndMeetingAtTheSameTimeAreSideBySide() {
-        let cols = DayLayout.columns([ev("Reminder", 9, 9), ev("Meeting", 9, 10)])
-        // Drawn at the same top (the view gives every event at least 14 pt): they must not share a column.
-        #expect(Set(cols.map(\.column)).count == 2, "\(cols.map { ($0.event.subject, $0.column, $0.of) })")
-    }
-
     // MARK: WhatsNew
 
     @Test func whatsNewHasNoDuplicateLines() {
@@ -95,30 +89,6 @@ struct Probe_Model2Tests {
             }
         }
         #expect(problems.isEmpty, "\(problems.prefix(5))")
-    }
-
-    /// With zero-length, negative and duplicate events: every placed entry is distinct (the day column's
-    /// ForEach uses the Placed value as its id), and events that start together never share a column.
-    @Test func dayLayoutWithDegenerateEventsOverRandomDays() {
-        var problems: [String] = []
-        for seed in UInt64(0)..<2000 {
-            var rng = SplitMix(state: seed)
-            var evs: [CalendarEvent] = []
-            for _ in 0..<Int.random(in: 2...8, using: &rng) {
-                let s = Double(Int.random(in: 32..<40, using: &rng)) / 4
-                let len = Double(Int.random(in: -2...4, using: &rng)) / 4
-                evs.append(ev("Busy", s, s + len))
-            }
-            let placed = DayLayout.columns(evs)
-            if placed.count != evs.count { problems.append("seed \(seed): count \(placed.count) of \(evs.count)"); continue }
-            if Set(placed).count != placed.count { problems.append("seed \(seed): duplicate Placed values") }
-            for (i, a) in placed.enumerated() {
-                for b in placed[(i + 1)...] where a.event.start == b.event.start && a.column == b.column {
-                    problems.append("seed \(seed): two events at \(a.event.start) in column \(a.column)")
-                }
-            }
-        }
-        #expect(problems.isEmpty, "\(problems.count) problems, e.g. \(problems.prefix(3))")
     }
 
     // MARK: freeURL

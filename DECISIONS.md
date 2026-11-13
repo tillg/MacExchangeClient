@@ -692,3 +692,32 @@ edited: 2026-11-13
 - **Why:** smallest change that makes each command a new window, as in Mail.
 - **Not covered:** a compose window restored by macOS from a session saved before this change opens empty (its stored value was a `Draft`).
 - **Alternatives:** an `id` inside `Draft` (rejected: changes `Draft` equality and its stored form in the outbox and caches).
+
+## 03:45 — A 0-minute calendar entry takes 20 minutes in the day column {#d-bug-086}
+
+- **Status:** decided
+- **Context:** BUG-086. `DayLayout.columns` gave a 0-minute (or end-before-start) entry no time, so it shared a column with an entry starting at the same time, while the view draws every entry at least 14 pt (about 19 minutes at 44 pt per hour) tall.
+- **Decision:** For the layout only, an entry ends no earlier than start + `DayLayout.shortest` (20 min). Its drawn height and the conflict check are unchanged.
+- **Why:** matches the room the view draws, so nothing is drawn on top; identical entries now get different columns, which also makes the column's `ForEach` ids distinct.
+- **Alternatives:** Draw zero-length entries as a line (rejected: unreadable subject).
+
+## 03:45 — "Calendar not available" when an invite's day can't be read {#d-bug-150}
+
+- **Status:** decided
+- **Context:** BUG-150. The day column showed a spinner while `dayEvents` was nil, and `loadDay` left it nil when there was no server, the account was paused or the request failed.
+- **Decision:** `MailStore.unavailableDays` holds such invites (only when no day is shown yet; a later successful load or `setDayEvents` removes it); the column shows "Calendar not available" instead of the spinner, with the empty hour grid.
+- **Alternatives:** Treat it as an empty day (rejected: would claim the calendar is free).
+
+## 03:45 — List row fonts: the code's 13/12 pt kept, the README claim corrected {#d-bug-153}
+
+- **Status:** decided
+- **Context:** BUG-153. The README marked "✅ fonts 13pt / 11pt" for list rows; the rows draw 13 pt sender and 12 pt subject, preview and date, and no source for 11 pt was found (Mail builds its list cells in code; `MessageListViewController.nib` holds no fonts). Screenshots of Mail can't be taken on this machine.
+- **Decision:** Code unchanged; the README row now says 13 pt sender, 12 pt subject, preview and date, marked ⚠️ (not checked against Mail).
+- **Open question for review:** compare with Mail.app on a screen; if Mail uses 11 pt, change the three `.system(size: 12)` in `MessageRow`.
+
+## 03:45 — The chosen invite answer is outlined {#d-bug-151}
+
+- **Status:** decided
+- **Context:** BUG-151. `.tint` and `.borderedProminent` have no effect on a bordered menu button on macOS (checked with a snapshot).
+- **Decision:** The chosen answer's menu button gets an accent-coloured rounded outline (1.5 pt) drawn around it.
+- **Alternatives:** A checkmark symbol in the label (rejected: Accept already uses a checkmark).

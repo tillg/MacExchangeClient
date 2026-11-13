@@ -124,4 +124,5 @@ Sent mail is plain text (`Draft.text`) unless a JPEG, PNG or GIF is placed in th
 
 - Avatars show `Contact.initials`; there are no contact photos.
 - List and header dates are formatted in local time ([functional.md](functional.md#message-list)).
-- Invites show times in local time; the day column spans 8–18 h, widened to fit the invite and the day's events.
+- Invites show times in local time; the day column spans 8–18 h, widened to fit the invite and the day's events
+  (`DayLayout.hours`).
