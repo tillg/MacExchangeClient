@@ -20,25 +20,6 @@ struct Probe_R5D_Compose {
 
     func store(_ m: [Message]) -> MailStore { MailStore(accounts: [work], messages: m) }
 
-    /// R5D-01: a reply goes to the Reply-To address the sender asked for (RFC 5322 §3.6.2), not to From.
-    @Test func replyGoesToReplyToAddress() throws {
-        let d = try XMLDocument(xmlString: """
-            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" \
-            xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" \
-            xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"><s:Body>\
-            <t:Message><t:ItemId Id="ID1"/><t:Body BodyType="Text">Your ticket 4711</t:Body>\
-            <t:From><t:Mailbox><t:Name>Shop</t:Name><t:EmailAddress>noreply@shop.example</t:EmailAddress></t:Mailbox></t:From>\
-            <t:ReplyTo><t:Mailbox><t:Name>Support</t:Name><t:EmailAddress>support@shop.example</t:EmailAddress></t:Mailbox></t:ReplyTo>\
-            <t:ToRecipients><t:Mailbox><t:EmailAddress>me@work.com</t:EmailAddress></t:Mailbox></t:ToRecipients></t:Message>\
-            </s:Body></s:Envelope>
-            """)
-        var m = msg(); m.bodyLoaded = false
-        let s = store([m])
-        s.setBody(EWSBackend.parseBody(try #require(d.first("Message"))), for: m.id)
-        let to = s.draft(.reply, to: m.id).to
-        #expect(to == "support@shop.example", "reply goes to \(to)")
-    }
-
     /// R5D-02: Reply All to a note only to myself goes to me, as Reply does (d-bug-029 follow-up), not to nobody.
     @Test func replyAllToNoteToSelfGoesToMe() {
         let me = Contact(name: "Me", email: "me@work.com")

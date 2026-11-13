@@ -39,7 +39,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [182](BUG-182-junk-button-label-in-junk.md) | P4 | UI / MessageViewer, MailCommands, MessageListView | Junk button, menu and context menu keep saying "Junk" / "Move to Junk" in the Junk mailbox, where they move mail to the Inbox |
 | [184](BUG-184-new-viewer-window-mirrors.md) | P3 | UI / MessageViewer | File ▸ New Viewer Window opens a second window that always shows the same mailbox and selection as the first |
 | [185](BUG-185-flagged-badge-unread.md) | P4 | UI / SidebarView | Flagged in the sidebar shows no count while flagged messages are read |
-| [186](BUG-186-reply-ignores-reply-to.md) | P2 | compose / EWS body | Reply and Reply All ignore the sender's Reply-To and go to From (e.g. noreply@) |
 | [187](BUG-187-reply-all-note-to-self-empty-to.md) | P4 | compose | Reply All to a note sent only to myself opens with an empty To |
 | [188](BUG-188-fffc-in-quoted-text-becomes-file-mark.md) | P3 | compose | A U+FFFC character in the original's text is taken for a file mark: the forwarded picture is sent inline there, Exclude Attachments deletes it from the quote |
 | [189](BUG-189-remote-content-missed-svg-imageset-base.md) | P3 | rendering / privacy | SVG <image href>, CSS image-set() and <base href> relative pictures are not seen as remote content: no banner, they can never be loaded |

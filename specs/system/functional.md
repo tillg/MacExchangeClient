@@ -120,8 +120,8 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
     sender has no name of its own, `Contact.formatted`, as for the forward header and an invite answer's To) or a "Begin forwarded message:" block (From, Subject,
     Date with long date and time incl. seconds and zone, To, Cc when there is one), then every
     line of the plain-text body (split on any line ending: `\r\n`, `\n`, `\r`) prefixed with "> ", joined with `\n`.
-  - Reply: To = the sender's address; when the sender is the account's own address (compared without case), the
-    original To addresses instead (each once, mine left out; if none is left, the sender's address). Reply All: To = sender and To addresses, Cc = the original Cc, both minus
+  - Reply: To = the Reply-To addresses if the message has any (RFC 5322; `Message.replyTo`), else the sender's address; when the sender is the account's own address (compared without case), the
+    original To addresses instead (each once, mine left out; if none is left, the sender's address). Reply All: To = Reply-To (or the sender) and To addresses, Cc = the original Cc, both minus
     the account address (compared without case); each address once across both fields (compared without case,
     first occurrence kept, so To wins); recipients without an address are left out. Forward: To empty.
 - Original attachments: Forward always loads them. Replies follow Edit ▸ Include Attachments With Replies (Never,

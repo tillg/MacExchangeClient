@@ -48,7 +48,7 @@ is made, retries, undo): [architecture.md](architecture.md). Types: [domain-mode
 | `folders()` | `GetFolder` (not strict) for `inbox`, `drafts`, `sentitems`, `junkemail`, `deleteditems`, `outbox` with `TotalCount`; then `FindFolder Deep` from `msgfolderroot`, pages of 1000 by `IndexedPagingOffset` until `IncludesLastItemInRange` (an offset that doesn't advance stops) |
 | `newest(in:limit:)` | `FindItem Shallow`, `IndexedPageItemView` offset 0, sorted by `DateTimeReceived` descending |
 | `sync(_:token:)` | `SyncFolderItems`, `MaxChangesReturned` 512, with `SyncState` when there is a token |
-| `body(remoteID:)` | `GetItem`, `BodyType Best`, `item:Body`, `item:TextBody`, attachments, From/To/Cc, invite fields |
+| `body(remoteID:)` | `GetItem`, `BodyType Best`, `item:Body`, `item:TextBody`, attachments, From/To/Cc, ReplyTo, invite fields |
 | `inlineImages` | `GetItem` attachments; then `GetAttachment` (not strict) for image attachments whose `ContentId` is wanted |
 | `attachment(remoteID:index:)` | `GetItem` attachments (IDs looked up each time; moves change them), then `GetAttachment` with `IncludeMimeContent` |
 | `events(from:to:)` | `FindItem` with `CalendarView` on the `calendar` folder |
