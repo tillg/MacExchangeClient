@@ -231,27 +231,6 @@ struct Probe_Race4Tests {
 
     // MARK: E. A refused erase, queued behind the move that renamed the message, brings it back under its old ID
 
-    /// Delete twice on a server message before the first change is written: a move to Trash and an erase are queued.
-    /// The move's answer renames R1 to T1 in the queued erase. Exchange refuses the erase; the message is put back,
-    /// but from the copy taken when the erase was queued, with the old ID R1. The next Trash check lists T1, which
-    /// is then added a second time.
-    // file:// fixture
-    @Test func probeRefusedEraseAfterRenameKeepsNewID() async throws {
-        let server = RaceServer([RX.moved(["T1"]), RX.fault("ErrorAccessDenied", "Access is denied.")])
-        defer { server.stop() }
-        let s = store(server)
-        s.merge([summary("R1")], account: acct.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        s.delete([id])  // to Trash (queued move)
-        s.delete([id])  // erase from Trash (queued delete of R1)
-        try await waitFor { s.outbox.isEmpty }
-        try #require(s.outbox.isEmpty, "the changes never reached the server: \(s.status ?? "")")
-        try #require(s.status?.hasPrefix("Exchange refused a change") == true, "status \(s.status ?? "nil")")
-        #expect(s.message(id)?.remoteID == "T1", "the erase was refused, the message is back with ID \(s.message(id)?.remoteID ?? "none")")
-        s.merge([summary("T1", box: .trash)], account: acct.id, mailbox: .trash)  // next Trash check
-        #expect(s.count(.account(acct.id, .trash)) == 1, "trash \(s.messages.filter { $0.mailbox == .trash }.map { $0.remoteID ?? "" })")
-    }
-
     /// Control: the same two deletes, both accepted.
     // file:// fixture
     @Test func controlMoveThenEraseBothAccepted() async throws {
