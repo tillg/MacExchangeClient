@@ -36,18 +36,6 @@ struct Probe_SyncTests {
 
     // MARK: Merging server updates
 
-    /// A message deleted elsewhere: its queued read/flag changes can't be written any more and must leave the outbox
-    /// (else they are sent, refused, and show "Exchange refused a change").
-    @Test func serverDeletionDropsTheMessagesQueuedChanges() {
-        let s = synced(["A", "B"])
-        s.toggleRead([id(s, "A")])
-        s.setFlag(.red, for: [id(s, "A"), id(s, "B")])
-        s.apply(page(del: ["A"], token: "t1"), account: work.id, mailbox: .inbox)
-        #expect(s.message(id(s, "B")) != nil)
-        let ids = s.outbox.flatMap(\.change.remoteIDs)
-        #expect(!ids.contains("A"), "outbox still has \(s.outbox.map(\.change))")
-    }
-
     // MARK: Status messages
 
     // MARK: Idempotence / paging

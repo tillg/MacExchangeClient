@@ -107,7 +107,8 @@ flowchart LR
   skipped, so a page fetched before the erase reached the server doesn't bring it back (likewise at launch, for a
   message moved offline whose stored copy isn't in memory yet: `finishLoading` then adds that copy, once). A deletion reported for a message with a pending move is held, not applied
   (`deletedWhileMoving`, in memory): the move makes its source report it. A move that goes through drops it; a
-  refused move removes the message instead of moving it back. Other deletions win. If nothing changed, `messages` is not reassigned.
+  refused move removes the message instead of moving it back. Other deletions win, and take the message out of the
+  account's queued read and flag changes (an entry left empty goes), so they aren't sent and refused. If nothing changed, `messages` is not reassigned.
 - **Sync from the start** (no token: a new folder, after the conversation upgrade): when it begins, the store notes
   the server IDs the folder holds (`unlisted`); each page ticks off what it lists. When the pass completes, the
   folder's server messages it didn't list are removed (deleted or moved elsewhere meanwhile). One with a queued
