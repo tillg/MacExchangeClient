@@ -302,3 +302,12 @@ edited: 2026-11-13
 - **Why:** #d-memory-search said "at the start of a word" and assumed the existing tests used only single words. But `searchTypedBeforeTheIndexIsReady` pins memory finding "Misreported" for `report` (and `searchHitsFollowWhatIsInMemory` relies on the same difference), and existing tests are never changed. Matching more on the memory path never hides mail the index would show.
 - **Cost:** Each query folds every message's fields once: 0.17 s for 70,000 messages in a debug build (new test `memorySearchStaysFastAt70kMessages`). Only the launch window and index errors pay it.
 - **Alternatives:** Word-start matching as decided (rejected: breaks an existing test). Keep "as before" (rejected in #d-memory-search).
+
+## 01:09 — A complete sync from the start is authoritative for its folder {#d-bug-053}
+
+- **Status:** decided
+- **Context:** BUG-053. After the conversation upgrade (all tokens reset), and after any other sync that starts without a token, the pass lists what is on the server now and reports no deletions. Mail deleted or moved elsewhere meanwhile stayed in its folder for good.
+- **Decision:** When a folder's sync starts without a token, the store notes the server IDs it holds. Every page of that pass (single `apply` or a history batch) ticks off the IDs it lists (upserts and read changes). When the pass completes, the rest of that folder's server messages are removed (and forgotten on disk). Messages with a change still queued stay; they are checked again after each drain and go once their change is done. Local messages (no server ID), other folders and other accounts are not touched. The newest-N lookup doesn't tick off IDs: it may run before a deletion the pass later sees.
+- **Why:** README: the upgrade sync is meant to refresh; a from-scratch SyncFolderItems pass enumerates every item in the folder, so anything it doesn't list is gone.
+- **Limit:** The noted IDs live in memory only. If the app quits in the middle of a from-scratch pass, the pass resumes from its saved token after relaunch and removes nothing at the end (ghosts from that window stay). Persisting the set (up to one ID per message) for a one-off upgrade wasn't worth a new table; restarting the pass from scratch on every relaunch could keep a big Sent folder from ever finishing.
+- **Alternatives:** Restart an interrupted pass from scratch (rejected, see above). Persist the ID set in a new table (rejected for now: size and write cost for a rare case).

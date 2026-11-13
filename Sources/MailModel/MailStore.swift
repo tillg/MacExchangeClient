@@ -69,6 +69,10 @@ public final class MailStore {
     private var syncTokens: [String: String] = [:] { didSet { syncChanged = true } }
     /// Folders ("account/mailbox") whose full sync has finished; checks then only fetch changes.
     private var complete: Set<String> = [] { didSet { syncChanged = true } }
+    /// Folders syncing from the start (token nil): the server IDs they held when that began that no page has
+    /// listed since. A from-scratch sync lists everything there and reports no deletions, so once it is complete
+    /// these are gone from the server (`prune`). In memory only: a pass interrupted by quitting removes nothing.
+    @ObservationIgnored private var unlisted: [String: (done: Bool, ids: Set<String>)] = [:]
     private var historyTask: Task<Void, Never>?
     /// Folders whose history sync failed this session; retried after a relaunch.
     private var historyFailed: Set<String> = []
@@ -583,7 +587,9 @@ public final class MailStore {
     /// Merges one page of a folder sync and moves that folder's sync position on.
     /// The last page (`more == false`) completes the folder: later checks then only fetch changes.
     public func apply(_ r: SyncResult, account: UUID, mailbox: MailboxKind) {
+        startPassIfFromScratch(account, mailbox)
         merge(r.upserts, deleted: r.deletedRemoteIDs, reads: r.readChanges, account: account, mailbox: mailbox)
+        listed(r.upserts.compactMap(\.remoteID) + r.readChanges.keys, account, mailbox, complete: !r.more)
         syncTokens[key(account, mailbox)] = r.token
         if !r.more { complete.insert(key(account, mailbox)) }
     }
@@ -592,6 +598,7 @@ public final class MailStore {
     /// message, so a batch of history pages costs one pass instead of one per page.
     public func apply(_ pages: [SyncResult], account: UUID, mailbox: MailboxKind) {
         guard let last = pages.last else { return }
+        startPassIfFromScratch(account, mailbox)
         var upserts: [Message] = [], slot: [String: Int] = [:], deleted = Set<String>(), reads: [String: Bool] = [:]
         for p in pages {
             for rid in p.deletedRemoteIDs {
@@ -610,8 +617,49 @@ public final class MailStore {
         }
         merge(slot.sorted { $0.value < $1.value }.map { upserts[$0.value] }, deleted: Array(deleted), reads: reads,
               account: account, mailbox: mailbox)
+        listed(pages.flatMap { $0.upserts.compactMap(\.remoteID) + $0.readChanges.keys }, account, mailbox,
+               complete: !last.more)
         syncTokens[key(account, mailbox)] = last.token
         if !last.more { complete.insert(key(account, mailbox)) }
+    }
+
+    /// A sync without a token starts a pass over the whole folder: every server message here now must be listed by it.
+    private func startPassIfFromScratch(_ account: UUID, _ mailbox: MailboxKind) {
+        let k = key(account, mailbox)
+        guard syncTokens[k] == nil else { return }
+        var ids = Set<String>()
+        for m in messages where m.accountID == account && m.mailbox == mailbox { if let r = m.remoteID { ids.insert(r) } }
+        unlisted[k] = (false, ids)
+    }
+
+    /// Server IDs a page of a from-scratch pass listed. Its last page removes the rest (`prune`).
+    private func listed(_ rids: [String], _ account: UUID, _ mailbox: MailboxKind, complete: Bool) {
+        let k = key(account, mailbox)
+        guard var pass = unlisted[k], !pass.done else { return }
+        pass.ids.subtract(rids)
+        pass.done = complete
+        unlisted[k] = pass
+        if complete { prune() }
+    }
+
+    /// Removes what a completed from-scratch pass didn't list: deleted or moved away on the server meanwhile.
+    /// A message with a change still queued stays until that change is done (`drain` calls this again).
+    private func prune() {
+        for (k, pass) in unlisted where pass.done {
+            guard let account = UUID(uuidString: String(k.prefix(36))) else { continue }
+            let mailbox = MailboxKind(rawValue: String(k.dropFirst(37)))
+            let pending = Set(outbox.lazy.filter { $0.account == account }.flatMap(\.change.remoteIDs))
+            var gone = Set<Message.ID>(), kept = Set<String>()
+            for m in messages where m.accountID == account && m.mailbox == mailbox {
+                guard let r = m.remoteID, pass.ids.contains(r) else { continue }
+                if pending.contains(r) { kept.insert(r) } else { gone.insert(m.id) }
+            }
+            unlisted[k] = kept.isEmpty ? nil : (true, kept)
+            guard !gone.isEmpty else { continue }
+            messages.removeAll { gone.contains($0.id) }
+            selection.subtract(gone)
+            forget(gone)
+        }
     }
 
     /// Merges server messages into one mailbox without touching its sync position (used for the newest-N
@@ -898,6 +946,7 @@ public final class MailStore {
                 failed(p, error.localizedDescription)
             }
         }
+        prune()
     }
 
     private func canSend(_ p: PendingChange) -> Bool { backends[p.account] != nil && !paused.contains(p.account) }

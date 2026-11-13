@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "After an update, mail you deleted or moved on another device no longer stays behind in its old mailbox.",
             "If the mail kept by an older version can't be read, the app keeps a copy of it, starts fresh and saves your mail again.",
             "Messages no longer show up dated in the year 1, and more meeting invitations show their details and answer buttons.",
             "A folder no longer fails to load because of one old message with unusual characters in it.",
