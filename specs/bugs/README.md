@@ -23,7 +23,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [172](BUG-172-memory-search-keeps-punctuation-words.md) | P3 | search | Memory search requires punctuation the index ignores; an invisible character alone lists all mail |
 | [173](BUG-173-arabic-hebrew-vowel-marks.md) | P4 | search | Arabic and Hebrew words with vowel marks aren't found when typed without them |
 | [174](BUG-174-georgian-mtavruli-not-indexed.md) | P4 | search | Georgian written in capitals (Mtavruli) isn't found by search |
-| [175](BUG-175-damaged-database-never-recovered.md) | P3 | storage | A damaged Mail.sqlite stops all saving for good; it's never set aside |
 | [178](BUG-178-subtitle-1-messages.md) | P4 | UI / MessageViewer | The window subtitle says "1 messages" for a mailbox with one message |
 | [179](BUG-179-compose-from-row-centred.md) | P4 | UI / ComposeView | Compose window: the "From:" row is centred instead of lined up with To, Cc and Subject |
 | [180](BUG-180-header-date-wraps.md) | P4 | UI / MessageDetailView | Message header: the date breaks onto two lines in a narrow message pane |

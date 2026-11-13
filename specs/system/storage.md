@@ -103,6 +103,10 @@ columns changed. U+001E/U+001F are word breaks for the tokenizer. How it is quer
 
 There is no general migration framework. On open:
 
+0. **Damaged file:** a `Mail.sqlite` whose first 16 bytes aren't SQLite's header is renamed to
+   `Mail.sqlite.unreadable` (`-2`, … if taken; its `-wal`/`-shm` along), never deleted, and a new database is created
+   (`MailDatabase.setAside`); the app's status says so and mail is downloaded again (BUG-175).
+
 1. `CREATE TABLE IF NOT EXISTS` for all tables.
 2. **Conversations:** if `messages` lacks `conversation` (checked with `pragma_table_info`), the column is added and
    every sync state is reset (`token = NULL, complete = 0`), so every folder syncs from scratch and existing messages

@@ -87,22 +87,4 @@ struct Probe_R5CStorage {
         FileManager.default.temporaryDirectory.appendingPathComponent("Probe_R5C-\(UUID())")
     }
 
-    /// R5C-05: a Mail.sqlite that isn't a database (damaged file) makes every launch fail with "Couldn't load mail
-    /// from disk … Changes aren't saved until relaunch", and a relaunch fails the same way: nothing is ever saved
-    /// again. Cache.json in the same situation is set aside (DECISIONS #d-bug-009).
-    @Test func aDamagedDatabaseFileIsSetAsideAndANewOneCreated() throws {
-        let dir = tempDir()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let url = dir.appendingPathComponent("Mail.sqlite")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try Data(repeating: 0x41, count: 8192).write(to: url)
-        var opened: MailDatabase?
-        do { opened = try MailDatabase(url: url) } catch {
-            Issue.record("damaged database isn't recovered: \(error.localizedDescription)")
-        }
-        #expect(opened != nil)
-        let kept = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0 != "Mail.sqlite" && !$0.hasPrefix("Mail.sqlite-") }
-        #expect(!kept.isEmpty, "the damaged file should be kept aside, never deleted")
-    }
-
 }
