@@ -235,6 +235,6 @@ struct MailStorePerformanceTests {
         let t = Date().timeIntervalSince(start)
         print(String(format: "PERF open next unread, grouped, 210k %.3fs", t))
         #expect(s.message(unread[1])?.isRead == true)
-        #expect(t < 0.05)
+        #expect(t < 0.1)  // about 0.04s; 0.39s when it built the list again
     }
 }

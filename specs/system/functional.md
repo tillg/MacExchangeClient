@@ -43,7 +43,8 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
   ("Jan, Sergio & Till"), one per address (two Jans are "Jan & Jan", BUG-157); the first word after the last comma
   of "Last, First (Org)", any blank splitting words (BUG-160); a name that is empty or only commas and blanks shows
   the address.
-- Selecting exactly one message marks it read (one main-loop turn later), and the message view loads it.
+- Selecting exactly one message marks it read (one main-loop turn later), and the message view loads it. With
+  conversations, the conversation's messages are taken from the grouping already built for the list (BUG-222).
 - A message that was unread when opened stays in the list with the unread filter and in Unread while it is selected
   (it is judged as unread there; sidebar counts use the real state). It leaves once the selection moves on, the
   filter is toggled or another mailbox is selected; deleted or moved, it leaves at once.
