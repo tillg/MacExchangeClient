@@ -632,3 +632,12 @@ edited: 2026-11-13
 - **Context:** BUG-104. After a sent answer, Exchange moves the meeting request to Deleted Items under a new ItemId. The Inbox sync deletes the old ID (the answered copy here goes), the Trash sync brings the new ID as a new message, and its body has no answer: "Please respond" again.
 - **Decision:** Deferred, no code change. Nothing the store receives links the new ID to the old one.
 - **Open question for review:** (a) read the answer from Exchange (⚠️ `t:ResponseType` / the calendar item's `MyResponseType`; to be checked on the live server with `EWSLiveMeetingProbe` first), or (b) carry the answer over to a new Trash invite with the same conversation, subject and start (risk: an updated invite for the same meeting takes the old answer). (a) is the sound one; it needs a live check this run can't make.
+
+## 03:11 — List separators inside values are escaped with U+001D {#d-bug-034}
+
+- **Status:** decided
+- **Context:** BUG-034. To/Cc and attachment lists are stored as U+001F/U+001E-separated text; a value holding one of them came back split. The format is on disk in the user's 180k-row database.
+- **Decision:** Inside a value, U+001D, U+001E and U+001F are written as U+001D + `0`/`1`/`2`; decoding undoes it, and U+001D followed by anything else stays. No migration: values without those characters are written exactly as before, and old rows read the same (test `listsWrittenBeforeReadAsBefore`).
+- **Why:** the smallest change that round-trips every value and keeps the column format. Exchange can't deliver these characters (XML 1.0), so only pasted local text ever carries them.
+- **Not covered:** an old row whose value held a raw U+001D followed by 0, 1 or 2 reads with that pair decoded (it could only come from pasted text, which these characters already corrupted).
+- **Alternatives:** JSON columns (rejected: a migration of every row). Dropping the characters on write (rejected: loses text).

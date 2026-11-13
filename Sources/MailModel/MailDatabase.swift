@@ -466,29 +466,55 @@ public final class MailDatabase: @unchecked Sendable {
     // Bits: VIP, has attachments, body loaded.
     private static let vip = 1, attach = 2, loaded = 4
 
-    /// Contacts as "name␟email␞name␟email": control characters that don't occur in names or addresses.
+    /// Contacts as "name␟email␞name␟email". The separators, and U+001D that escapes them, are written as
+    /// U+001D plus 2, 1 or 0 inside a value (`escape`); rows written before hold none of them.
     private static func contacts(_ list: [Contact]) -> String {
-        list.map { $0.name + "\u{1F}" + $0.email }.joined(separator: "\u{1E}")
+        list.map { escape($0.name) + "\u{1F}" + escape($0.email) }.joined(separator: "\u{1E}")
     }
 
     private static func contacts(_ s: String) -> [Contact] {
         s.isEmpty ? [] : s.split(separator: "\u{1E}", omittingEmptySubsequences: false).map { c in
             let f = c.split(separator: "\u{1F}", maxSplits: 1, omittingEmptySubsequences: false)
-            return Contact(name: String(f[0]), email: f.count > 1 ? String(f[1]) : "")
+            return Contact(name: unescape(f[0]), email: f.count > 1 ? unescape(f[1]) : "")
         }
+    }
+
+    static func escape(_ s: String) -> String {
+        guard s.unicodeScalars.contains(where: { (0x1D...0x1F).contains($0.value) }) else { return s }
+        return s.replacingOccurrences(of: "\u{1D}", with: "\u{1D}0").replacingOccurrences(of: "\u{1E}", with: "\u{1D}1")
+            .replacingOccurrences(of: "\u{1F}", with: "\u{1D}2")
+    }
+
+    static func unescape<S: StringProtocol>(_ s: S) -> String {
+        guard s.contains("\u{1D}") else { return String(s) }
+        var out = "", escaped = false
+        for c in s.unicodeScalars {
+            if escaped {
+                escaped = false
+                switch c {
+                case "0": out.unicodeScalars.append("\u{1D}"); continue
+                case "1": out.unicodeScalars.append("\u{1E}"); continue
+                case "2": out.unicodeScalars.append("\u{1F}"); continue
+                default: out.unicodeScalars.append("\u{1D}")  // not an escape: kept as it was
+                }
+            }
+            if c == "\u{1D}" { escaped = true } else { out.unicodeScalars.append(c) }
+        }
+        if escaped { out.unicodeScalars.append("\u{1D}") }
+        return out
     }
 
     /// Attachments as "name␟size␟type␞…". Older rows hold names only.
     static func attachments(_ list: [Attachment]) -> String {
-        list.map { [$0.name, $0.size.map(String.init) ?? "", $0.contentType ?? ""].joined(separator: "\u{1F}") }
+        list.map { [escape($0.name), $0.size.map(String.init) ?? "", escape($0.contentType ?? "")].joined(separator: "\u{1F}") }
             .joined(separator: "\u{1E}")
     }
 
     static func attachments(_ s: String) -> [Attachment] {
         s.isEmpty ? [] : s.components(separatedBy: "\u{1E}").map { a in
             let f = a.components(separatedBy: "\u{1F}")
-            return Attachment(name: f[0], size: f.count > 1 ? Int(f[1]) : nil,
-                              contentType: f.count > 2 && !f[2].isEmpty ? f[2] : nil)
+            return Attachment(name: unescape(f[0]), size: f.count > 1 ? Int(f[1]) : nil,
+                              contentType: f.count > 2 && !f[2].isEmpty ? unescape(f[2]) : nil)
         }
     }
 

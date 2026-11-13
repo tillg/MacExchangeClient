@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Names and file names with unusual hidden characters no longer split into several recipients or attachments after you restart the app.",
             "Text pasted with a hidden control character is no longer cut off at that point when it is saved, and searching for it no longer fails.",
             "A reply to a meeting invitation, such as \"Accepted: …\", no longer shows Accept and Decline buttons as if it were an invitation.",
             "Mail brought over from the app's old storage now learns which conversation it belongs to, so opening it shows its replies.",

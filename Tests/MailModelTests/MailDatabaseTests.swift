@@ -92,6 +92,41 @@ struct MailDatabaseTests {
         #expect(try reopen(url).messages() == [old])
     }
 
+    /// Names, addresses and file names holding the list separators (or their escape) come back as they were.
+    @Test func separatorCharactersInListsSurvive() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        var m = remote("S")
+        m.to = [Contact(name: "A\u{1E}B", email: "a@x.com"), Contact(name: "C", email: "c\u{1F}d@x.com")]
+        m.cc = [Contact(name: "Unit\u{1F}Sep\u{1D}", email: "u@x.com"), Contact(name: "\u{1D}1", email: "")]
+        m.attachments = [MailModel.Attachment(name: "report\u{1E}2026.pdf", size: 10, contentType: "application/pdf"),
+                         MailModel.Attachment(name: "a\u{1F}b.txt", size: 3, contentType: "text/plain")]
+        m.hasAttachments = true
+        try MailDatabase(url: url).write(StoreChanges(upserts: [m]))
+        let back = try reopen(url).messages().first
+        #expect(back?.to == m.to)
+        #expect(back?.cc == m.cc)
+        #expect(back?.attachments == m.attachments)
+    }
+
+    /// Lists written before the escaping read as they always did.
+    @Test func listsWrittenBeforeReadAsBefore() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let m = remote("L")
+        try MailDatabase(url: url).write(StoreChanges(upserts: [m]))
+        var raw: OpaquePointer?
+        #expect(sqlite3_open(url.path, &raw) == SQLITE_OK)
+        let old = "UPDATE messages SET to_list = 'Ann, Smith' || char(31) || 'ann@x.com' || char(30) || 'Bob' || char(31), "
+            + "cc_list = 'Cy', attachments = 'a.pdf' || char(31) || '12' || char(31) || 'application/pdf' || char(30) || 'b.png'"
+        #expect(sqlite3_exec(raw, old, nil, nil, nil) == SQLITE_OK)
+        sqlite3_close(raw)
+        let back = try reopen(url).messages().first
+        #expect(back?.to == [Contact(name: "Ann, Smith", email: "ann@x.com"), Contact(name: "Bob", email: "")])
+        #expect(back?.cc == [Contact(name: "Cy", email: "")])
+        #expect(back?.attachments == [MailModel.Attachment(name: "a.pdf", size: 12, contentType: "application/pdf"), "b.png"])
+    }
+
     @Test func foldersSyncPositionsAndWaitingChangesSurvive() throws {
         let url = tempURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
