@@ -1450,6 +1450,7 @@ public final class MailStore {
             renameRemote(try await b.move([id], to: trash), account: account)
         } catch where error is URLError || error is ServerBusy || error is AuthenticationError {
             if let wait = (error as? ServerBusy)?.retryAfter { busyUntil[account] = Date.now.addingTimeInterval(wait) }
+            _ = pauseIfSignInFailed(error, account: account)  // queued, but not sent with the rejected password (BUG-170)
             outbox.append(PendingChange(account: account, change: .move([id], to: .trash), previous: []))
         } catch where !error.localizedDescription.contains("ErrorItemNotFound") {
             let subject = messages.first { $0.accountID == account && $0.remoteID == id }?.subject ?? ""
@@ -2212,9 +2213,12 @@ public final class MailStore {
     /// Asks the server once per session; without an answer there is no limit to show.
     public func loadMaxMessageSize(for account: UUID) async {
         guard maxMessageSizes[account] == nil, let backend = backends[account], !paused.contains(account),
-              let address = self.account(account)?.address,
-              let size = try? await backend.maxMessageSize(from: address) else { return }
-        maxMessageSizes[account] = size
+              let address = self.account(account)?.address else { return }
+        do {
+            maxMessageSizes[account] = try await backend.maxMessageSize(from: address)
+        } catch {
+            _ = pauseIfSignInFailed(error, account: account)  // a rejected password isn't sent again (BUG-170)
+        }
     }
 
     public func maximumSize(for d: Draft) -> Int? { maxMessageSizes[d.accountID] }

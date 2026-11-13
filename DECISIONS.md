@@ -14,6 +14,7 @@ edited: 2026-11-13
   - [12:58 — Contents list added to DECISIONS.md, older run listed without its decisions](#run-2026-11-13-1235-4)
   - [12:58 — Commit and push straight to main](#run-2026-11-13-1235-5)
   - [13:20 — Five parallel probe hunters in detached worktrees; bugs numbered from BUG-154](#run-2026-11-13-1235-6)
+  - [13:58 — Commit while timing and WebKit tests fail under the hunters' load](#run-2026-11-13-1235-7)
 
 # 2026-11-12 23:16 — Unattended bug-fix run {#run-2026-11-12-2316}
 
@@ -960,3 +961,14 @@ edited: 2026-11-13
 - **Why:** concurrent builds in one `.build/tests` collide; detached worktrees need no branch.
 - **Alternatives:** one sequential hunter (much slower); hunting in the main checkout (one broken probe blocks everyone).
 - **Consequences:** if fewer than 100 real bugs turn up, the report says the true number instead of padding.
+
+## 13:58 — Commit while timing and WebKit tests fail under the hunters' load {#run-2026-11-13-1235-7}
+
+- **Status:** open
+- **Overrides:** `/autonomous` — commit only with the full suite green (or no new failures)
+- **Context:** fixing BUG-170 while hunters F and G build and snapshot in parallel; load average 43–49. `MailStorePerformanceTests`, `HTMLPageRenderTests` and `plainTextUnclosedStyleIsFast` time out; each passes alone when the load is lower (checked earlier in this run). The other 446 tests pass.
+- **Question:** wait for the hunters, or commit?
+- **Decision:** commit when everything except those timing/WebKit suites is green and the change doesn't touch their code; run the full suite again once the load drops and fix anything real.
+- **Why:** the failures are timeouts in code the change doesn't touch; waiting would stall fixing for up to an hour.
+- **Alternatives:** stop the hunters (loses their work); wait (idle time).
+- **Consequences:** a full-suite rerun at low load is owed; its result goes into the report. Applies to every commit made while hunters run.
