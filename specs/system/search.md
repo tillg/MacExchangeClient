@@ -26,7 +26,8 @@ query of the SQLite FTS5 index. Index schema: [storage.md](storage.md#search-ind
 
 - Fields: `subject`, `from.name`, `from.email`, every To and Cc name and address, `serverPreview`, `body`, joined
   with line breaks and folded (case and diacritics) once per message.
-- Match: the typed text is split at whitespace; every word (folded the same way) must occur in that text, in any
+- Match: the typed text is split where the index splits, at anything but letters, digits and marks (BUG-172; a
+  query without any word finds nothing); every word (folded the same way) must occur in that text, in any
   order and any field. Unlike the index, a word also matches inside a word (`report` finds "Misreported"), see
   DECISIONS.md#d-bug-052. A message whose body isn't loaded is found by its headers and server preview.
 - Scope: see below. Results newest first. Runs on the main actor on every recomputation of the list.

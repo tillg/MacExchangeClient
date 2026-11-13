@@ -48,18 +48,6 @@ struct Probe_R5CSearch {
         #expect(try indexSearch([kana], "ﾃｽﾄ").count == 1, "half-width katakana word inside text not found by the index")
     }
 
-    /// R5C-02: memory search keeps words with no letter or digit, which the index drops (search.md). A dash typed
-    /// between words hides the mail; a query of only invisible characters lists every message.
-    @Test func memorySearchDropsWordsWithoutLettersLikeTheIndex() throws {
-        let q3 = msg("Q3 report")
-        #expect(try indexSearch([q3], "q3 - report").count == 1)
-        #expect(memorySearch([q3], "Q3 - report").count == 1, "memory path requires the dash itself")
-        #expect(try indexSearch([q3], "report, q3").count == 1)
-        #expect(memorySearch([q3], "report, q3").count == 1, "memory path requires the comma typed after a word")
-        #expect(memorySearch([q3], "\u{200B}").isEmpty, "a zero-width space alone lists every message")
-        #expect(memorySearch([q3], "\u{2028}").isEmpty, "a line separator alone lists every message")
-    }
-
     /// R5C-03: Arabic harakat and Hebrew niqqud are diacritics, but neither path ignores them, unlike Latin accents
     /// ("Case and accents don't matter", README Search) and Greek tonos (BUG-082).
     @Test func arabicAndHebrewVowelMarksDontMatter() throws {
