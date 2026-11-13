@@ -14,6 +14,8 @@ This is a SwiftUI copy of the macOS Mail main window, built with SwiftPM. The da
   ```
   In Claude Code, run each command as its own top-level Bash call. Inside `sh -c`, `run.sh` or `&&` chains, the Testing macro plugin fails to load (the rtk hook only wraps top-level calls). `./run.sh test` works in a normal terminal.
 - The build's dependency scanner sometimes leaves out the Testing macro plugin (`plugin for module 'TestingMacros' not found`, which also hides real compile errors). The `-load-plugin-library` flag above loads it explicitly. After a failed build, `swift test --skip-build` runs the old binary, so check the test count.
+- `MailStorePerformanceTests` (and the WebKit `HTMLPageRenderTests`) time out when the machine is busy (other builds, agents): before treating a failure there as real, run that suite on its own (`--filter`), and the rest with `--skip`.
+- In a Bash call that edits files with a script and then commits, chain every step with `&&`: a failed edit must stop the commit.
 - Don't share `.build` between the app build and the test build. Their SDK configs poison each other's cache.
 
 ## Verifying the UI
