@@ -577,4 +577,42 @@ struct MailStoreSyncTests {
         let b = backend(try responseFile(response("UpdateItem", ok("UpdateItem"))))
         await #expect(throws: (any Error).self) { try await b.setRead(["A", "B"], true) }
     }
+
+    // MARK: Answers that aren't EWS answers (BUG-060)
+
+    /// An empty SOAP body, or a proxy's error page that happens to be well-formed XML, carries no EWS result.
+    nonisolated static let answersWithoutResult = [
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body></s:Body></s:Envelope>",
+        "<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><title>503 Service Unavailable</title></head><body><h1>Service Unavailable</h1></body></html>",
+        "<?xml version=\"1.0\"?><error><code>503</code><message>Backend not available</message></error>",
+    ]
+
+    @Test(arguments: answersWithoutResult) func sendWithAnswerWithoutResultFails(_ xml: String) async throws {
+        let b = backend(try responseFile(xml))
+        await #expect(throws: (any Error).self) {
+            try await b.send(Draft(accountID: work.id, to: "a@x.com", subject: "S", body: "B"))
+        }
+    }
+
+    @Test func syncWithAnswerWithoutResultFails() async throws {
+        let b = backend(try responseFile(envelope("")))
+        await #expect(throws: (any Error).self) { _ = try await b.sync(RemoteFolder(role: .inbox, id: "INBOX"), token: "OLD") }
+    }
+
+    /// The message is neither sent nor lost: it is kept in Drafts with a status.
+    @Test func sendWithAnswerWithoutResultKeepsTheMessage() async throws {
+        let s = try store(answering: envelope(""))
+        s.send(Draft(accountID: work.id, to: "bob@x.com", subject: "Quarterly report", body: "Hi"))
+        try await waitForOutbox(s)
+        #expect(s.messages.contains { $0.subject == "Quarterly report" && $0.mailbox == .drafts }, "status: \(s.status ?? "")")
+        #expect(s.status != nil)
+    }
+
+    /// History against an answer without a result doesn't mark the folder complete with an empty sync position.
+    @Test func historyWithAnswerWithoutResultDoesNotCompleteTheFolder() async throws {
+        let s = try store(answering: envelope(""))
+        await s.syncHistory()
+        #expect(!s.isComplete(work.id, .inbox))
+        #expect(s.syncToken(work.id, .inbox) == nil)
+    }
 }

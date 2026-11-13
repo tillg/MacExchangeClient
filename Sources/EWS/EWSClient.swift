@@ -44,6 +44,10 @@ public final class EWSClient: Sendable {
         if let fault = doc.first("Fault") {
             throw EWSError(code: fault.text("ResponseCode") ?? "SOAP fault", message: fault.text("faultstring") ?? "Server error")
         }
+        // Every EWS answer has a ResponseCode per item. Without one (an empty body, a proxy's page) nothing was done.
+        guard doc.first("ResponseCode") != nil else {
+            throw EWSError(code: "HTTP \(status)", message: "The server's answer holds no Exchange result")
+        }
         if strict, let bad = doc.all("ResponseCode").first(where: { $0.stringValue != "NoError" }) {
             let text = bad.parent?.text("MessageText") ?? "Request failed"
             throw EWSError(code: bad.stringValue ?? "", message: text)

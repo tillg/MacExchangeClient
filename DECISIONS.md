@@ -422,3 +422,11 @@ edited: 2026-11-13
 - **Why:** README: a refused change is undone. Here the server refused one item, not the other 99.
 - **Alternatives:** Return the refused items from each method (rejected: it changes every signature, and `move` already returns the new IDs). Treat items missing from a move's ID map as refused (rejected: a successful move may come back without a new ID).
 - **Not covered:** A transient per-item code (`ErrorServerBusy` inside one response message rather than as a fault) counts as a refusal of that item.
+
+## 01:56 — An answer without any Exchange result is an error {#d-bug-060}
+
+- **Status:** decided
+- **Context:** BUG-060. `EWSClient.call` failed only on unparsable XML, a SOAP Fault, HTTP 401 or a bad `ResponseCode`. An empty SOAP body or a proxy's well-formed error page passed as success: Send "succeeded" without sending, a sync "completed" with an empty token.
+- **Decision:** After the Fault check, `call` (strict or not) throws when the answer has no `ResponseCode` at all ("The server's answer holds no Exchange result", code "HTTP <status>"). Every operation the app uses answers with a `ResponseCode` per item, so no real answer is affected.
+- **Why:** README: a message that fails to send is kept in Drafts; a non-answer is a failure, not a success.
+- **Alternatives:** Reject any non-2xx status first (rejected: Exchange sends SOAP faults with HTTP 500, which must still be read).

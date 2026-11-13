@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "When something between you and Exchange answers with an error page instead of Exchange, a message you send is kept in Drafts instead of disappearing, and a mailbox no longer counts as fully loaded.",
             "When you mark, flag, move or erase several messages and one of them was already deleted on the server, the others keep your change.",
             "Forwarding or saving an attachment you opened and changed (for example a form filled in with Preview) uses the file as it came in the email, not your changed copy.",
             "With pictures from the internet blocked, opening an email no longer lets its sender find out through a hidden connection to their server.",
