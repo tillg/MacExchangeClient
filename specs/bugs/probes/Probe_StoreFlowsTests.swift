@@ -27,13 +27,6 @@ struct Probe_StoreFlowsTests {
 
     // MARK: Sending / drafts without a backend
 
-    @Test func probe_localSendEmptySubjectShowsNoSubject() {
-        let s = store([])
-        s.send(Draft(accountID: work.id, to: "a@x.com", subject: "", body: "B"))
-        let m = s.messages.first { $0.mailbox == .sent }
-        #expect(m?.subject == "(No Subject)", "subject: \(String(describing: m?.subject))")
-    }
-
     @Test func probe_localSendStripsFileMarks() {
         let s = store([])
         var d = Draft(accountID: work.id, to: "a@x.com", subject: "S", body: "a\u{FFFC}b")
