@@ -128,6 +128,9 @@ public struct Contact: Hashable, Codable, Sendable {
     /// except inside double quotes or `<>`; the quotes around a name are removed. A piece without an address
     /// followed by one with `<…>` is a name with a comma written without quotes (Outlook's `Last, First <addr>`).
     public static func parseList(_ s: String) -> [Contact] {
+        // Invisible characters pasted along (byte order mark, zero-width space, word joiner) aren't part of an address
+        // (BUG-213).
+        let s = s.filter { !["\u{FEFF}", "\u{200B}", "\u{2060}"].contains($0) }
         /// Nil when a quote or `<` is never closed: it would swallow the recipients after it.
         func split(nesting: Bool) -> [String]? {
             var pieces: [String] = [], piece = "", quoted = false, escaped = false, inAngle = false
