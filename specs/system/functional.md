@@ -110,7 +110,7 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
   - Reply: To = the sender's address; when the sender is the account's own address (compared without case), the
     original To addresses instead (each once, mine left out; if none is left, the sender's address). Reply All: To = sender and To addresses, Cc = the original Cc, both minus
     the account address (compared without case); each address once across both fields (compared without case,
-    first occurrence kept, so To wins). Forward: To empty.
+    first occurrence kept, so To wins); recipients without an address are left out. Forward: To empty.
 - Original attachments: Forward always loads them. Replies follow Edit ▸ Include Attachments With Replies (Never,
   default; Ask: an alert when the window opens; When Adding Recipients: on leaving To/Cc or Return, if an address with
   "@" wasn't on the original; while the original's addresses aren't known, a recipient with the name of one of its

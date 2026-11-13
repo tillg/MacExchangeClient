@@ -6,7 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [050](BUG-050-reply-all-trailing-comma-for-addressless-recipient.md) | P4 | MailStore | Reply All leaves a trailing ", " (empty recipient) when the original lists a recipient without address |
 | [051](BUG-051-symlink-to-folder-cannot-be-attached.md) | P4 | MailStore | Attaching a symbolic link to a folder fails with "Couldn't attach" instead of zipping the folder |
 | [079](BUG-079-mail-of-account-no-longer-set-up-loaded-at-launch.md) | P4 | MailStore | Stored mail of an account that is no longer set up is loaded at launch and shows in All Inboxes and search (its rows are never removed) |
 | [080](BUG-080-switching-account-scope-flashes-no-results.md) | P4 | MailStore | Switching from one account's mailbox to another's during a search shows an empty list (No Results) until the new answer arrives |
