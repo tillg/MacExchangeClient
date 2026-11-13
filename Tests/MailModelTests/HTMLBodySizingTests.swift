@@ -52,6 +52,12 @@ final class BodyPage: NSObject, WKScriptMessageHandler {
         return h
     }
 
+    /// Waits until the view holds everything the page draws (it re-measures by itself), at most `seconds`.
+    func waitUntilItFits(seconds: Double = 15) async {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline, await contentHeight() > v.frame.height { try? await Task.sleep(for: .milliseconds(100)) }
+    }
+
     /// The height everything the page draws needs (at least the view's own height).
     func contentHeight() async -> Double {
         await eval("Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)")
@@ -129,7 +135,7 @@ struct HTMLBodySizingTests {
         let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
         let p = await BodyPage(#"<p>Top</p><img loading="lazy" style="display:block" src="data:image/png;base64,\#(png)" width="1" height="1"><img loading="lazy" style="display:block;width:300px" src="data:image/png;base64,\#(png)"><p>End</p>"#)
         _ = await p.settle()
-        try? await Task.sleep(for: .milliseconds(1500))
+        await p.waitUntilItFits()
         let content = await p.contentHeight()
         #expect(content <= p.v.frame.height, "view \(p.v.frame.height), page \(content)")
     }
@@ -138,7 +144,7 @@ struct HTMLBodySizingTests {
         let p = await BodyPage(#"<details id="d"><summary>Show order</summary>\#(String(repeating: "<p>Item</p>", count: 20))</details><p>End</p>"#)
         let closed = await p.settle()
         _ = await p.eval("document.getElementById('d').open = true; 1")  // what a click on the summary does
-        try? await Task.sleep(for: .milliseconds(1500))
+        await p.waitUntilItFits()
         let content = await p.contentHeight()
         #expect(content <= p.v.frame.height && p.v.frame.height > closed, "closed \(closed), view \(p.v.frame.height), page \(content)")
     }

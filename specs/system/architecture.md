@@ -16,7 +16,7 @@ Server protocol: [ews.md](ews.md).
 
 | Target | Kind | Depends on | Holds |
 |---|---|---|---|
-| `MailModel` | library | — | `MailStore`, the models, `MailBackend` protocol, `MailDatabase` (SQLite), `MailCache` (old JSON), `HTMLPage`, `Invite`, `MessageDrag`, `WhatsNew` |
+| `MailModel` | library | — (system: WebKit, for `HTMLPage`'s body-view helpers) | `MailStore`, the models, `MailBackend` protocol, `MailDatabase` (SQLite), `MailCache` (old JSON), `HTMLPage`, `Invite`, `MessageDrag`, `WhatsNew` |
 | `EWS` | library | `MailModel` | `EWSBackend` (the `MailBackend` over EWS), `EWSClient` (SOAP over HTTPS), `ExchangeAccount`, `Keychain` |
 | `MailReplica` | executable | `MailModel`, `EWS` | SwiftUI views, `AppSetup`, `MailCommands`, `SampleData`, `DebugSnapshot`, `AppIcon` |
 | `MailModelTests` | tests | `MailModel`, `EWS` | Swift Testing suites; live EWS tests run only with `EWS_USER`/`EWS_SERVER` set |

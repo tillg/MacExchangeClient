@@ -538,3 +538,9 @@ edited: 2026-11-13
 - **Context:** With 061, an unreadable or result-less answer is `ServerBusy`; with 098, `ServerBusy` in the history set the whole account aside. A folder whose page is unreadable every time would then never be marked failed, come first on every run, and stall the account's other folders without a status, against the README ("A folder whose history fails is skipped, and the error stays under the window title").
 - **Decision:** The history sets an account aside only for a `URLError` or a `ServerBusy` with a back-off (throttling). A `ServerBusy` without one (a page that isn't an Exchange answer) counts as that folder's failure: skipped for the session, with a status. The outbox keeps treating every `ServerBusy` as "not refused, wait".
 - **Why:** Throttling is per account and passes; a broken page for one folder is that folder's problem.
+## 02:27 — Body padding and placed content in the height {#d-bug-108}
+
+- **Status:** decided
+- **Context:** BUG-108. Body padding and `position: absolute` content were outside the measured box. The padding case was already fixed by measuring the root box (d-bug-064).
+- **Decision:** `HTMLPage.measureScript` takes the larger of the root box's bottom and the body's top plus its `scrollHeight` and bottom margin (plus `scrollY`). Both terms are independent of the view's own height, so the view still shrinks when the window widens.
+- **Not covered:** absolutely placed content with no positioned ancestor (its containing block is the window, not the body), so the body's `scrollHeight` doesn't count it: seen in a scratch run as 84 pt measured for 316 pt drawn. `documentElement.scrollHeight` would count it but never drops below the view's height. Making the body `position: relative` would count it but shift such content by the body's margins, which Mail doesn't do.
