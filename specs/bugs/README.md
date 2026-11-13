@@ -27,7 +27,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [080](BUG-080-switching-account-scope-flashes-no-results.md) | P4 | MailStore | Switching from one account's mailbox to another's during a search shows an empty list (No Results) until the new answer arrives |
 | [081](BUG-081-cjk-words-inside-sentence-not-found.md) | P4 | MailDatabase | Index search can't find a Chinese or Japanese word inside a sentence (the old search could) |
 | [082](BUG-082-greek-accents-not-ignored.md) | P4 | MailDatabase | Search doesn't ignore Greek accents: "καλημερα" doesn't find "Καλημέρα" |
-| [083](BUG-083-import-fails-after-database-is-in-place-when-imported-cache-exists.md) | P4 | MailDatabase | Import from Cache.json reports failure after the database is already in place when Cache.json.imported exists; the session then saves nothing |
 | [084](BUG-084-ipf-note-subclass-folders-hidden.md) | P4 | EWS | Mail folders whose class is a subclass of IPF.Note (e.g. IPF.Note.OutlookHomepage) are left out of the folder tree |
 | [085](BUG-085-embedded-data-fonts-blocked.md) | P4 | HTMLPage | Fonts embedded in the mail (data: URIs) are blocked unless remote content is allowed |
 | [086](BUG-086-daylayout-zero-length-events-drawn-on-top.md) | P4 | Invite | Day column: zero-length (or end-before-start) events take no room, so they are drawn on top of the event starting at the same time |

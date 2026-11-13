@@ -21,7 +21,7 @@ cache), `Sources/MailReplica/AccountsSettings.swift` (`AppSetup`: when it is rea
 | Opened attachments | `$TMPDIR/Mail Downloads/<message id>/<index>/<file name>`, quarantined |
 | Files of drafts kept after a failed send | `files` table of `Mail.sqlite` (sample data: memory only) |
 | Inline images, calendar days, MailTips size | Memory only |
-| Old cache | `Cache.json` in the same folder, renamed `Cache.json.imported` after import |
+| Old cache | `Cache.json` in the same folder, renamed `Cache.json.imported` after import (`.imported-2`, `-3` … if taken) |
 
 The folder is created with mode 0700 and a new database file with 0600. Sample data is never stored. Only messages
 of server accounts (accounts with a backend or restored sync state) are written.
@@ -124,7 +124,7 @@ Runs when `Mail.sqlite` doesn't exist (`MailDatabase.importCache`); the sidebar 
    once more from the start and the imported mail learns its conversation.
 4. Write everything into `Mail.sqlite.importing` (old leftovers removed first) and check the row count.
 5. Refuse if `Mail.sqlite` exists meanwhile; else move the temp file into place and reopen it.
-6. Rename `Cache.json` to `Cache.json.imported`. Interrupted before that, the next launch imports again.
+6. Rename `Cache.json` to `Cache.json.imported`, or the first free `Cache.json.imported-N` (N ≥ 2) if that exists. Interrupted before that, the next launch imports again.
 
 `MailCache` (one JSON file with, per account, messages, sync tokens by mailbox, outbox, complete folders and folders)
 is still written by `MailStore.cache()` only for tests and tools; the app no longer saves it.

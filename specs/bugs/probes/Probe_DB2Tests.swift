@@ -449,21 +449,4 @@ struct Probe_DB2Tests {
         #expect(try d.search(query, accounts: nil).count == 1, "\(query) → \(subject)")
     }
 
-    /// README "To go back": delete Mail.sqlite* and rename Cache.json.imported to Cache.json. A user who copies
-    /// it back instead (keeping the .imported file) upgrades again: the database is built and put in place, then
-    /// renaming the cache fails, the import reports an error and the session runs without saving.
-    @Test func probeImportWhenAnImportedCacheIsAlreadyThere() async throws {
-        let dir = tempURL().deletingLastPathComponent(); defer { try? FileManager.default.removeItem(at: dir) }
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
-        let old = MailStore(accounts: [work], messages: [])
-        old.apply(SyncResult(upserts: [mail("A", rid: "A")], deletedRemoteIDs: [], token: "t", more: false), account: work.id, mailbox: .inbox)
-        try old.cache().save(to: cacheURL)
-        try FileManager.default.copyItem(at: cacheURL, to: cacheURL.appendingPathExtension("imported"))
-        let s = MailStore(accounts: [work], messages: [])
-        var err: String?
-        do { _ = try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s) } catch { err = error.localizedDescription }
-        #expect(err == nil, "import: \(err ?? "")")
-        #expect(FileManager.default.fileExists(atPath: dbURL.path) == (err == nil), "database in place although the import failed")
-    }
 }
