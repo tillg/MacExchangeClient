@@ -13,6 +13,7 @@ public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
             "When the server refuses changes to many messages at once, the app no longer stops responding for a moment while it puts them back.",
+            "Attachments that come without a name are listed as \"Attachment\", and an attached message without a subject saves as a file you can see in the Finder.",
             "When a folder is deleted on the server, its mail no longer lingers in Flagged and search results here, and a window showing that folder switches to the Inbox.",
             "When sending or saving a message with attachments fails, no second copy without the attachments is left in Drafts.",
             "Files that some mail apps, such as Apple Mail, send \"inline\" (a PDF in a plain-text email, for example) are now listed below the message, so you can open and save them.",

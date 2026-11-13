@@ -130,19 +130,24 @@ public struct EWSBackend: MailBackend {
 
     /// The attachments shown below a message, in order, with the IDs to fetch them. Inline pictures (signature
     /// logos and the like) are left out; an attached message is listed as a .eml file. An inline file that isn't a
-    /// picture is listed too, since only pictures are placed in the body. Those come last, so the positions of the
-    /// other files stay as they were in bodies stored before.
+    /// picture is listed too, since only pictures are placed in the body, and so is one without a name (it gets
+    /// "Attachment"). Those come last, so the positions of the other files stay as they were in bodies stored before.
     static func listedAttachments(_ item: XMLNode) -> [(id: String?, attachment: Attachment)] {
         let all = item.child("Attachments")?.elementChildren ?? []
-        let inline = all.filter { $0.text("IsInline") == "true" }
-        let shown = all.filter { $0.text("IsInline") != "true" } + inline.filter { !isPicture($0) }
-        return shown.compactMap { a in
-            guard let name = a.child("Name")?.stringValue else { return nil }
+        let named = { (a: XMLNode) in !(a.child("Name")?.stringValue ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+        let old = all.filter { $0.text("IsInline") != "true" && named($0) }
+        let added = all.filter { a in !old.contains { $0 === a } && (a.text("IsInline") != "true" || !isPicture(a)) }
+        return (old + added).map { a in
             let isMessage = a.localName == "ItemAttachment"
+            let type = isMessage ? "message/rfc822" : a.text("ContentType")
+            var name = a.child("Name")?.stringValue ?? ""
+            if name.trimmingCharacters(in: .whitespaces).isEmpty {
+                let ext = isMessage ? nil : type.flatMap { UTType(mimeType: $0)?.preferredFilenameExtension }
+                name = "Attachment" + (ext.map { "." + $0 } ?? "")
+            }
             let file = isMessage && !name.lowercased().hasSuffix(".eml") ? name + ".eml" : name
             return (a.child("AttachmentId")?.attr("Id"),
-                    Attachment(name: file, size: a.text("Size").flatMap { Int($0) },
-                               contentType: isMessage ? "message/rfc822" : a.text("ContentType")))
+                    Attachment(name: file, size: a.text("Size").flatMap { Int($0) }, contentType: type))
         }
     }
 
