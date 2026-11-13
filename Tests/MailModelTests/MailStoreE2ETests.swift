@@ -174,4 +174,25 @@ struct MailStoreE2ETests {
         #expect(s2.messages.filter { $0.remoteID == "A" }.count == 1)
         #expect(s2.syncToken(a.id, .sent) == "new")
     }
+
+    /// Mark All as Read while launch is still loading (Flagged spans every mailbox) also marks the mail that
+    /// loads afterwards.
+    @Test func markAllReadWhileLoadingCoversMailLoadedAfterwards() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let s = MailStore(accounts: [a], messages: [])
+        let db = try MailDatabase(url: url)
+        s.apply(page([server("I1", flagged: true)]), account: a.id, mailbox: .inbox)
+        s.apply(page([server("R1", flagged: true), server("R2", flagged: true)]), account: a.id, mailbox: .archive)
+        try db.write(s.takeChanges())
+        let s2 = MailStore(accounts: [a], messages: [])
+        let first = [MailboxKey(account: a.id, mailbox: .inbox)]
+        s2.restore(try db.meta())
+        s2.restore(try db.messages(in: first), boxes: first)
+        #expect(s2.unreadCount(.smart(.flagged)) == 1)
+        s2.markAllRead(in: .smart(.flagged))
+        s2.finishLoading(try db.messages(notIn: first))
+        #expect(s2.unreadCount(.smart(.flagged)) == 0, "\(s2.unreadCount(.smart(.flagged))) flagged still unread")
+        #expect(s2.outbox.flatMap(\.change.remoteIDs).sorted() == ["I1", "R1", "R2"])
+    }
 }

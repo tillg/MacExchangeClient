@@ -852,3 +852,9 @@ edited: 2026-11-13
 - **Decision:** Read, flag and move changes keep copies without body, HTML, attachment list and preview (`undoCopy`). The undo of a refused change only puts back read state, flag and mailbox, so it is unchanged. Erases (a refused erase puts the whole message back) and invite answers keep whole messages. The same archive now makes an outbox well under 2 MB.
 - **Why:** no storage change: `PendingChange` and its JSON are the same, only smaller; rows written before still decode and undo as before (`outboxRowWithAttachmentNamesOnlyStillLoads` reads such a row).
 - **Not covered:** the outbox table is still rewritten whole when it changes; with slim copies that is small. Writing only changed rows would need a new table layout.
+
+## 07:15 — Mark All as Read during launch loading is applied again when loading ends {#d-bug-122}
+
+- **Status:** decided
+- **Context:** BUG-122. During launch only the Inboxes are in memory; Mark All Messages as Read on Flagged (or an account mailbox not loaded yet) marked only what was in memory, and the rest arrived unread.
+- **Decision:** While `isLoading`, the mailbox is remembered and `finishLoading` marks it all read once more, which also queues the server changes for the newly loaded messages. Mail that arrives later from the server is not included (the action covers what the mailbox held when it ran, plus what was stored then).

@@ -603,7 +603,12 @@ public final class MailStore {
 
     public func markAllRead(in ref: MailboxRef) {
         update(Set(messages.filter { contains(ref, $0) }.map(\.id))) { $0.isRead = true }
+        // Launch is still loading: the mailbox's mail that isn't in memory yet is marked as it arrives.
+        if isLoading { markAllReadWhenLoaded.append(ref) }
     }
+
+    /// Mailboxes marked all read while launch was loading, applied again to what `finishLoading` brings.
+    @ObservationIgnored private var markAllReadWhenLoaded: [MailboxRef] = []
 
     /// Runs `action` on the selection, then selects the message that followed it in the list – as Mail does.
     /// A selection that wasn't in the list (hidden by the unread filter or a search) isn't kept selected
@@ -1029,6 +1034,8 @@ public final class MailStore {
         messages += notInMemory(withoutRemovedFolders(rest))
         removedFolders = [:]
         loadedBoxes = nil
+        for ref in markAllReadWhenLoaded { markAllRead(in: ref) }
+        markAllReadWhenLoaded = []
         scheduleFlush()
         if !backends.isEmpty { startHistory() }
     }
