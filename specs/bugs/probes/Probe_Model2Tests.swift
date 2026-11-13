@@ -32,34 +32,6 @@ struct Probe_Model2Tests {
         #expect(r as? String == "hello")
     }
 
-    // MARK: HTMLPage.document structure
-
-    /// The page's height is what HTMLBodyView.measure computes: the bottom of #mail-replica-body plus the body's
-    /// bottom margin. All of the message must be inside the wrapper, or the view is cut short.
-    static let measureJS = """
-        [Math.ceil(document.getElementById('\(HTMLPage.bodyID)').getBoundingClientRect().bottom
-            + parseFloat(getComputedStyle(document.body).marginBottom)),
-         document.documentElement.scrollHeight,
-         document.getElementById('\(HTMLPage.bodyID)').contains(document.getElementById('tail'))].join('|')
-        """
-
-    @Test func strayClosingDivDoesNotEscapeTheMeasuredWrapper() async throws {
-        let mail = "<div><p>Hello</p></div></div><p id=tail style='height:600px'>Signature and the rest of the mail</p>"
-        let r = await Render.eval(HTMLPage.document(mail, allowRemote: false), Self.measureJS)
-        try #require(r != nil)
-        let parts = (r as? String ?? "").split(separator: "|").map(String.init)
-        #expect(parts.count == 3 && parts[2] == "true", "measured|content height|tail inside wrapper = \(parts)")
-        #expect(parts.count == 3 && Int(parts[0])! >= Int(parts[1])!, "measured|content height|tail inside wrapper = \(parts)")
-    }
-
-    @Test func controlBalancedDivsStayInsideTheWrapper() async throws {
-        let mail = "<div><p>Hello</p></div><p id=tail style='height:600px'>Signature and the rest of the mail</p>"
-        let r = await Render.eval(HTMLPage.document(mail, allowRemote: false), Self.measureJS)
-        try #require(r != nil)
-        let parts = (r as? String ?? "").split(separator: "|").map(String.init)
-        #expect(parts.count == 3 && parts[2] == "true" && Int(parts[0])! >= Int(parts[1])!, "\(parts)")
-    }
-
     /// Fonts embedded in the mail as data: URIs contact no one, like data: images (which the policy allows).
     static func fontMail() throws -> String {
         let font = try Data(contentsOf: URL(fileURLWithPath: "/System/Library/Fonts/Supplemental/NotoSansCarian-Regular.ttf"))

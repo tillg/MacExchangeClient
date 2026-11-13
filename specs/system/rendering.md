@@ -42,7 +42,8 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
   start with `data:` is `visibility: hidden` (keeps its space, as Mail does).
 - The web view (`MailWebView`): content JavaScript off, non-persistent data store, light appearance. It reloads only
   when the HTML, the remote decision or the set of inline image IDs changes. Its height is measured by an app script
-  (bottom of the body div plus the body's bottom margin) after load and on width changes; vertical scrolling goes to
+  (`HTMLPage.measureScript`: the bottom of the root element's box, which holds the body with its margins, so markup
+  that closes our wrapper early can't cut the mail off) after load and on width changes; vertical scrolling goes to
   the surrounding scroll view, horizontal stays in the page.
 - Navigation (`BodyNavigation`): `about:blank` is allowed only for the app's own load, from `willLoad()` (called before
   each `loadHTMLString`) until that load commits; a meta refresh or link to `about:blank` afterwards is cancelled, like
