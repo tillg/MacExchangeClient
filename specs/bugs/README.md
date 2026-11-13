@@ -38,7 +38,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [195](BUG-195-recipient-group-and-comment-syntax.md) | P4 | compose | Recipients written with RFC 5322 group syntax or a comment become invalid addresses ("Team: a@x.com", "a@x.com (Ann)") |
 | [196](BUG-196-content-id-not-a-msg-id.md) | P4 | compose / sent HTML | Placed pictures are sent with a Content-ID without "@" (bare UUID) |
 | [197](BUG-197-blocked-picture-source-broken-box.md) | P4 | rendering | With remote content blocked, <picture> with a web <source> and <input type=image> show WebKit's broken-image box |
-| [198](BUG-198-cid-in-entity-quoted-css-url.md) | P3 | rendering / inline images | An inline picture referenced as url(&quot;cid:…&quot;) (Outlook's style attributes) never shows |
 | [199](BUG-199-whatsnew-date-day-early-west-of-utc.md) | P4 | UI / WhatsNewView | Help ▸ What's New dates each day one day early on a Mac west of UTC (2026-11-13 shown as Thursday, 12 November) |
 | [200](BUG-200-all-day-invite-other-zone-two-days.md) | P3 | invites / EWS | An all-day invite from a colleague in another time zone (London, New York, Tokyo) is shown as two days, or the wrong day |
 | [201](BUG-201-when-line-runs-backwards-on-clock-change.md) | P4 | invites | On the night the clocks go back, an invite's when line reads "at 2:30 – 2:15", as if it ended before it starts |

@@ -92,7 +92,7 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
 
 ## Inline images (`cid:`)
 
-- `HTMLPage.contentIDs(in:)` finds references with the regex `(?<![\w+.-])cid:((?:(?!/>)[^"'\s)<>])+)`
+- `HTMLPage.contentIDs(in:)` finds references with the regex `(?<![\w+.-])cid:((?:(?!/>|&quot;|&apos;|&#0*3[49];|&#x0*2[27];)[^"'\s)<>])+)` (a quote written as a character reference ends the ID, as in Outlook's `url(&quot;cid:…&quot;)`, BUG-198)
   (case-insensitive; not inside a word such as `acid:rain`; an unquoted value ends before `/>`). Each ID: character
   references decoded (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, numeric), percent-decoded, then `<` and `>` trimmed.
 - `MailStore.loadInlineImages` asks the backend for those IDs once per message and keeps them in memory only, for

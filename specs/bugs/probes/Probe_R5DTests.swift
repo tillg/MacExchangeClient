@@ -84,14 +84,6 @@ struct Probe_R5D_RemoteContent {
         return m
     }
 
-    /// R5D-14: Outlook writes quotes inside style attributes as `&quot;`; such a `cid:` picture is found and shown.
-    @Test func cidInEntityQuotedCSSURL() {
-        let h = #"<td style="background-image:url(&quot;cid:image001.png@01DA.5678&quot;)">x</td>"#
-        let ids = HTMLPage.contentIDs(in: h)
-        #expect(ids == ["image001.png@01DA.5678"], "\(ids)")
-        let page = HTMLPage.document(h, allowRemote: false, inline: ["image001.png@01DA.5678": InlineImage(contentType: "image/png", data: Data([1]))])
-        #expect(page.contains("data:image/png;base64,AQ=="))
-    }
 }
 
 /// Real WKWebView, configured as MailWebView, with a listener on 127.0.0.1 standing in for the sender's server.
