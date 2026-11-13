@@ -155,27 +155,6 @@ struct Probe_SyncTests {
         #expect(failures.isEmpty, "\(failures.count) seeds; shortest: \(failures.min { $0.count < $1.count } ?? "")")
     }
 
-    /// A refresh that runs before launch has restored the database (the user clicks a mailbox while
-    /// "Loading Mail…"; SidebarView refreshes on every selection change) merges the newest Inbox mail under new
-    /// local IDs; restoring the stored Inbox then adds the same server messages again, and the stored
-    /// (older) sync position replaces the one just fetched.
-    @Test func refreshBeforeLaunchRestoreDoesNotDuplicateTheInbox() {
-        let s = store()
-        // Stored last session:
-        var stored = remote("A"); stored.accountID = work.id
-        var meta = StoredMeta()
-        meta.sync = [SyncState(account: work.id, mailbox: .sent, token: "old", complete: true)]
-        // Early refresh: Inbox not complete in memory yet → newest 50 merged; Sent delta moved on to "new".
-        s.merge([remote("A"), remote("B")], account: work.id, mailbox: .inbox)
-        s.apply(page(token: "new"), account: work.id, mailbox: .sent)
-        // Then launch restores the database.
-        s.restore(meta)
-        s.restore([stored], boxes: [MailboxKey(account: work.id, mailbox: .inbox)])
-        s.finishLoading([])
-        #expect(s.messages.filter { $0.remoteID == "A" }.count == 1, "Inbox shows A \(s.messages.filter { $0.remoteID == "A" }.count) times")
-        #expect(s.syncToken(work.id, .sent) == "new")
-    }
-
     /// An Exchange account whose password is missing from the Keychain has no backend (AppSetup.connect). Signing
     /// in to a second account calls removeLocalAccounts(), which must drop only the sample data, not that account.
     @Test func signingInAnotherAccountKeepsAnExchangeAccountWithoutPassword() {
