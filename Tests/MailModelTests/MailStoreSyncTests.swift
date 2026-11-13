@@ -781,4 +781,28 @@ struct MailStoreSyncTests {
         #expect(s.count(.account(work.id, .archive)) == 1)
         #expect(s.selection == [a])
     }
+
+    /// The Inbox sync says A was deleted (elsewhere) while a move of A was queued. When the move then fails (the item
+    /// is gone), A goes: no later sync reports the deletion again.
+    @Test func deletionSeenDuringAPendingMoveIsAppliedWhenTheMoveFails() {
+        let s = synced(["A", "B"])
+        let a = id(s, "A"), b = id(s, "B")
+        s.archive([a, b])
+        s.apply(page([], del: ["A", "B"], token: "t1"), account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.mailbox == .archive, "the deletion may be the move's own")
+        s.failed(s.outbox[0], "The specified object was not found in the store.")
+        s.apply(page([], token: "t2"), account: work.id, mailbox: .inbox)
+        #expect(s.message(a) == nil, "deleted on the server but shown in \(s.message(a)?.mailbox.rawValue ?? "-")")
+        #expect(s.message(b) == nil)
+    }
+
+    /// A move that goes through: the source's deletion was its own, and nothing is removed.
+    @Test func deletionSeenDuringAPendingMoveIsDroppedWhenTheMoveWorks() async throws {
+        let s = try batchStore(response("MoveItem", movedItem("N1")), ["A"])
+        let a = id(s, "A")
+        s.archive([a])
+        s.apply(page([], del: ["A"], token: "t1"), account: work.id, mailbox: .inbox)
+        try await waitForOutbox(s)
+        #expect(s.message(a)?.remoteID == "N1" && s.message(a)?.mailbox == .archive)
+    }
 }

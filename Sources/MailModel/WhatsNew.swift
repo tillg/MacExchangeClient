@@ -13,6 +13,7 @@ public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
             "Newsletters that fill the window no longer leave a large empty area below them after you widen the window, and their last lines are no longer hidden.",
+            "A message deleted on another device while you were moving it no longer stays behind in its old mailbox.",
             "Invoices and newsletters with an unusual layout show to their last line instead of being cut off.",
             "Emails with a form to fill in, such as surveys, show in full instead of only a thin strip at the end.",
             "A message you move no longer shows up twice in its new mailbox.",

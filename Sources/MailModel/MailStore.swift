@@ -104,6 +104,9 @@ public final class MailStore {
     /// Notices about an account's connection (its failed check, offline, busy), by account. Only that account's next
     /// successful check clears them; other notices ("Couldn't send …", a refused change) stay until replaced.
     @ObservationIgnored private var connectionNotices: [UUID: String] = [:]
+    /// Server deletions of messages whose move was still queued, by account. They are held, not applied, because the
+    /// move itself makes the source folder report them; if the move then fails, the deletion was real and is applied.
+    @ObservationIgnored private var deletedWhileMoving: [UUID: Set<String>] = [:]
     /// Writes the changes to disk and returns once they are written; called before a send goes out, so its
     /// `inFlight` mark is saved first. Nil with sample data and in tests that don't save.
     @ObservationIgnored public var saveBeforeSending: (() async -> Void)?
@@ -719,6 +722,8 @@ public final class MailStore {
         var changed = false
         // By index, reading only what's needed: copying each of 180,000 messages is slow.
         let gone = Set(deleted).subtracting(moving)
+        let held = Set(deleted).intersection(moving)
+        if !held.isEmpty { deletedWhileMoving[account, default: []].formUnion(held) }
         if !gone.isEmpty {
             var ids = Set<Message.ID>()
             for i in ms.indices where ms[i].accountID == account {
@@ -967,6 +972,8 @@ public final class MailStore {
         default:
             // Only what this change set, and only while it still holds: later changes (still queued or sent)
             // stay, and a message erased since isn't brought back. Only a refused erase re-adds the message.
+            // A refused move of a message the server reported deleted meanwhile: that deletion was real.
+            var deletedOnServer = Set<Message.ID>()
             for old in p.previous {
                 guard let i = messages.firstIndex(where: { $0.id == old.id }) else {
                     if case .delete = p.change {
@@ -979,7 +986,10 @@ public final class MailStore {
                 switch p.change {
                 case let .setRead(_, v): if messages[i].isRead == v { messages[i].isRead = old.isRead }
                 case let .setFlagged(_, v): if (messages[i].flag != nil) == v { messages[i].flag = old.flag }
-                case let .move(_, box): if messages[i].mailbox == box { messages[i].mailbox = old.mailbox }
+                case let .move(_, box):
+                    if let r = messages[i].remoteID, deletedWhileMoving[p.account]?.remove(r) != nil {
+                        deletedOnServer.insert(old.id)
+                    } else if messages[i].mailbox == box { messages[i].mailbox = old.mailbox }
                 case .respond, .reply, .removeFromCalendar:
                     let holds = switch p.change {
                     case let .respond(_, r): messages[i].invite?.response == r && messages[i].invite?.reply == nil
@@ -991,6 +1001,11 @@ public final class MailStore {
                     messages[i].invite = old.invite
                 case .delete, .send, .saveDraft: break
                 }
+            }
+            if !deletedOnServer.isEmpty {
+                messages.removeAll { deletedOnServer.contains($0.id) }
+                selection.subtract(deletedOnServer)
+                forget(deletedOnServer)
             }
             status = "Exchange refused a change: \(error)"
         }
@@ -1033,6 +1048,8 @@ public final class MailStore {
             do {
                 try await perform(p, backend)
                 outbox.removeAll { $0.id == p.id }
+                // The move went through: the deletions its source reported were its own.
+                if case let .move(ids, _) = p.change { deletedWhileMoving[p.account]?.subtract(ids) }
             } catch where pauseIfSignInFailed(error, account: p.account) {
                 // Refused at sign-in: it didn't go out, and goes when the account works again.
                 if let i = outbox.firstIndex(where: { $0.id == p.id }) { outbox[i].inFlight = nil }
@@ -1055,6 +1072,7 @@ public final class MailStore {
             } catch let e as PartlyRefused {
                 // The other items changed on the server: they keep the change (and moved ones their new IDs).
                 renameRemote(e.moved, account: p.account)
+                deletedWhileMoving[p.account]?.subtract(e.moved.keys)
                 var refused = p
                 // `previous` follows the change's IDs in order; matched by position, as an earlier move renames the IDs.
                 refused.previous = zip(p.change.remoteIDs, p.previous.filter { $0.remoteID != nil })

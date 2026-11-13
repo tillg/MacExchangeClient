@@ -515,3 +515,11 @@ edited: 2026-11-13
 - **Why:** There is no public API: `setMinimumViewportInset` only changes `lvh`/`svh`, and plain `vh` can't be overridden in CSS. Without it a re-measure on page changes (BUG-109) would make a `100vh` block grow without end. Verified in a real `WKWebView`: with the size pinned, the block's height stays the same when the view grows.
 - **Risk:** private method; if it disappears, viewport units fall back to the old behaviour (no crash), and 109's re-measuring is not installed then (see d-bug-109).
 - **Alternatives:** Rewrite `vh` in the mail's CSS (rejected: needs parsing of style sheets and inline styles). Measure in a hidden second web view (rejected: double the work for every message).
+
+## 02:14 — A deletion seen while a move is queued is held, and applied if the move fails {#d-bug-074}
+
+- **Status:** decided
+- **Context:** BUG-074. `merge` ignored a deletion for a message with a queued move, assuming the move caused it. If the message was really deleted elsewhere, the move then failed, `failed` put it back in its old mailbox, and no later sync reported the deletion again: a ghost forever.
+- **Decision:** `merge` notes such deletions per account (`deletedWhileMoving`, in memory). A move that goes through (also the moved part of a partly refused batch) drops them: they were its own. A refused move removes the noted messages instead of moving them back.
+- **Why:** If the move failed, the move can't have caused the source's deletion, so the server's word stands.
+- **Not covered:** The note isn't saved: if the app quits between the deletion and the failed move, the message comes back as before (rare: both happen within one drain, usually seconds). A move that stays queued (offline) keeps the note until it is sent.
