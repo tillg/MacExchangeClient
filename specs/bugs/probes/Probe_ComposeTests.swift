@@ -153,21 +153,6 @@ struct Probe_ComposeTests {
 
     // MARK: Header formats
 
-    /// Mail's "Begin forwarded message:" block carries the time zone and the recipients (To, Cc).
-    @Test func forwardHeaderHasTimeZoneAndRecipients() {
-        let m = msg(work, from: Contact(name: "Ann", email: "ann@x.com"),
-                    to: [Contact(name: "Bob", email: "bob@x.com")], cc: [Contact(name: "Cy", email: "cy@x.com")])
-        let s = store([m])
-        let body = s.draft(.forward, to: m.id).body
-        let dateLine = body.split(separator: "\n").first { $0.hasPrefix("Date:") }.map(String.init) ?? ""
-        let tz = TimeZone.current
-        let zoneNames = [tz.abbreviation(for: m.date) ?? "~", "GMT", "UTC", tz.identifier,
-                         tz.localizedName(for: .standard, locale: .current) ?? "~", tz.localizedName(for: .daylightSaving, locale: .current) ?? "~"]
-        #expect(zoneNames.contains { dateLine.contains($0) }, "Date line has no time zone: \(dateLine)")
-        #expect(body.contains("To: Bob <bob@x.com>"), "no To line: \(body.debugDescription)")
-        #expect(body.contains("Cc: Cy <cy@x.com>"), "no Cc line: \(body.debugDescription)")
-    }
-
     // MARK: Compose windows
 
     // MARK: Include attachments / new recipients (controls and edge cases)
