@@ -27,7 +27,7 @@ is made, retries, undo): [architecture.md](architecture.md). Types: [domain-mode
   `RequestServerVersion Exchange2013_SP1`; the operation goes into `soap:Body` as a string.
 - Authentication per request: Negotiate is rejected (so the server falls back to NTLM, as Kerberos fails off the
   domain); Basic and NTLM get the credential once; a second challenge cancels and the call throws
-  `AuthenticationError`. HTTP 401 also throws it. The store then pauses the account.
+  `AuthenticationError`. HTTP 401 also throws it. The store then pauses the account, wherever it comes from: sync, the outbox, the MailTips size request (`loadMaxMessageSize`) and the move after an invite answer (BUG-170).
 - Responses: every numeric character reference (decimal or hex) whose value isn't an XML 1.0 `Char` (C0 controls
   except tab/LF/CR, surrogates `D800`–`DFFF`, `FFFE`, `FFFF`, past `10FFFF`) becomes `&#xFFFD;` before parsing.
   A body that isn't an Exchange answer throws `ServerBusy` (nothing was refused): unparsable ("Unreadable EWS

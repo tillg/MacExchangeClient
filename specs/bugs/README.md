@@ -23,7 +23,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [167](BUG-167-two-refused-changes-leave-wrong-state.md) | P3 | Outbox | Two refused changes of the same message leave it in the state of the first change, which the server never had |
 | [168](BUG-168-refused-folder-stops-newest-of-others.md) | P4 | Sync | One folder that Exchange refuses in the history's first step stops the newest-200 fetch for all the account's other folders |
 | [169](BUG-169-account-address-not-trimmed.md) | P3 | EWS | An email pasted with a blank keeps the blank in the account's address: your own invitations become answerable, and MailTips asks for the wrong address |
-| [170](BUG-170-rejected-password-not-paused-mailtips-move.md) | P3 | EWS | A rejected password seen by MailTips or by the move after an unsent answer doesn't pause the account, so the wrong password is sent again |
 | [171](BUG-171-thai-halfwidth-kana-words-not-found.md) | P3 | search | A word inside Thai text (or half-width katakana) isn't found by search |
 | [172](BUG-172-memory-search-keeps-punctuation-words.md) | P3 | search | Memory search requires punctuation the index ignores; an invisible character alone lists all mail |
 | [173](BUG-173-arabic-hebrew-vowel-marks.md) | P4 | search | Arabic and Hebrew words with vowel marks aren't found when typed without them |
