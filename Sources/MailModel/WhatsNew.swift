@@ -13,6 +13,7 @@ public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
             "Emails with untidy formatting are no longer cut off partway: you can read them to the end.",
+            "A message you erased from Trash no longer comes back for a moment while the server is still deleting it.",
             "An email can no longer blank out its own text when you open it.",
             "Photos sent from Apple Mail or an iPhone fit the window instead of showing only a corner of a huge picture.",
             "A note that a message couldn't be sent, or that one account couldn't be checked, stays under the window title instead of vanishing at the next check of another account.",

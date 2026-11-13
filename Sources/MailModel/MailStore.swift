@@ -753,6 +753,10 @@ public final class MailStore {
                     if pending.contains(rid) { m.isRead = old.isRead; m.flag = old.flag; m.mailbox = old.mailbox }
                     guard m != old else { continue }
                     ms[i] = m
+                } else if let rid = m.remoteID, pending.contains(rid) {
+                    // Gone here with a change still queued (erased, or moved and erased): a page fetched before
+                    // that change reached the server doesn't bring it back.
+                    continue
                 } else {
                     ms.append(m)
                     if let rid = m.remoteID { index[rid] = ms.count - 1 }

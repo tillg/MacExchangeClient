@@ -743,4 +743,27 @@ struct MailStoreSyncTests {
         #expect(t.status == nil, "status: \(t.status ?? "nil")")
         #expect(t.outbox.isEmpty)
     }
+
+    // MARK: Server pages while a change is queued (BUG-072, BUG-073, BUG-074)
+
+    /// A store without a backend: queued changes stay queued, as while their request is on its way.
+    func synced(_ rids: [String], in box: MailboxKind = .inbox) -> MailStore {
+        let s = MailStore(accounts: [work, home], messages: [])
+        s.apply(SyncResult(upserts: rids.map { var m = remote($0); m.mailbox = box; return m }, deletedRemoteIDs: [],
+                           token: "t0", more: false), account: work.id, mailbox: box)
+        return s
+    }
+
+    /// A message erased from Trash doesn't come back from a Trash page, or the newest lookup, fetched before the
+    /// queued erase reached the server.
+    @Test func erasedMessageIsNotBroughtBackWhileItsEraseIsQueued() {
+        let s = synced(["A"], in: .trash)
+        let a = id(s, "A")
+        s.delete([a])
+        #expect(s.outbox.map(\.change) == [.delete(["A"])])
+        s.apply(page(["A"], token: "t1"), account: work.id, mailbox: .trash)
+        #expect(s.messages.filter { $0.remoteID == "A" }.isEmpty, "erased message is back in Trash")
+        s.merge([remote("A")], account: work.id, mailbox: .trash)
+        #expect(s.messages.filter { $0.remoteID == "A" }.isEmpty, "erased message is back from the newest lookup")
+    }
 }

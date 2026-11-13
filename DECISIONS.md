@@ -490,3 +490,10 @@ edited: 2026-11-13
 - **Decision:** The measuring script moves to `HTMLPage.measureScript` (so tests run the app's own script) and measures the bottom of `document.documentElement`'s box, which contains the body with its margins whatever the mail's markup. The wrapper stays (it keeps `display: flow-root`) but no longer defines the height.
 - **Test:** the probe also checked that the tail sits inside the wrapper; that is an implementation detail and not adopted (as in d-bug-094). The regression test checks measured height ≥ what the page draws; a guard test checks the view still shrinks when the window is widened.
 - **Alternatives:** An end marker after the mail (rejected: an unclosed `<table>` in the mail would foster-parent it above the table). `scrollHeight` (rejected: it never drops below the view's own height, so the view wouldn't shrink).
+
+## 02:08 — A server page doesn't bring back a message gone here with a change queued {#d-bug-072}
+
+- **Status:** decided
+- **Context:** BUG-072. `merge` protected messages with queued changes only while they were in memory. A Trash page or the newest lookup fetched before a queued erase reached the server appended the erased message again, under a new local ID.
+- **Decision:** `merge` skips an upsert whose remote ID has a queued change and no message here. Once the change is done (or refused, which re-adds an erased message), later pages behave as before.
+- **Why:** README: erasing removes the message; the server page is older than the user's action.
