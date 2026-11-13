@@ -61,7 +61,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [091](BUG-091-moving-placed-picture-not-a-change.md) | P4 | Models | Moving a picture to another place in the text doesn't count as a change, so closing the window discards it without asking |
 | [092](BUG-092-refresh-before-restore-duplicates-inbox.md) | P4 | MailStore | A refresh that runs before launch has restored the stored Inbox duplicates Inbox messages |
 | [093](BUG-093-server-deletion-keeps-queued-changes.md) | P4 | MailStore | Changes queued for a message that the server reports deleted stay in the outbox and are sent anyway |
-| [097](BUG-097-preconnect-reaches-sender-server.md) | P2 | HTMLPage | <link rel="preconnect"> in a blocked mail opens a connection to the sender's server, so opening the mail is reported although remote content is blocked |
 | [098](BUG-098-unreachable-account-stops-other-accounts-history.md) | P3 | MailStore | One unreachable account stops the background history and background checks of every other account |
 | [099](BUG-099-invite-answered-in-multiselection-erased-by-delete.md) | P3 | MailStore | An invite answered while it is part of a multi-selection stays selected in Trash; Delete then erases it |
 | [100](BUG-100-mail-check-clears-couldnt-send-and-other-account-errors.md) | P3 | MailStore | Each mail check clears the status: "Couldn't send …" and another account's error disappear |

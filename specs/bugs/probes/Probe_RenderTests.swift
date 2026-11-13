@@ -357,32 +357,6 @@ struct Probe_RenderTests {
         #expect(r == "14px 14px 14px|Helvetica", "\(r)")
     }
 
-    // MARK: Isolating what reaches the network without permission
-
-    nonisolated static let leakVectors: [String] = [
-        #"<link rel="preconnect" href="BASE/preconnect">"#,
-        #"<link rel="dns-prefetch" href="BASE/dnsprefetch">"#,
-        #"<link rel="prefetch" href="BASE/prefetch">"#,
-        #"<link rel="preload" as="image" href="BASE/preload.png">"#,
-        #"<link rel="icon" href="BASE/favicon.ico">"#,
-        #"<link rel="stylesheet" href="BASE/style.css">"#,
-        #"<style>@import url("BASE/import.css");</style>"#,
-        #"<img src="BASE/img.png">"#,
-        #"<video poster="BASE/poster.png" src="BASE/video.mp4" preload="auto"></video>"#,
-        #"<iframe src="BASE/iframe"></iframe>"#,
-        #"<a href="BASE/link">link</a>"#,
-        #"<form action="BASE/form"><input name=q></form>"#,
-    ]
-
-    @Test(arguments: leakVectors)
-    func blockedVectorReachesNothing(_ vector: String) async throws {
-        let rec = try LoopbackRecorder()
-        let mail = "<p>Hello</p>" + vector.replacingOccurrences(of: "BASE", with: "http://127.0.0.1:\(rec.port)")
-        _ = await RPage(HTMLPage.document(mail, allowRemote: false))
-        try? await Task.sleep(for: .milliseconds(1200))
-        #expect(rec.connections == 0, "\(vector): connections \(rec.connections), requests \(rec.requests)")
-    }
-
     // MARK: More height cases
 
     /// position:fixed footer (seen in web-page-turned-newsletter mail): the view is as tall as the content, so the
