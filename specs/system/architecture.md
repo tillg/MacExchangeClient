@@ -135,7 +135,8 @@ flowchart LR
     change to the same message stays. Only a refused erase (`delete`) re-adds a message that is gone; a message
     erased after the refused change stays gone. Status shows the reason.
 - A move needs the folder list (read on demand) and renames the moved messages to the new IDs Exchange returns,
-  in memory and in the queued changes (`renameRemote`). An answer sent with "Do Not Send a Response" and Remove from
+  in memory and in the queued changes (`renameRemote`). If the destination's sync already brought a moved item under
+  its new ID, that copy is dropped first; the moved message keeps its local ID, body and selection. An answer sent with "Do Not Send a Response" and Remove from
   Calendar also move the item to Trash on the server, ignoring failure.
 - Exchange messages can't move to another account: `update` reverts such a change and sets a status.
 

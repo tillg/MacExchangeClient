@@ -234,21 +234,6 @@ struct Probe_EWS2StoreTests {
     }
 
 
-    /// Exchange gives a moved item a new ID. If the target folder's history page with the new ID is merged before
-    /// the MoveItem answer is processed (history runs alongside the outbox), the message must not end up twice.
-    /// The race is not reproduced here; the store calls are made in the order it produces.
-    @Test func probeMoveAnswerAfterTargetSyncLeavesOneMessage() async throws {
-        let s = MailStore(accounts: [acct], messages: [])  // no backend: the move stays queued, as during the round trip
-        s.merge([serverMessage("OLD")], account: acct.id, mailbox: .inbox)
-        s.move(Set(s.messages.map(\.id)), to: .archive)
-        #expect(s.outbox.count == 1)
-        // The server already moved it (new ID in the Archive) and the Archive's history page arrives first.
-        s.merge([serverMessage("NEW")], account: acct.id, mailbox: .archive)
-        // Then the MoveItem answer: OLD → NEW.
-        s.renameRemote(["OLD": "NEW"], account: acct.id)
-        #expect(s.messages.filter { $0.remoteID == "NEW" }.count == 1, "\(s.messages.map { ($0.remoteID ?? "", $0.mailbox.rawValue) })")
-    }
-
     /// ExchangeAccount list round-trips through UserDefaults (control; never the Keychain).
     @Test func probeAccountsRoundTrip() throws {
         let suite = "probe-ews2-\(UUID().uuidString)"

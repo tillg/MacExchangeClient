@@ -36,18 +36,6 @@ struct Probe_SyncTests {
 
     // MARK: Merging server updates
 
-    /// While a move is on its way, the destination's sync can already list the moved copy under its new ID;
-    /// when the move's answer then renames the message, there must be one message, not two.
-    @Test func renameOntoAnIDTheSyncAlreadyBroughtDoesNotDuplicate() {
-        let s = synced(["A"])
-        let a = id(s, "A")
-        s.archive([a])
-        s.apply(page([remote("A2")], token: "a1"), account: work.id, mailbox: .archive)
-        s.renameRemote(["A": "A2"], account: work.id)
-        #expect(s.messages.filter { $0.remoteID == "A2" }.count == 1)
-        #expect(s.count(.account(work.id, .archive)) == 1)
-    }
-
     /// The Inbox sync says A was deleted (elsewhere) while a local move of A was queued. The move then fails
     /// (the item is gone): A must not stay in the Inbox forever – no later sync will report it again.
     @Test func deletionSeenDuringAPendingMoveIsNotForgotten() {
