@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "When a draft can't be saved on the server, the message says so instead of claiming it couldn't be sent, and a message without a subject is named \"(No Subject)\".",
             "Saving an attachment next to a broken alias with the same name no longer fails: the copy gets a number, as in the Finder.",
             "If your answer to an invitation with a comment can't be sent, the comment you wrote is kept in Drafts instead of being lost.",
             "A link to a folder can be attached: the folder goes as a zip archive, as when you attach the folder itself.",

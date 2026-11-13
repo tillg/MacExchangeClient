@@ -1068,7 +1068,8 @@ public final class MailStore {
         switch p.change {
         case let .send(d), let .saveDraft(d):
             keepInDrafts(d)
-            status = "Couldn't send “\(d.subject)”: \(error). It's in Drafts on this Mac."
+            let what = if case .send = p.change { "send" } else { "save the draft" }
+            status = "Couldn't \(what) “\(d.subject.isEmpty ? "(No Subject)" : d.subject)”: \(error). It's in Drafts on this Mac."
         default:
             // Only what this change set, and only while it still holds: later changes (still queued or sent)
             // stay, and a message erased since isn't brought back. Only a refused erase re-adds the message.

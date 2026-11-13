@@ -288,6 +288,17 @@ struct MailStoreTests {
         #expect(d.to == "ann@x.com" && d.cc == "", "to: \(d.to.debugDescription), cc: \(d.cc.debugDescription)")
     }
 
+    /// A failed Save Draft doesn't say the message couldn't be sent; a message without subject is named as its draft is.
+    @Test func failedSaveOrSendStatusNamesWhatFailed() {
+        let s = store([])
+        s.merge([(.inbox, [])], account: work.id)
+        let d = Draft(accountID: work.id, to: "bo@x.com", subject: "Plan", body: "draft text")
+        s.failed(PendingChange(account: work.id, change: .saveDraft(d), previous: []), "busy")
+        #expect(s.status?.contains("send") != true && s.status?.contains("“Plan”") == true, "status: \(s.status ?? "nil")")
+        s.failed(PendingChange(account: work.id, change: .send(Draft(accountID: work.id, to: "a@x.com", body: "b")), previous: []), "busy")
+        #expect(s.status?.hasPrefix("Couldn't send “(No Subject)”") == true, "status: \(s.status ?? "nil")")
+    }
+
     @Test func replyDraftQuotesOriginal() {
         let m = msg(work, subject: "Plans", from: "Ann")
         let s = store([m])
