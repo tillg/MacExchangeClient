@@ -359,13 +359,4 @@ struct Probe_Store2Tests {
         #expect(afterLoad == false)
         #expect(s2.addsNewRecipient(d2) == false)
     }
-
-    /// Moving a picture to another place in the text is a change: closing the window must ask.
-    @Test func movingAPlacedPictureIsAChange() {
-        var d = Draft(accountID: work.id, to: "a@x.com", subject: "S", body: "\u{FFFC}Hello world")
-        d.attachments = [DraftAttachment(name: "p.png", contentType: "image/png", data: Data([1]))]
-        let start = d
-        d.body = "Hello world\u{FFFC}"
-        #expect(d.hasChanges(since: start))
-    }
 }

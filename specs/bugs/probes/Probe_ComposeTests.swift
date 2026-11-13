@@ -51,69 +51,7 @@ struct Probe_ComposeTests {
 
     // MARK: File marks and grapheme clusters
 
-    /// NSTextView keeps U+FFFC for the picture and the next character as separate UTF-16 units; when the next
-    /// character is a combining one (Arabic shadda, an accent, ZWJ/ZWNJ), Swift sees one Character "\u{FFFC}\u{651}"
-    /// that is not `fileMark`.
-    @Test func markFollowedByCombiningCharacterStillCountsAsAFile() {
-        for combining in ["\u{0651}", "\u{0301}", "\u{200C}", "\u{200D}"] {
-            var d = Draft(accountID: work.id, to: "a@x.com", body: "A\(mark)\(combining)B\(mark)C")
-            d.attachments = [png("one.png"), png("two.png")]
-            #expect(d.placedPictures == [0, 1], "combining U+\(String(combining.unicodeScalars.first!.value, radix: 16)): placed \(d.placedPictures)")
-            #expect(!d.text.unicodeScalars.contains("\u{FFFC}"),
-                    "sent text keeps an object replacement character: \(d.text.unicodeScalars.map { String($0.value, radix: 16) })")
-            let h = d.html { "id\($0)" }
-            #expect(h.contains("A<img src=\"cid:id0\""), "first picture not after A: \(h)")
-        }
-    }
-
-    /// Exclude Attachments with a combining character after the original's picture: the user's own file must stay.
-    @Test func excludeOriginalWithCombiningCharacterKeepsUsersFile() {
-        var d = Draft(accountID: work.id, body: "x\(mark)\u{0301}y\(mark)z")
-        d.attachments = [DraftAttachment(name: "orig.png", contentType: "image/png", data: Data([1]), fromOriginal: true),
-                         png("mine.png")]
-        d.excludeOriginalAttachments()
-        #expect(d.attachments.map(\.name) == ["mine.png"])
-        #expect(d.body.unicodeScalars.filter { $0 == "\u{FFFC}" }.count == 1, "marks left: \(d.body.unicodeScalars.map { String($0.value, radix: 16) })")
-        #expect(d.placedPictures == [0], "placed: \(d.placedPictures)")
-    }
-
-    /// Property: for random bodies built from marks and text, the marks counted by scalars equal the files placed.
-    @Test func randomDraftsMarksMatchPictures() {
-        var rng = ComposeRNG(state: 42)
-        let pieces = ["a", " ", "\n", "é", "\u{0301}", "😀", "👍🏽", "שלום", "\u{200D}", "<", "&", mark]
-        var failures = 0, first = ""
-        for _ in 0..<2000 {
-            var body = ""
-            for _ in 0..<Int.random(in: 0..<20, using: &rng) { body += pieces.randomElement(using: &rng)! }
-            let scalarMarks = body.unicodeScalars.filter { $0 == "\u{FFFC}" }.count
-            var d = Draft(accountID: work.id, body: body)
-            d.attachments = (0..<scalarMarks).map { png("p\($0).png") }
-            if d.placedPictures != Array(0..<scalarMarks) || d.text.unicodeScalars.contains("\u{FFFC}") {
-                failures += 1
-                if first.isEmpty { first = body.unicodeScalars.map { String($0.value, radix: 16) }.joined(separator: " ") }
-            }
-        }
-        #expect(failures == 0, "\(failures) of 2000 drafts misplace files; first body scalars: \(first)")
-    }
-
     // MARK: Draft.html in WebKit
-
-    /// A Hebrew/Arabic line shows right-to-left in the compose window (NSTextView's natural direction) and in a
-    /// plain-text mail. Once a picture is placed, the mail goes as HTML: it must not turn into a left-to-right line.
-    @Test func rtlLineStaysRightToLeftInHTML() async throws {
-        var d = Draft(accountID: work.id, body: "שלום עולם!\n\(mark)")
-        d.attachments = [png("p.png")]
-        let h = d.html { _ in "x" }
-        let js = """
-        (() => { const div = document.querySelector('div'); const t = div.firstChild; const r = document.createRange();
-          r.setStart(t, t.length - 1); r.setEnd(t, t.length); const bang = r.getBoundingClientRect();
-          r.setStart(t, 0); r.setEnd(t, 1); const first = r.getBoundingClientRect();
-          return [bang.left < first.left, Math.round(first.right), Math.round(div.getBoundingClientRect().right)].join('|') })()
-        """
-        let r = try #require(await ComposeRender.eval(h, js) as? String)
-        let parts = r.split(separator: "|")
-        #expect(parts.first == "true", "'!' should be at the left end (RTL paragraph); bang-left-of-first|first.right|div.right = \(r)")
-    }
 
     /// Property: what WebKit shows of Draft.html is the text that was typed (for text without the known
     /// whitespace-collapsing cases: runs of spaces, tabs, CR, leading/trailing blanks).
@@ -172,19 +110,6 @@ struct Probe_ComposeTests {
     }
 
     // MARK: Size
-
-    /// Every render of the compose window computes the size 2-3 times (sizeText, red colour); typing in a long reply
-    /// re-renders on every key. The estimate should not walk the whole body by grapheme each time.
-    @Test func estimatedSizeIsCheapForALongReply() {
-        let line = "> Thanks, that works for me. Let's keep Friday at 10 as planned, ok?\n"
-        var d = Draft(accountID: work.id, body: String(repeating: line, count: 6_000))  // ~420 KB quoted thread
-        d.attachments = [png("p.png", 1_000_000)]
-        let clock = ContinuousClock()
-        var total = 0
-        let t = clock.measure { for _ in 0..<3 { total &+= d.estimatedSize } }
-        print("estimatedSize x3 on \(d.body.utf8.count) bytes: \(t)")
-        #expect(t < .milliseconds(16), "three size estimates (one keystroke's render) took \(t)")
-    }
 
     /// Base64 with a CRLF every 76 characters: the per-file estimate is never below the encoded size, for any length.
     @Test func attachmentEstimateNeverBelowBase64() {
@@ -269,17 +194,6 @@ struct Probe_ComposeTests {
     }
 
     // MARK: Compose windows
-
-    /// The compose WindowGroup is `WindowGroup(for: Draft.self)` and is opened with `openWindow(id:value:)`; SwiftUI
-    /// brings an existing window to the front when one already presents an equal value. Two New Message
-    /// commands (or Reply twice to the same message) must produce different values to open two windows.
-    @Test func twoNewMessagesAreDistinctWindowValues() {
-        let s = store([msg(work)])
-        let a = Draft(accountID: s.accounts[0].id), b = Draft(accountID: s.accounts[0].id)
-        #expect(a != b, "two New Message drafts are equal values")
-        let id = s.messages[0].id
-        #expect(s.draft(.reply, to: id) != s.draft(.reply, to: id), "two replies to one message are equal values")
-    }
 
     // MARK: Include attachments / new recipients (controls and edge cases)
 

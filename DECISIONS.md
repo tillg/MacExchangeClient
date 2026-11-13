@@ -667,3 +667,28 @@ edited: 2026-11-13
 - **Why:** no rebuild, no migration. Measured on 180,000 synthetic rows (3 KB bodies): 0.4 s for a word with no hit (full scan, on the search queue, off the main thread), close to the old memory search; with hits the newest-first scan stops at the limit.
 - **Not covered:** a CJK word that only appears in the HTML (not in the text body) isn't found, as for every search; LIKE is not accent-folded (irrelevant for these scripts).
 - **Alternatives:** `trigram` tokenizer (rejected: index rebuild, three times the index size, no prefix semantics for other languages). Answer CJK queries from memory (rejected: a MailStore change in an area another agent is editing).
+
+## 03:38 — position:fixed in a mail becomes static when the page is measured {#d-bug-128}
+
+- **Status:** decided
+- **Context:** BUG-128. The body view is as tall as the page and never scrolls, so a `position: fixed` bar ("View in browser", web pages sent as mail) sat over the message's first or last lines for good. CSS can't select by computed position, and content JavaScript is off.
+- **Decision:** `HTMLPage.measureScript` (the app's script, run before each measurement) sets every element of the mail whose computed `position` is `fixed` to `position: static !important`, so it shows where the mail has it in the text and is measured with it.
+- **Why:** `absolute` or a containing block on the root still puts a `bottom: 0` bar over the last lines; `static` hides nothing. Mail.app's own handling isn't verified (⚠️).
+- **Not covered:** `position: sticky`; a fixed element appearing only after a later style change is fixed at the next measurement.
+- **Alternatives:** Leave fixed elements alone (rejected: text unreadable). Hide them (rejected: loses content).
+
+## 03:38 — Mail's nested-list numbering at zero specificity {#d-bug-129}
+
+- **Status:** decided
+- **Context:** BUG-129. Mail's MUIWebDocument.css numbers nested `<ol>` 1. a. i. and draws `ul.Apple-dash-list` with dashes. Mail loads it as a user style sheet, which the mail's own CSS and an `<ol type>` override; our style block is an author style sheet and would override them.
+- **Decision:** The dash-list rules are taken as they are; the `<ol>` rules are wrapped in `:where(…)` (zero specificity) and skip an `<ol type>`, so the mail's list styles and `type` still win (test `appleMailListStyles`).
+- **Alternatives:** Copy the rules verbatim (rejected: `ol ol` would beat a mail's `ol.x { list-style-type: … }` and `type="A"`).
+
+## 03:38 — A compose window is opened with its own value {#d-bug-117}
+
+- **Status:** decided
+- **Context:** BUG-117. Compose windows were `WindowGroup(for: Draft.self)`; SwiftUI brings forward a window already showing an equal value, and two New Message drafts (or two replies to one message) are equal.
+- **Decision:** New `ComposeWindow` (MailModel): the draft plus a fresh `UUID` per request; every `openWindow(id: "compose")` passes one. `Draft` itself is unchanged (no on-disk change, `Draft` equality unchanged).
+- **Why:** smallest change that makes each command a new window, as in Mail.
+- **Not covered:** a compose window restored by macOS from a session saved before this change opens empty (its stored value was a `Draft`).
+- **Alternatives:** an `id` inside `Draft` (rejected: changes `Draft` equality and its stored form in the outbox and caches).

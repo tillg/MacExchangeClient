@@ -30,7 +30,8 @@ stored: [storage.md](storage.md). How EWS fills them: [ews.md](ews.md).
 
 `Contact(name, email)`. EWS list summaries carry display names only (`email` empty) until the body loads.
 
-- `initials`: the first letters of the first two parts of `name` split on ASCII space, uppercased.
+- `initials`: the first letters of the first two parts of `name` split on any whitespace (space, tab, no-break
+  space), each uppercased and cut to one letter (ß → S, ﬀ → F), so at most two.
 - `parseList(_:)` parses what the user types in To/Cc:
   1. Split on `,` and `;`, except inside double quotes (where `\"` and `\\` are escapes) or inside `<>`.
      If a quote or `<` is never closed (or a `<` opens inside `<>`), the split ignores quotes and `<>` instead,
@@ -76,20 +77,25 @@ Decoding also accepts a bare string as the name (size and type nil), the form bu
 
 ## Draft
 
-A message being written (`Draft`, `Codable`, also the compose window's value):
+A message being written (`Draft`, `Codable`). A compose window is opened with a `ComposeWindow` (the draft plus a
+new `id` per request), so equal drafts (two New Messages, two replies to one message) still open separate windows.
 
 - `accountID`, `to`, `cc` (free text, parsed with `Contact.parseList` when sent), `subject`, `body`.
 - `attachments: [DraftAttachment]` (`name`, `contentType`, `data`, `fromOriginal`). Stored as an optional so older
   drafts decode.
 - **File marks:** `body` holds U+FFFC (`Draft.fileMark`) where a file is placed; the k-th mark is `attachments[k]`.
   Files beyond the marks were added without a place. `text` is `body` without marks — what is sent as plain text.
+  Marks are counted by Unicode scalar (`text`, `placedPictures`, `html`, `excludeOriginalAttachments`, the compose
+  text view's load), as a combining character after a mark joins it into one `Character`.
 - `placedPictures`: indices of attachments that have a mark and are `image/jpeg`, `image/jpg`, `image/png` or
   `image/gif` (case-insensitive); only these go inline.
 - `original`: the message replied to or forwarded, when it has attachments. `loadingOriginal`: set while its files
   still have to be added. `inviteAnswer`: makes Send answer an invite instead of sending mail.
-- `hasChanges(since:)` compares account, To, Cc, subject, `text` and the non-original files.
+- `hasChanges(since:)` compares account, To, Cc, subject, `body` without the marks of the original's files (so
+  moving a placed file is a change) and the non-original files.
 - `excludeOriginalAttachments()` removes original files and their marks.
-- `estimatedSize`: UTF-8 bytes of text and subject plus, per file, base64 size + a line break per 76 chars + 300.
+- `estimatedSize`: UTF-8 bytes of text (the body's bytes minus 3 per mark, found with `memchr`; no copy of the
+  body) and subject plus, per file, base64 size + a line break per 76 chars + 300.
 - `html(contentID:)`: [rendering.md](rendering.md#html-of-sent-mail).
 - `IncludeAttachments`: never, ask, whenAddingRecipients, always. `ReplyKind`: reply, replyAll, forward.
 

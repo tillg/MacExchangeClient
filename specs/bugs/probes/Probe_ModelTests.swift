@@ -11,30 +11,7 @@ struct Probe_ModelTests {
         #expect(c.map(\.email) == ["tom+tag@bücher.de", "ünï@xn--bcher-kva.de"])
     }
 
-    // MARK: Contact.initials
-
-    @Test func initialsAtMostTwoLetters() {
-        for name in ["ßtefan Müller", "ǆenan Kovač", "ﬀoo Bar"] {
-            let i = Contact(name: name, email: "x@x.com").initials
-            #expect(i.count <= 2, "\(name) -> \(i)")
-        }
-    }
-
-    @Test func initialsWeirdNames() {
-        #expect(Contact(name: "👨‍👩‍👧 Family Group", email: "f@x").initials == "👨‍👩‍👧F")
-        #expect(Contact(name: "", email: "f@x").initials == "")
-        #expect(Contact(name: "Jane\u{00A0}Doe", email: "j@x").initials == "JD")
-        #expect(Contact(name: "Jane\tDoe", email: "j@x").initials == "JD")
-        #expect(Contact(name: "محمد علي", email: "m@x").initials == "مع")
-    }
-
     // MARK: Message.preview
-
-    @Test func previewCollapsesBlankWhitespaceLines() {
-        let m = Message(accountID: UUID(), from: Contact(name: "A", email: "a@x"), to: [], subject: "S",
-                        body: "Hello\n   \n\tWorld", date: .now)
-        #expect(m.preview == "Hello World")
-    }
 
     @Test func previewCRLF() {
         let m = Message(accountID: UUID(), from: Contact(name: "A", email: "a@x"), to: [], subject: "S",

@@ -6,9 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [044](BUG-044-initials-only-split-on-ascii-space.md) | P4 | Models | Contact.initials ignores names separated by tab or no-break space |
-| [045](BUG-045-initials-can-be-three-letters.md) | P4 | Models | Contact.initials can return 3+ letters (ß, ǆ, ﬀ expand when uppercased) |
-| [046](BUG-046-preview-keeps-whitespace-only-lines.md) | P4 | Models | Message.preview keeps whitespace-only lines and tabs, leaving gaps in the list preview |
 | [047](BUG-047-action-that-changes-nothing-moves-selection.md) | P4 | MailStore | Archive while viewing Archive changes nothing but moves the selection to the next message |
 | [048](BUG-048-drop-reports-success-when-nothing-changed.md) | P4 | MailStore | drop() returns true for an already-flagged Trash message dropped on Flagged, although nothing changed |
 | [049](BUG-049-local-send-empty-subject-inconsistent.md) | P4 | MailStore | Sending without a server stores an empty subject; Drafts and failed sends use "(No Subject)" |
@@ -26,19 +23,14 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [088](BUG-088-sign-in-resets-mailbox-and-selection.md) | P4 | MailStore | Signing in another account always jumps to All Inboxes and clears the selection, even when no sample account was removed |
 | [089](BUG-089-failed-send-status-wording.md) | P4 | MailStore | After a failed Save Draft the status says "Couldn't send …"; with no subject it reads "Couldn't send “”" |
 | [090](BUG-090-failed-send-draft-loses-picture-placement.md) | P4 | MailStore | The draft kept after a failed send loses where the pictures were placed in the text |
-| [091](BUG-091-moving-placed-picture-not-a-change.md) | P4 | Models | Moving a picture to another place in the text doesn't count as a change, so closing the window discards it without asking |
 | [092](BUG-092-refresh-before-restore-duplicates-inbox.md) | P4 | MailStore | A refresh that runs before launch has restored the stored Inbox duplicates Inbox messages |
 | [093](BUG-093-server-deletion-keeps-queued-changes.md) | P4 | MailStore | Changes queued for a message that the server reports deleted stay in the outbox and are sent anyway |
 | [099](BUG-099-invite-answered-in-multiselection-erased-by-delete.md) | P3 | MailStore | An invite answered while it is part of a multi-selection stays selected in Trash; Delete then erases it |
 | [101](BUG-101-send-from-account-without-password.md) | P3 | MailStore | Send from an Exchange account without a Keychain password: shown in Sent though nothing is sent, or queued with no word |
 | [102](BUG-102-invite-answer-comment-lost-on-network-error.md) | P3 | MailStore | Respond with Comments that fails with a network error is undone and the typed comment is lost |
 | [104](BUG-104-answered-invite-shows-unanswered-after-sync.md) | P3 | Invite | An invite answered here shows "Please respond" again once Exchange has moved it to Deleted Items |
-| [113](BUG-113-combining-character-after-file-mark-breaks-placement.md) | P4 | Models | A combining character right after a placed file breaks the file marks: pictures change place, a stray U+FFFC is sent, Exclude removes the wrong file |
-| [114](BUG-114-rtl-lines-sent-left-to-right-in-html.md) | P4 | Models | Hebrew/Arabic lines turn left-to-right (left-aligned, punctuation on the wrong side) once a placed picture makes the mail HTML |
 | [115](BUG-115-address-shown-twice-when-no-display-name.md) | P4 | MailStore | Senders without a display name appear as "a@x.com <a@x.com>" in the forward header, the reply attribution and an invite answer's To |
 | [116](BUG-116-forward-header-lacks-recipients-and-time-zone.md) | P4 | MailStore | The forward header leaves out To and Cc (and the date has no time zone), so the forward loses who the original went to |
-| [117](BUG-117-second-new-message-reuses-window.md) | P4 | Models | A second New Message (or a second Reply to the same message) brings the first compose window forward instead of opening a new one |
-| [118](BUG-118-size-estimate-walks-whole-body-each-render.md) | P4 | Models | Message Size: the estimate walks the whole body by character on every render (about 40 ms per keystroke in a 400 KB reply with a file) |
 | [119](BUG-119-mark-read-or-unflag-leaves-hidden-selection.md) | P4 | MailStore | Mark as Read with the unread filter on, or Clear Flag in Flagged, leaves the messages selected after they left the list |
 | [120](BUG-120-unchanged-messages-rewritten-on-save.md) | P4 | MailStore | Actions that change nothing still rewrite their rows: Mark All as Read on a read mailbox rewrites every message |
 | [121](BUG-121-queued-moves-store-full-message-copies.md) | P4 | MailStore | Queued changes keep a full copy of every message: archiving an opened Inbox makes a 35 MB outbox, rewritten after one more flag |

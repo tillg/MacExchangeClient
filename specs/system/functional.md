@@ -93,7 +93,7 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
 
 ## Compose
 
-- New Message (⌘N) opens a compose window for the first account (the toolbar button: the selected mailbox's or message's account). Fields To, Cc,
+- New Message (⌘N) opens a new compose window each time (as do Reply, Reply All, Forward, also twice for one message) for the first account (the toolbar button: the selected mailbox's or message's account). Fields To, Cc,
   Subject, From picker with more than one account, Message Size when files are attached. Send (⇧⌘D) needs a
   non-empty To; Save Draft (⌘S).
 - Reply rules (`draft(_:to:)`):

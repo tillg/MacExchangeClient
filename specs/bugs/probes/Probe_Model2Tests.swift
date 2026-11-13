@@ -34,15 +34,6 @@ struct Probe_Model2Tests {
 
     // MARK: Draft.hasChanges
 
-    @Test func movingAPictureInTheTextIsAChange() {
-        let m = String(Draft.fileMark)
-        var start = Draft(accountID: UUID(), to: "a@x.com", body: "Hello \(m)world")
-        start.attachments = [DraftAttachment(name: "p.png", contentType: "image/png", data: Data([1, 2]))]
-        var moved = start
-        moved.body = "Hello world\(m)"
-        #expect(moved.hasChanges(since: start))
-    }
-
     // MARK: DayLayout
 
     let day = ISO8601DateFormatter().date(from: "2026-11-23T00:00:00Z")!

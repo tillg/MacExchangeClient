@@ -102,7 +102,7 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
 ## List preview
 
 `Message.preview`: the server preview while the body isn't loaded; otherwise the body split into lines (any newline),
-lines starting with `>` dropped, joined with spaces and trimmed of spaces. It is computed on every access, but only
+each line trimmed of spaces and tabs, empty lines and lines starting with `>` dropped, joined with spaces. It is computed on every access, but only
 over the first 10,000 characters of the body, and returns at most 500 characters. The row shows two lines of it.
 
 ## HTML of sent mail
@@ -110,7 +110,8 @@ over the first 10,000 characters of the body, and returns at most 500 characters
 Sent mail is plain text (`Draft.text`) unless a JPEG, PNG or GIF is placed in the text (`placedPictures`). Then
 `Draft.html(contentID:)` builds the body:
 
-- `<html><head>` with a UTF-8 meta, `<body style="overflow-wrap: break-word; -webkit-nbsp-mode: space;
+- `<html><head>` with a UTF-8 meta and `<style>div { unicode-bidi: plaintext; }</style>` (each line takes its
+  direction from its first strong letter, so a Hebrew or Arabic line stays right to left), `<body style="overflow-wrap: break-word; -webkit-nbsp-mode: space;
   line-break: after-white-space;">`.
 - `body` is split on every line ending (`isNewline`: `\r\n`, `\n`, `\r`, U+2028, …); each line becomes `<div>…</div>`, an empty line `<div><br></div>`, lines joined by
   `\n`. Text is escaped (`&`, `<`, `>`, `"`). Between marks, a space that follows a space or starts the
