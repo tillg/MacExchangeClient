@@ -127,7 +127,9 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
 - Closing a window with user changes (not the original's files) asks "Save this message as a draft?" (Save / Cancel
   / Don't Save). Invite answers close without asking. `saveDraft` returns false while a forward's original files
   load; the sheet's Save then keeps the window open and saves and closes it once they are in (`closeWhenLoaded`).
-- Send on an Exchange account queues `send`; without a server the message is added to Sent. Save Draft likewise
+- Send on an Exchange account (`isServer`, or one with stored mail) queues `send`, also while it has no password; then
+  the status says "“…” waits in the outbox until “…” is signed in again in Settings ▸ Accounts." and it goes out
+  once the account is signed in. Without a server the message is added to Sent. Save Draft likewise
   queues `saveDraft` or adds a local Drafts message (with To and Cc). A local Sent or Drafts message without a
   subject, and a draft kept after a failed send, is called "(No Subject)". A draft whose account is no longer set up
   (sample accounts go when signing in) is neither sent nor saved from another account: `send`/`saveDraft` return

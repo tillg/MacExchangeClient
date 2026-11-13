@@ -16,7 +16,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [090](BUG-090-failed-send-draft-loses-picture-placement.md) | P4 | MailStore | The draft kept after a failed send loses where the pictures were placed in the text |
 | [092](BUG-092-refresh-before-restore-duplicates-inbox.md) | P4 | MailStore | A refresh that runs before launch has restored the stored Inbox duplicates Inbox messages |
 | [093](BUG-093-server-deletion-keeps-queued-changes.md) | P4 | MailStore | Changes queued for a message that the server reports deleted stay in the outbox and are sent anyway |
-| [101](BUG-101-send-from-account-without-password.md) | P3 | MailStore | Send from an Exchange account without a Keychain password: shown in Sent though nothing is sent, or queued with no word |
 | [102](BUG-102-invite-answer-comment-lost-on-network-error.md) | P3 | MailStore | Respond with Comments that fails with a network error is undone and the typed comment is lost |
 | [104](BUG-104-answered-invite-shows-unanswered-after-sync.md) | P3 | Invite | An invite answered here shows "Please respond" again once Exchange has moved it to Deleted Items |
 | [115](BUG-115-address-shown-twice-when-no-display-name.md) | P4 | MailStore | Senders without a display name appear as "a@x.com <a@x.com>" in the forward header, the reply attribution and an invite answer's To |

@@ -745,3 +745,12 @@ edited: 2026-11-13
 - **Context:** BUG-069, BUG-070. The compose window closed after Send whatever happened, so an answer to an invite that had vanished, or a draft of an account that was removed, was dropped (or sent from another account) without a word.
 - **Decision:** `send` returns false (and `saveDraft` already did) when the message can't go ahead; the window stays open and shows the status in an alert. An invite answer whose invite is gone says "the invitation is no longer in your mailbox"; a draft of a removed account is never sent or saved from another account, and the From picker is shown so another one can be chosen.
 - **Alternatives:** send the answer by the remote ID kept in the draft (rejected: `InviteAnswer` is stored in the outbox; and the invite is usually gone because it was answered elsewhere). Fall back to the first account (the old behaviour; rejected: mail from the wrong identity).
+
+## 04:03 — Send from an account without a password waits in the outbox and says so {#d-bug-101}
+
+- **Status:** decided
+- **Context:** BUG-101. An Exchange account without a Keychain password has no backend. Before anything was stored for it, Send filed the message under Sent as if sent; afterwards it queued it with no word. The bug suggested keeping it in Drafts instead.
+- **Decision:** An `isServer` account is always treated as a server account by `send`/`saveDraft`. Send queues the message as before and, while the account has no backend, the status says it waits until the account is signed in again.
+- **Why:** existing tests (`exchangeAccountWithoutPasswordIsAServerAccount`, `signingInAgainConnectsTheSameAccount`) and the code's documented design say an account without a password keeps its changes queued until it is signed in again. Moving the send to Drafts would change those tests, which this run may not do.
+- **Not covered:** the queued message still goes out when the password is entered, maybe much later; the status line is the only notice.
+- **Alternatives:** keep it in Drafts like a failed send (rejected here: needs the two tests above changed; a product call for the user).

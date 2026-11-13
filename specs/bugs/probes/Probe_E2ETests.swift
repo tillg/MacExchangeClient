@@ -166,39 +166,6 @@ struct Probe_E2ETests {
         #expect(s2.unreadCount(.smart(.flagged)) == 0, "\(s2.unreadCount(.smart(.flagged))) flagged still unread")
     }
 
-    /// An Exchange account whose Keychain password is missing has no backend. Before it has any stored sync
-    /// position (fresh database), Send files the message under Sent as if sent, and nothing is queued.
-    @Test func sendFromAnExchangeAccountWithoutPasswordIsNotShownAsSent() {
-        let ex = ExchangeAccount(email: "till@work.com", username: "W\\till", server: "mail.work.com")
-        let s = MailStore(accounts: [], messages: [])
-        s.accounts.append(ex.account)  // AppSetup.connect without a Keychain password
-        s.send(Draft(accountID: ex.id, to: "x@y.com", subject: "Important", body: "b"))
-        let sent = s.messages.filter { $0.mailbox == .sent && $0.subject == "Important" }
-        #expect(sent.isEmpty && s.outbox.contains(where: isSend), "shown in Sent \(sent.count), queued \(s.outbox.count)")
-    }
-
-    /// The same account after a relaunch (its sync positions are stored): Send queues the message, which can never
-    /// go out (no backend) and nothing says so; it stays queued across relaunches and goes out whenever a
-    /// password is added, maybe days later.
-    @Test func sendFromARestoredExchangeAccountWithoutPasswordSaysItCannotSend() throws {
-        let url = tempURL()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let ex = ExchangeAccount(email: "till@work.com", username: "W\\till", server: "mail.work.com")
-        let s = MailStore(accounts: [ex.account], messages: [])
-        s.apply(page([server("A1")]), account: ex.id, mailbox: .inbox)
-        try MailDatabase(url: url).write(s.takeChanges())
-        let db = try MailDatabase(url: url)
-        let s2 = MailStore(accounts: [], messages: [])
-        s2.accounts.append(ex.account)  // AppSetup.connect without a Keychain password
-        s2.status = "No password in the Keychain for W\\till"
-        s2.restore(try db.meta())
-        s2.finishLoading(try db.messages())
-        let before = s2.status
-        s2.send(Draft(accountID: ex.id, to: "x@y.com", subject: "Important", body: "b"))
-        #expect(s2.status != before || s2.messages.contains { $0.subject == "Important" && $0.mailbox == .drafts },
-                "queued: \(s2.outbox.count), status: \(s2.status ?? "nil")")
-    }
-
     /// A failed database write is retried with the next one. If a message erased in the failed batch was
     /// brought back meanwhile (a refused delete) and saved, the retry deletes it from disk although it is in memory.
     @Test func retryOfAFailedWriteDoesNotDeleteAMessageBroughtBackMeanwhile() throws {
