@@ -67,3 +67,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [215](BUG-215-empty-address-recipient-fails-whole-send.md) | P3 | ews | A recipient typed as "Name <>" makes the whole send fail (empty EmailAddress is schema-invalid) |
 | [216](BUG-216-deleted-appointment-or-task-cannot-be-erased.md) | P2 | ews | A deleted appointment or task in Trash can't be erased: DeleteItem lacks SendMeetingCancellations / AffectedTaskOccurrences |
 | [217](BUG-217-flag-or-read-on-deleted-appointment-refused.md) | P3 | ews | Flagging or marking read a deleted appointment in Trash is refused and undone (UpdateItem lacks SendMeetingInvitationsOrCancellations) |
+| [218](BUG-218-cmd-delete-acts-on-mail-while-typing.md) | P1 | MailCommands | ⌘⌫ while typing in a compose window (or the search field) deletes the main window's selected message, and erases it if it is in Trash |
+| [219](BUG-219-second-viewer-window-reloads-mail.md) | P2 | MailReplicaApp | New Viewer Window loads the mail database into the running app again: an unsaved queued send is no longer saved, a send on its way is reported as interrupted |
+| [220](BUG-220-list-date-weekday-for-future-and-week-old.md) | P3 | MessageListView | Message list shows only a weekday for a date in the future, and for last week's same weekday after the current time |
