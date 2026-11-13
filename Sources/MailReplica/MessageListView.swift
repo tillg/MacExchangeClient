@@ -63,7 +63,8 @@ struct MessageListView: View {
                 }
             }
             .contextMenu(forSelectionType: Message.ID.self) { ids in
-                MessageContextMenu(ids: ids)
+                // Read state from the rows' lookup: `store.message` goes over every message, on every redraw.
+                MessageContextMenu(ids: ids, unread: ids.contains { lookup.byID[$0]?.isRead == false })
             } primaryAction: { ids in
                 // Double-click opens the message; in Mail that's a separate window. Here: reply-less read.
                 store.selection = ids
@@ -167,6 +168,8 @@ struct MessageContextMenu: View {
     @Environment(MailStore.self) private var store
     @Environment(\.openWindow) private var openWindow
     let ids: Set<Message.ID>
+    /// Whether any of them is unread.
+    let unread: Bool
 
     var body: some View {
         if ids.count == 1, let id = ids.first {
@@ -175,7 +178,6 @@ struct MessageContextMenu: View {
             Button("Forward") { Task { openWindow(id: "compose", value: ComposeWindow(await store.loadedDraft(.forward, to: id))) } }
             Divider()
         }
-        let unread = ids.contains { store.message($0)?.isRead == false }
         Button(unread ? "Mark as Read" : "Mark as Unread") { store.toggleRead(ids) }
         Menu("Flag") {
             ForEach(FlagColor.allCases, id: \.self) { c in Button(c.title) { store.setFlag(c, for: ids) } }

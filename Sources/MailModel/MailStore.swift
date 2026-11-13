@@ -476,8 +476,13 @@ public final class MailStore {
     /// the change is queued for the server.
     /// Only messages it actually changes are saved again.
     private func update(_ ids: Set<Message.ID>, _ f: (inout Message) -> Void) {
+        update(at: messages.indices.filter { ids.contains(messages[$0].id) }, f)
+    }
+
+    /// `update` of the messages at these indices, for a caller that already found them.
+    private func update(at indices: [Int], _ f: (inout Message) -> Void) {
         var changed: [(old: Message, new: Message)] = []
-        for i in messages.indices where ids.contains(messages[i].id) {
+        for i in indices {
             let old = messages[i]
             f(&messages[i])
             guard messages[i] != old else { continue }
@@ -651,23 +656,34 @@ public final class MailStore {
             case .smart(.vip), .smart(.unread): break
             }
         }
+        // Runs on the main thread as the mouse is let go, so the whole message array is gone over as few times as
+        // possible: once, to find the dropped messages by index (without copying each message).
+        let at = messages.indices.filter { ids.contains(messages[$0].id) }
+        let dropped = at.map { messages[$0] }
         // Only messages the drop changes: a flagged one in Trash isn't listed in Flagged, but has its flag already.
-        var moving = Set(messages.filter { m in
-            guard ids.contains(m.id), !contains(ref, m) else { return false }
+        var moving = Set(dropped.filter { m in
+            guard !contains(ref, m) else { return false }
             var c = m
             change(&c)
             return c != m
         }.map(\.id))
         if case let .account(acct, _) = ref {
-            let blocked = messages.filter { moving.contains($0.id) && $0.remoteID != nil && $0.accountID != acct }
+            let blocked = dropped.filter { moving.contains($0.id) && $0.remoteID != nil && $0.accountID != acct }
             if !blocked.isEmpty { status = "Exchange messages can't be moved to another account yet" }
             moving.subtract(blocked.map(\.id))
         }
         guard !moving.isEmpty else { return false }
-        let apply: (Set<Message.ID>) -> Void = { ids in
-            self.keepingSelectionVisible(ids) { self.update(ids, change) }
+        let movingAt = at.filter { moving.contains(messages[$0].id) }
+        if ids == selection {
+            // As `actOnSelection`: the selection moves on to the message that followed it. Every message in `moving`
+            // changes, so there is no need to compare the messages before and after.
+            let list = visibleMessages.map(\.id)
+            update(at: movingAt, change)
+            let remaining = Set(visibleMessages.map(\.id))
+            selection = Self.following(ids, in: list, remaining: remaining) ?? ids.intersection(remaining)
+        } else {
+            keepingSelectionVisible(moving) { update(at: movingAt, change) }
         }
-        if ids == selection { actOnSelection(apply) } else { apply(moving) }
         return true
     }
 
@@ -1118,22 +1134,29 @@ public final class MailStore {
     public func renameRemote(_ map: [String: String], account: UUID) {
         // The destination's sync may already have brought a moved message under its new ID. That copy goes; the
         // renamed message keeps its local ID, body and selection.
+        // One pass over the messages, by index (this runs on the main thread after every move): the renamed ones and
+        // those already under a new ID; the rest works on these few.
+        let newIDs = Set(map.values)
+        var renamed: [Int] = [], under: [Int] = []
+        for i in messages.indices where messages[i].accountID == account {
+            guard let rid = messages[i].remoteID else { continue }
+            if map[rid] != nil { renamed.append(i) } else if newIDs.contains(rid) { under.append(i) }
+        }
         var original: [String: Message.ID] = [:]  // new ID → the message renamed to it
-        for m in messages where m.accountID == account {
-            if let rid = m.remoteID, let new = map[rid] { original[new] = m.id }
+        for i in renamed { original[map[messages[i].remoteID!]!] = messages[i].id }
+        for i in renamed {
+            messages[i].remoteID = map[messages[i].remoteID!]
+            changedIDs.insert(messages[i].id)
         }
         var copies = Set<Message.ID>()
-        for m in messages where m.accountID == account {
-            guard let rid = m.remoteID, map[rid] == nil, let keep = original[rid] else { continue }
-            copies.insert(m.id)
-            if selection.remove(m.id) != nil { selection.insert(keep) }
+        for i in under {
+            guard let keep = original[messages[i].remoteID!] else { continue }
+            copies.insert(messages[i].id)
+            if selection.remove(messages[i].id) != nil { selection.insert(keep) }
         }
         if !copies.isEmpty {
             messages.removeAll { copies.contains($0.id) }
             forget(copies)
-        }
-        for i in messages.indices where messages[i].accountID == account {
-            if let rid = messages[i].remoteID, let new = map[rid] { messages[i].remoteID = new; changedIDs.insert(messages[i].id) }
         }
         for i in outbox.indices where outbox[i].account == account {
             outbox[i].change = outbox[i].change.renamed(map)

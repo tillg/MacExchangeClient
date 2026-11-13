@@ -11,10 +11,11 @@ struct MailStorePerformanceTests {
     /// well below the 0.8s per redraw the uncached sidebar counts took.
     static let limit = 0.25
 
-    func bigStore() -> MailStore {
-        let boxes: [(MailboxKind, Int)] = [(.inbox, 2_900), (.drafts, 300), (.sent, 54_000), (.trash, 11_800), (.archive, 30)]
+    func bigStore(times k: Int = 1) -> MailStore {
+        let sizes: [(MailboxKind, Int)] = [(.inbox, 2_900), (.drafts, 300), (.sent, 54_000), (.trash, 11_800), (.archive, 30)]
+        let boxes = sizes.map { ($0.0, $0.1 * k) }
         var msgs: [Message] = []
-        msgs.reserveCapacity(70_000)
+        msgs.reserveCapacity(70_000 * k)
         var n = 0
         for (box, count) in boxes {
             for _ in 0..<count {
@@ -120,5 +121,35 @@ struct MailStorePerformanceTests {
         }.min()!
         print(String(format: "PERF failed() 100 in 70k %.3fs", t))
         #expect(t < Self.limit)
+    }
+
+    /// Dropping the selected message on another mailbox at about 210k messages (a real account's size). The drop
+    /// runs on the main thread as the mouse is let go; the redraw after it costs as much again, so it must be quick.
+    @Test func droppingTheSelectionStaysFastAt210kMessages() {
+        let t = (0..<3).map { _ in
+            let s = bigStore(times: 3)
+            s.selectedMailbox = .account(work.id, .inbox)
+            let id = s.visibleMessages[5].id
+            s.selection = [id]
+            let start = Date()
+            #expect(s.drop([id], on: .account(work.id, .archive)))
+            return Date().timeIntervalSince(start)
+        }.min()!
+        print(String(format: "PERF drop 1 of 210k %.3fs", t))
+        #expect(t < 0.15)  // about 0.1s, most of it the list the redraw needs anyway; 0.26s before (seven passes)
+    }
+
+    /// Exchange's answer to a move renames the moved message; that also runs on the main thread, right after a drop.
+    @Test func renamingAMovedMessageStaysFastAt210kMessages() {
+        let t = (0..<3).map { _ in
+            let s = bigStore(times: 3)
+            let start = Date()
+            s.renameRemote(["R5": "NEW5"], account: work.id)
+            let t = Date().timeIntervalSince(start)
+            #expect(s.messages.filter { $0.remoteID == "NEW5" }.count == 1)
+            return t
+        }.min()!
+        print(String(format: "PERF renameRemote 1 in 210k %.3fs", t))
+        #expect(t < 0.1)
     }
 }
