@@ -6,11 +6,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 
 | # | Priority | Area | Title |
 |---|---|---|---|
-| [039](BUG-039-hasremotecontent-import-false-positive.md) | P4 | HTMLPage | Any text mentioning "@import" shows the Load Remote Content banner |
-| [040](BUG-040-cid-regex-matches-inside-words.md) | P4 | HTMLPage | cid: references are found inside ordinary words ("acid:rain", "Lucid:dreams") |
-| [041](BUG-041-cid-unquoted-self-closing-keeps-slash.md) | P4 | HTMLPage | Unquoted cid: in a self-closing tag gets a trailing "/" in its ID, so the image never shows |
-| [042](BUG-042-cid-html-entities-not-decoded.md) | P4 | HTMLPage | cid: references with &amp; (or other entities) are not decoded, so the image is not found |
-| [043](BUG-043-unresolved-uppercase-cid-image-not-hidden.md) | P4 | HTMLPage | Unresolved CID: (uppercase scheme) images are not hidden when remote content is allowed |
 | [044](BUG-044-initials-only-split-on-ascii-space.md) | P4 | Models | Contact.initials ignores names separated by tab or no-break space |
 | [045](BUG-045-initials-can-be-three-letters.md) | P4 | Models | Contact.initials can return 3+ letters (ß, ǆ, ﬀ expand when uppercased) |
 | [046](BUG-046-preview-keeps-whitespace-only-lines.md) | P4 | Models | Message.preview keeps whitespace-only lines and tabs, leaving gaps in the list preview |
@@ -26,7 +21,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [079](BUG-079-mail-of-account-no-longer-set-up-loaded-at-launch.md) | P4 | MailStore | Stored mail of an account that is no longer set up is loaded at launch and shows in All Inboxes and search (its rows are never removed) |
 | [080](BUG-080-switching-account-scope-flashes-no-results.md) | P4 | MailStore | Switching from one account's mailbox to another's during a search shows an empty list (No Results) until the new answer arrives |
 | [084](BUG-084-ipf-note-subclass-folders-hidden.md) | P4 | EWS | Mail folders whose class is a subclass of IPF.Note (e.g. IPF.Note.OutlookHomepage) are left out of the folder tree |
-| [085](BUG-085-embedded-data-fonts-blocked.md) | P4 | HTMLPage | Fonts embedded in the mail (data: URIs) are blocked unless remote content is allowed |
 | [086](BUG-086-daylayout-zero-length-events-drawn-on-top.md) | P4 | Invite | Day column: zero-length (or end-before-start) events take no room, so they are drawn on top of the event starting at the same time |
 | [087](BUG-087-save-attachment-fails-next-to-dangling-symlink.md) | P4 | MailStore | Saving an attachment fails when a broken alias/symlink with the same name is in the target folder |
 | [088](BUG-088-sign-in-resets-mailbox-and-selection.md) | P4 | MailStore | Signing in another account always jumps to All Inboxes and clears the selection, even when no sample account was removed |
@@ -52,10 +46,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [123](BUG-123-same-time-messages-swap-after-relaunch.md) | P4 | MailStore | Messages with the same time swap places in Flagged (and other mixed lists) after a relaunch |
 | [125](BUG-125-mailbox-selected-during-check-not-checked.md) | P4 | MailStore | Selecting a mailbox while a check is running doesn't check it (README: "at once when you select a mailbox") |
 | [126](BUG-126-paging-never-ends-when-server-repeats-page.md) | P4 | MailStore | Quick check and history page forever when the server answers "more" with the same SyncState |
-| [128](BUG-128-fixed-footer-covers-last-lines.md) | P4 | HTMLPage | A position:fixed footer/header in a mail permanently covers the message's last (or first) lines |
-| [129](BUG-129-apple-mail-list-styles.md) | P4 | HTMLPage | Apple Mail dash lists show bullets, and nested numbered lists show 1. 1. 1. instead of 1. a. i. |
-| [130](BUG-130-contenteditable-mail-is-editable.md) | P4 | HTMLPage | A mail with contenteditable can be edited in the message view (the reader can type into received mail) |
-| [131](BUG-131-embedded-pictures-hidden-when-remote-blocked.md) | P4 | HTMLPage | With remote content blocked, embedded (data:) pictures are hidden when given via srcset/<picture> or with a leading space in src |
 | [132](BUG-132-pending-search-shows-mailbox-instead-of-results.md) | P4 | MailStore | While the next search answer is on its way, the list jumps back to the plain mailbox (or "No Results") when the previous results came from memory |
 | [134](BUG-134-finder-alias-attached-as-bookmark.md) | P3 | MailStore | A dropped or pasted Finder alias is attached as the alias file itself (about 940 bytes of bookmark data), not the file or folder it points to |
 | [137](BUG-137-selected-message-linear-scan-per-read.md) | P3 | MailStore | Clicking a message that arrived this session takes 0.43 s: selectedMessage scans all messages on each of its 7 reads per redraw |

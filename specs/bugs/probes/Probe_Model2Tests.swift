@@ -32,26 +32,6 @@ struct Probe_Model2Tests {
         #expect(r as? String == "hello")
     }
 
-    /// Fonts embedded in the mail as data: URIs contact no one, like data: images (which the policy allows).
-    static func fontMail() throws -> String {
-        let font = try Data(contentsOf: URL(fileURLWithPath: "/System/Library/Fonts/Supplemental/NotoSansCarian-Regular.ttf"))
-        return "<style>@font-face { font-family: Embedded; src: url(data:font/ttf;base64,\(font.base64EncodedString())); }"
-            + " p { font-family: Embedded, Helvetica; }</style><p>Embedded font</p>"
-    }
-    static let fontStatusJS = "Array.from(document.fonts).map(f => f.family + ':' + f.status).join(',')"
-
-    @Test func embeddedDataFontsLoadWithoutRemoteContent() async throws {
-        let r = await Render.eval(HTMLPage.document(try Self.fontMail(), allowRemote: false), Self.fontStatusJS, settle: 1000)
-        try #require(r != nil)
-        #expect(r as? String == "Embedded:loaded", "\(String(describing: r))")
-    }
-
-    @Test func controlEmbeddedDataFontsLoadWithRemoteContent() async throws {
-        let r = await Render.eval(HTMLPage.document(try Self.fontMail(), allowRemote: true), Self.fontStatusJS, settle: 1000)
-        try #require(r != nil)
-        #expect(r as? String == "Embedded:loaded", "\(String(describing: r))")
-    }
-
     // MARK: Draft.hasChanges
 
     @Test func movingAPictureInTheTextIsAChange() {

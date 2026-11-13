@@ -30,23 +30,33 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
   MUIWebDocument.css, so the mail's `<body bgcolor text>` apply, and otherwise the light colour scheme gives a white
   page with black text), then
   `<div id="mail-replica-body">` around the HTML.
-- CSP without remote content: `default-src 'none'; style-src 'unsafe-inline'; img-src data:`. With remote content:
+- CSP without remote content: `default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:` (fonts
+  embedded in the mail load). With remote content:
   `default-src 'none'; style-src * 'unsafe-inline'; img-src * data:; font-src * data:`. No scripts, frames or fetches in either case.
 - Without remote content, every `<link` tag start of the mail (any case, matched by Unicode scalar) is renamed `<x-blocked-link`
   (`HTMLPage.withoutLinks`): WebKit opens connections for resource hints (`preconnect`, …) regardless of the CSP.
+  Leading whitespace in quoted `src`/`srcset` values is removed (`HTMLPage.withEmbeddedSourcesTrimmed`), so the
+  rule below sees a `data:` picture as one.
+- From MUIWebDocument.css: `* { -webkit-user-modify: initial !important }` (a mail with `contenteditable` can't be
+  edited); `ul.Apple-dash-list` without bullets, each item with an en dash before it; nested `<ol>` numbered
+  decimal → lower-alpha → lower-roman, repeating, dashes from the 10th level. The `<ol>` rules have zero specificity
+  (`:where`) and skip an `<ol type>`, so the mail's own list styles win.
 - Apple Mail quotes, `blockquote[type=cite]`, as in Mail's MUIWebDocument.css: no margin, 8 px left padding, a 2 px solid
   bar on the left; bar and text in `HTMLPage.quoteColours` (levels 1–3, deeper levels keep level 3).
 - `img.Apple-web-attachment` (pictures placed by Apple Mail) gets `vertical-align: top` and at most the page width, as in
   MUIWebDocument.css; so does `video.Apple-web-attachment`. Other images keep their size.
-- `img[src^="cid:"]` is hidden (only exact lowercase `cid:`). Without remote content, every image whose `src` doesn't
-  start with `data:` is `visibility: hidden` (keeps its space, as Mail does).
+- `img[src^="cid:" i]` is hidden (any case). Without remote content, every image whose `src` doesn't
+  start with `data:` is `visibility: hidden` (keeps its space, as Mail does), except an image whose `srcset` starts
+  with `data:` and an image in a `<picture>` with a `<source srcset="data:…">`.
 - The web view (`MailWebView`): content JavaScript off, non-persistent data store, light appearance. It reloads only
   when the HTML, the remote decision or the set of inline image IDs changes. Its height is measured by an app script
   (`HTMLPage.measureScript`: the bottom of the root element's box, which holds the body with its margins, so markup
   that closes our wrapper early can't cut the mail off; plus `scrollY`, so a page scrolled at load, e.g. to an
   `autofocus` field, is measured from its top; at least the body's top plus its `scrollHeight` and bottom margin,
   which counts `position: absolute` content inside a positioned element (absolute content with no positioned
-  ancestor isn't counted). None of these terms depends on the view's own height, so the view shrinks again when
+  ancestor isn't counted). Before measuring, the script sets every element of the mail whose computed `position` is
+  `fixed` to `position: static !important`: the view is as tall as the page and never scrolls, so a fixed bar would
+  cover the lines under it for good. None of these terms depends on the view's own height, so the view shrinks again when
   the window widens). The page's style forces `html:root { height: auto; min-height: 0 }` (`!important`), so mail
   that makes the root as tall as the view can't keep it from shrinking; percentage heights such as MailChimp's
   `height="100%"` table resolve to auto in almost-standards mode. Viewport units (`vh`, `vw`, …) resolve against the
@@ -66,7 +76,8 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
 - `Message.hasRemoteContent`: the HTML matches (case-insensitive) `src=`, `background=` or `poster=` followed by
   `http(s):`; a `srcset=` value with an `http(s):` candidate anywhere in it; `href=` followed by `http(s):` inside a
   `<link …>` tag (not `<a href>`); `url(` followed by `http(s):`, optionally quoted with `"`, `'` or an entity
-  (`&quot;`, `&apos;`, `&#34;`, `&#39;`, `&#x22;`, `&#x27;`); or the text `@import` anywhere.
+  (`&quot;`, `&apos;`, `&#34;`, `&#39;`, `&#x22;`, `&#x27;`); or `@import` followed by `http(s):`, optionally
+  quoted the same way. Text that only mentions `@import` doesn't count.
 - Allowed when the user clicked Load Remote Content for this message (kept until the view goes away), or when
   `RemoteImages.loadsAutomatically(from:account:)` says so for the Privacy setting:
   - Always: yes. Ask before downloading: no.
@@ -78,12 +89,13 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
 
 ## Inline images (`cid:`)
 
-- `HTMLPage.contentIDs(in:)` finds references with the regex `cid:([^"'\s)>]+)` (case-insensitive, anywhere in the
-  text). Each ID: `&lt;`/`&gt;` decoded, percent-decoded, then `<` and `>` trimmed.
+- `HTMLPage.contentIDs(in:)` finds references with the regex `(?<![\w+.-])cid:((?:(?!/>)[^"'\s)<>])+)`
+  (case-insensitive; not inside a word such as `acid:rain`; an unquoted value ends before `/>`). Each ID: character
+  references decoded (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, numeric), percent-decoded, then `<` and `>` trimmed.
 - `MailStore.loadInlineImages` asks the backend for those IDs once per message and keeps them in memory only, for
   the messages of the conversation on screen.
 - `document(_:allowRemote:inline:)` replaces each reference with a known image by
-  `data:<type>;base64,<data>`. `<type>` is `HTMLPage.safeType(contentType)`: parameters after `;` dropped, trimmed,
+  `data:<type>;base64,<data>` (followed by a space when `/>` comes next, so the tag still closes). `<type>` is `HTMLPage.safeType(contentType)`: parameters after `;` dropped, trimmed,
   lowercased, and kept only if it is `token/token` (`a-z 0-9 ! # $ & ^ _ . + -`), else `application/octet-stream`. Unknown references stay `cid:` and
   are hidden by the style above.
 

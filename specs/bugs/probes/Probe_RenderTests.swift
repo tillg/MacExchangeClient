@@ -126,26 +126,6 @@ struct Probe_RenderTests {
         #expect(r == "naïve café “quoted” 日本", "\(r)")
     }
 
-    // MARK: Mail's MUIWebDocument.css rules (MailUI.framework/Resources/MUIWebDocument.css)
-
-    /// Mail draws Apple Mail's dash lists with dashes, and nested ordered lists as 1. a. i.
-    @Test func appleMailListStyles() async {
-        let mail = #"<ul class="Apple-dash-list" id="u"><li>one</li></ul><ol><li>a<ol id="o2"><li>b<ol id="o3"><li>c</li></ol></li></ol></li></ol>"#
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false))
-        let r = await p.string("""
-            ['u','o2','o3'].map(id => getComputedStyle(document.getElementById(id)).listStyleType).join(' ')
-            """)
-        #expect(r == "none lower-alpha lower-roman", "\(r)")
-    }
-
-    /// Mail's `* { -webkit-user-modify: initial !important }`: a message can't make itself editable.
-    @Test func contentEditableMailIsNotEditable() async {
-        let mail = #"<div contenteditable="true" id="e">Type here to change what I wrote</div>"#
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false))
-        let r = await p.string("document.getElementById('e').isContentEditable + '|' + getComputedStyle(document.getElementById('e')).webkitUserModify")
-        #expect(r == "false|read-only", "\(r)")
-    }
-
     // MARK: No JavaScript
 
     static let scriptVectors = """
@@ -261,34 +241,5 @@ struct Probe_RenderTests {
         let p = await RPage(HTMLPage.document(mail, allowRemote: false))
         let r = await p.string("['d','f','m'].map(i => getComputedStyle(document.getElementById(i)).fontSize).join(' ') + '|' + getComputedStyle(document.getElementById('d')).fontFamily")
         #expect(r == "14px 14px 14px|Helvetica", "\(r)")
-    }
-
-    // MARK: More height cases
-
-    /// position:fixed footer (seen in web-page-turned-newsletter mail): the view is as tall as the content, so the
-    /// footer sits over the message's last lines for good.
-    @Test func fixedFooterDoesNotCoverTheLastLine() async {
-        let mail = #"<p>\#(String(repeating: "Body text. ", count: 100))</p><p id="last">Kind regards, Ann</p><div id="bar" style="position:fixed;bottom:0;left:0;right:0;height:60px;background:#333;color:#fff">Open in browser</div>"#
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false), width: 600)
-        _ = await p.settleLikeTheApp()
-        let r = await p.string("""
-            (r => { const e = document.elementFromPoint(r.left + 5, r.top + r.height / 2); return e ? (e.id || e.tagName) : 'none' })(document.getElementById('last').getBoundingClientRect())
-            """)
-        #expect(r == "last", "element on top of the last line: \(r)")
-    }
-
-    // MARK: Blocked-image hiding vs. embedded pictures
-
-    /// Embedded pictures need no permission; the blocked-image rule must not hide them.
-    @Test func embeddedPicturesStayVisibleWhenRemoteBlocked() async {
-        let d = "data:image/png;base64,\(png1x1)"
-        let mail = """
-            <img id="a" src=" \(d)" width="10" height="10">
-            <img id="b" srcset="\(d) 1x" width="10" height="10">
-            <picture><source srcset="\(d)"><img id="c" width="10" height="10"></picture>
-            """
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false))
-        let r = await p.string("['a','b','c'].map(i => { const e = document.getElementById(i); return i + ':' + getComputedStyle(e).visibility + ':' + (e.complete && e.naturalWidth > 0) }).join(' ')")
-        #expect(r == "a:visible:true b:visible:true c:visible:true", "\(r)")
     }
 }

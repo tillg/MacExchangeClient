@@ -53,24 +53,6 @@ struct Probe_ModelTests {
 
     // MARK: HTMLPage
 
-    @Test func cidInsideWordsIsNotAReference() {
-        #expect(HTMLPage.contentIDs(in: "<p>Placid:lake and acid:rain, Lucid:dreams</p>").isEmpty)
-    }
-
-    @Test func cidUnquotedSelfClosing() {
-        #expect(HTMLPage.contentIDs(in: "<img src=cid:logo@x/>") == ["logo@x"])
-    }
-
-    @Test func cidAmpEntity() {
-        #expect(HTMLPage.contentIDs(in: #"<img src="cid:a&amp;b@x">"#) == ["a&b@x"])
-    }
-
-    @Test func unresolvedUppercaseCIDHidden() {
-        let page = HTMLPage.document(#"<img src="CID:missing@x">"#, allowRemote: true)
-        // The hiding rule must match regardless of the scheme's case, like the data: rule does.
-        #expect(page.contains(#"img[src^="cid:" i]"#))
-    }
-
     @Test func manyCIDsLargeHTMLPerformance() {
         let png = InlineImage(contentType: "image/png", data: Data(repeating: 7, count: 100))
         var inline: [String: InlineImage] = [:]
@@ -188,10 +170,6 @@ struct Probe_ModelTests {
     @Test func renamedMapsAllIDs() {
         let c = ServerChange.move(["a", "b"], to: .trash).renamed(["a": "A"])
         #expect(c.remoteIDs == ["A", "b"])
-    }
-
-    @Test func remoteContentFalsePositiveImportInText() {
-        #expect(!html("<p>Tip: write @import at the top of your stylesheet.</p>").hasRemoteContent)
     }
 
     @Test func remoteContentFalsePositiveTextAboutSrc() {
