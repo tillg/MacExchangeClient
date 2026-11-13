@@ -607,3 +607,12 @@ edited: 2026-11-13
 - **Context:** BUG-084 asks to show folders whose class starts with `IPF.Note.` (e.g. RSS Feeds, `IPF.Note.OutlookHomepage`). The existing test `folderTreeKeepsMailFoldersNestedUnderTheirParents` requires exactly that RSS Feeds folder to be left out.
 - **Decision:** Deferred, no code change: the fix would contradict a pinned test, and existing tests can't be changed unattended.
 - **Open question for review:** show all `IPF.Note.*` folders (and reword the test), or keep RSS Feeds out by name/class and show other subclasses?
+
+## 02:57 — A body that arrives for an older version of the message is asked for again {#d-bug-140}
+
+- **Status:** decided
+- **Context:** BUG-140. `loadBody` stored whatever `GetItem` returned, also when a sync had meanwhile brought a new version of the item (a draft edited elsewhere keeps its ItemId): old text under the new subject, marked loaded for good.
+- **Decision:** `loadBody` notes the summary's subject and preview when it asks; if either changed by the time the answer is in, the answer is dropped and the body is asked for again, up to three times in all (then it stays to be fetched, as before it was shown). A change of the server ID alone (a move's rename) doesn't count: the content is the same.
+- **Why:** The view loads the body once per selection (`task(id:)`); dropping the answer without asking again would leave the message without text until it is selected again.
+- **Not covered:** an edit that changes neither subject nor the first 255 characters (Exchange's `Preview`) isn't seen; the summaries carry no change key (see d-bug-103).
+- **Test:** the race tests of BUG-139 use a static response file instead of the probe's FIFO (only the order of local calls matters there); with three FIFO tests running beside `EWSFlowTests`' FIFO server, one of either suite timed out in about every second full run.

@@ -14,6 +14,7 @@ public enum WhatsNew {
         ChangeLogDay(date: "2026-11-13", features: [
             "Exchange accounts are shown by their email address instead of all being called \"Exchange\", so you can tell two accounts apart.",
             "When Exchange can't open your Inbox for a moment, the window title says so and the app tries again at the next check, instead of not checking the Inbox until you restart.",
+            "A draft changed on another device while you open it shows its new text, not the old text under the new subject.",
             "A check for new mail that crosses paths with your change no longer undoes it: a moved message doesn't come back to its old mailbox, a flag keeps its colour, and a message you read stays read.",
             "A link to a file in OneDrive or SharePoint attached to an email now opens that file in your browser instead of showing an error.",
             "When the server refuses changes to many messages at once, the app no longer stops responding for a moment while it puts them back.",

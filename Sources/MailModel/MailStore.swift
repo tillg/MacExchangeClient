@@ -1480,12 +1480,22 @@ public final class MailStore {
     /// For sample data and tests: a day of made-up calendar entries next to an invite.
     public func setDayEvents(_ events: [CalendarEvent], for id: Message.ID) { dayEvents[id] = events }
 
-    /// Fetches the body of a server message the first time it is shown.
+    /// Fetches the body of a server message the first time it is shown. If the server's version of the message changed
+    /// while the body was on its way (another subject or preview: a draft edited elsewhere), that body is the old
+    /// version's: it is asked for again, up to three times.
     public func loadBody(_ id: Message.ID) async {
-        guard let m = message(id), m.needsBody, let rid = m.remoteID, let backend = backends[m.accountID],
-              !paused.contains(m.accountID) else { return }
-        do { setBody(try await backend.body(remoteID: rid), for: id) } catch {
-            if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load message: \(error.localizedDescription)" }
+        for _ in 0..<3 {
+            guard let m = message(id), m.needsBody, let rid = m.remoteID, let backend = backends[m.accountID],
+                  !paused.contains(m.accountID) else { return }
+            do {
+                let b = try await backend.body(remoteID: rid)
+                guard let now = message(id), now.subject == m.subject, now.serverPreview == m.serverPreview else { continue }
+                setBody(b, for: id)
+                return
+            } catch {
+                if !pauseIfSignInFailed(error, account: m.accountID) { status = "Couldn't load message: \(error.localizedDescription)" }
+                return
+            }
         }
     }
 

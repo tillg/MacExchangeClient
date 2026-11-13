@@ -93,9 +93,18 @@ enum RX {
 struct MailStoreRaceTests {
     let acct = Account(name: "Exchange", address: "me@work.com")
 
-    func store(_ server: RaceServer) -> MailStore {
+    func store(_ server: RaceServer) -> MailStore { store(server.url) }
+
+    /// A file standing in for every server response, where the order of requests doesn't matter. // file:// fixture
+    func answering(_ xml: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("race-\(UUID().uuidString).xml")
+        try Data(xml.utf8).write(to: url)
+        return url
+    }
+
+    func store(_ url: URL) -> MailStore {
         let s = MailStore(accounts: [], messages: [])
-        s.add(acct, backend: EWSBackend(client: EWSClient(url: server.url, username: "u", password: "p")))
+        s.add(acct, backend: EWSBackend(client: EWSClient(url: url, username: "u", password: "p")))
         s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .drafts, id: "DRAFTS"),
                             RemoteFolder(role: .sent, id: "SENT"), RemoteFolder(role: .trash, id: "DEL"),
                             RemoteFolder(role: .archive, id: "ARCH")], account: acct.id)
@@ -122,9 +131,7 @@ struct MailStoreRaceTests {
     /// Inbox not fully synced: every check merges its newest messages. A check's answer taken before the flag arrives
     /// after the flag was written: the flag stays, and the next check (red on the server) keeps its colour.
     @Test func flagWrittenWhileACheckIsOnItsWayKeepsItsColour() async throws {
-        let server = RaceServer([RX.updated(["R1"])])
-        defer { server.stop() }
-        let s = store(server)
+        let s = store(try answering(RX.updated(["R1"])))
         s.merge([summary("R1")], account: acct.id, mailbox: .inbox)
         let id = s.messages[0].id
         let stale = [summary("R1")]  // the newest-50 answer, taken by Exchange before the flag
@@ -143,9 +150,7 @@ struct MailStoreRaceTests {
 
     /// Mark as Read: a history page taken before it doesn't turn the message unread again.
     @Test func readWrittenWhileAHistoryBatchIsCollectedStaysRead() async throws {
-        let server = RaceServer([RX.updated(["R1"])])
-        defer { server.stop() }
-        let s = store(server)
+        let s = store(try answering(RX.updated(["R1"])))
         s.merge([summary("R1")], account: acct.id, mailbox: .inbox)
         let id = s.messages[0].id
         let page = SyncResult(upserts: [summary("R1")], deletedRemoteIDs: [], token: "T1", more: true)
@@ -164,9 +169,7 @@ struct MailStoreRaceTests {
     /// The archive reaches Exchange (new ItemId) before the Inbox check's answer, taken before the move, arrives: the
     /// old ID doesn't come back as a ghost in the Inbox.
     @Test func moveWrittenWhileACheckIsOnItsWayLeavesNoGhost() async throws {
-        let server = RaceServer([RX.moved(["N1"])])
-        defer { server.stop() }
-        let s = store(server)
+        let s = store(try answering(RX.moved(["N1"])))
         s.merge([summary("R1"), summary("R2")], account: acct.id, mailbox: .inbox)
         let id = try #require(s.messages.first { $0.remoteID == "R1" }).id
         let stale = [summary("R1"), summary("R2")]  // newest answer taken before the move
@@ -182,5 +185,29 @@ struct MailStoreRaceTests {
         s.apply(SyncResult(upserts: [summary("R2")], deletedRemoteIDs: [], token: "T9", more: false), account: acct.id, mailbox: .inbox)
         #expect(s.isComplete(acct.id, .inbox))
         #expect(s.count(.account(acct.id, .inbox)) == 1, "after the full sync: \(s.messages.filter { $0.mailbox == .inbox }.map { $0.remoteID ?? "" })")
+    }
+
+    // MARK: A body requested before the server changed the message (BUG-140)
+
+    /// The draft is edited elsewhere while its body is on its way: the old body isn't stored under the new subject;
+    /// the body is asked for again and the new text is shown.
+    @Test func bodyRequestedBeforeAServerChangeIsFetchedAgain() async throws {
+        let server = RaceServer([], hold: true)
+        defer { server.stop() }
+        let s = store(server)
+        s.merge([summary("R1", box: .drafts, subject: "Plan v1", preview: "old text")], account: acct.id, mailbox: .drafts)
+        let id = s.messages[0].id
+        let t = Task { await s.loadBody(id) }
+        try await Task.sleep(for: .milliseconds(300))  // GetItem is out; Exchange has the old version
+        // Meanwhile the quick check brings the edited draft (same ItemId, as Exchange keeps it on an edit).
+        s.apply(SyncResult(upserts: [summary("R1", box: .drafts, subject: "Plan v2", preview: "new text")], deletedRemoteIDs: [],
+                           token: "T1", more: false), account: acct.id, mailbox: .drafts)
+        #expect(s.message(id)?.subject == "Plan v2")
+        server.push(RX.getItem(RX.textMessage("R1", subject: "Plan v1", body: "old text")))
+        server.push(RX.getItem(RX.textMessage("R1", subject: "Plan v2", body: "new text")))
+        await t.value
+        try #require(s.status == nil, "the body request failed: \(s.status ?? "")")
+        let m = try #require(s.message(id))
+        #expect(m.body == "new text" && !m.needsBody, "subject \(m.subject), body \(m.body), needsBody \(m.needsBody)")
     }
 }
