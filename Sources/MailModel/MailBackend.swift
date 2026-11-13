@@ -80,6 +80,10 @@ public struct PendingChange: Hashable, Codable, Sendable {
     public var change: ServerChange
     /// The messages as they were before, to undo the local change if the server refuses it.
     public var previous: [Message]
+    /// A send whose request may be on its way. Saved before the request goes out: after a quit or crash it may
+    /// have been sent, so the next launch keeps it in Drafts instead of sending it again. Optional, so rows written
+    /// before it existed still decode.
+    public var inFlight: Bool?
 }
 
 public struct RemoteFolder: Hashable, Sendable {

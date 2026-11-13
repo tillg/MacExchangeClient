@@ -9,6 +9,7 @@ enum AppSetup {
         guard usesServer else { return SampleData.store() }
         let store = MailStore(accounts: [], messages: [])
         for a in ExchangeAccount.saved() { connect(a, to: store) }
+        store.saveBeforeSending = { [weak store] in if let store { await saveAndWait(store) } }
         return store
     }
 
@@ -98,6 +99,22 @@ enum AppSetup {
 
     /// Without a password in the Keychain the account is still an Exchange account: its mail and drafts stay,
     /// and its changes wait until it is signed in again.
+    /// Writes what changed and returns once it is on disk: before a send goes out, so its in-flight mark is saved.
+    static func saveAndWait(_ store: MailStore) async {
+        guard let db = database else { return }
+        let changes = store.takeChanges()
+        guard !changes.isEmpty else { return }  // writeInBackground calls neither closure then
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            db.writeInBackground(changes, done: { done.resume() }) { error in
+                Task { @MainActor in
+                    store.retry(changes)
+                    store.status = "Couldn't save mail: \(error.localizedDescription)"
+                }
+                done.resume()
+            }
+        }
+    }
+
     static func connect(_ a: ExchangeAccount, to store: MailStore) {
         let backend = a.backend()
         store.add(a.account, backend: backend)

@@ -401,4 +401,64 @@ struct MailStoreSyncTests {
         #expect(saved?.body.contains("Please sign") == true)
         #expect(saved?.attachments.map(\.name) == ["contract.pdf"])
     }
+
+    // MARK: A send under way when the app quits is not sent again (BUG-095)
+
+    func isSend(_ p: PendingChange) -> Bool { if case .send = p.change { true } else { false } }
+
+    /// The save on quit (or the 15-second save) stores a send while its request is on the way. After a relaunch it
+    /// isn't sent again: it may have gone out. It is kept in Drafts on this Mac, and the status says to check Sent.
+    @Test func sendInFlightWhenTheAppQuitsIsNotSentAgainAfterRelaunch() async throws {
+        let url = tempURL(); defer { cleanup(url) }
+        let ok = try responseFile(success)  // file:// fixture
+        let s = MailStore(accounts: [], messages: [])
+        s.add(work, backend: backend(ok))
+        let db = try MailDatabase(url: url)
+        s.apply(page(["A1"], token: "T1"), account: work.id, mailbox: .inbox)
+        s.send(Draft(accountID: work.id, to: "boss@x.com", subject: "Resignation", body: "Once only"))
+        await Task.yield()  // the drain has started: the request is on its way
+        try #require(s.outbox.contains(where: isSend))
+        try db.write(s.takeChanges())  // the save on quit while the request is on its way
+        await s.refresh(history: false)  // the server accepted it
+        try #require(!s.outbox.contains(where: isSend))
+        // The app quit before the next save. Next launch:
+        let s2 = MailStore(accounts: [], messages: [])
+        s2.add(work, backend: backend(ok))
+        let db2 = try MailDatabase(url: url)
+        s2.restore(try db2.meta())
+        // (The next check's success clears any status: BUG-100.)
+        #expect(s2.status?.contains("check Sent") == true, "status: \(s2.status ?? "nil")")
+        s2.finishLoading(try db2.messages())
+        await s2.refresh(history: false)
+        #expect(s2.outbox.isEmpty)
+        #expect(s2.messages.filter { $0.mailbox == .drafts && $0.subject == "Resignation" }.count == 1)
+        // Written to disk: a second relaunch shows the one draft and sends nothing.
+        try db2.write(s2.takeChanges())
+        let s3 = try launch([work], from: url)
+        #expect(s3.outbox.isEmpty)
+        #expect(s3.messages.filter { $0.mailbox == .drafts && $0.subject == "Resignation" }.count == 1)
+    }
+
+    /// The mark is on disk before the request goes out: the store asks for a save first and waits for it.
+    @Test func sendIsMarkedAndSavedBeforeItGoesOut() async throws {
+        let s = MailStore(accounts: [], messages: [])
+        s.add(work, backend: backend(try responseFile(success)))  // file:// fixture
+        s.merge([(.inbox, [])], account: work.id)
+        var saved: StoreChanges?
+        s.saveBeforeSending = { saved = s.takeChanges() }
+        s.send(Draft(accountID: work.id, to: "boss@x.com", subject: "S", body: "b"))
+        await s.refresh(history: false)
+        #expect(s.outbox.isEmpty)
+        let marked = try #require(saved?.outbox?.first)
+        #expect(isSend(marked) && marked.inFlight == true)
+    }
+
+    /// Outbox rows written before the mark existed still read, as not under way.
+    @Test func outboxRowsWithoutTheMarkStillRead() throws {
+        let json = #"{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","account":"7F9619FF-8B86-D011-B42D-00C04FC964FF","#
+            + #""change":{"setRead":{"_0":["R1"],"_1":true}},"previous":[]}"#
+        let p = try JSONDecoder().decode(PendingChange.self, from: Data(json.utf8))
+        #expect(p.change == .setRead(["R1"], true))
+        #expect(p.inFlight == nil)
+    }
 }

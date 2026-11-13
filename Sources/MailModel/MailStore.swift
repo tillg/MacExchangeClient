@@ -97,6 +97,9 @@ public final class MailStore {
     /// Mailboxes whose stored mail is in memory while launch is still loading; nil once everything is.
     @ObservationIgnored private var loadedBoxes: Set<String>?
     private var flushTask: Task<Void, Never>?
+    /// Writes the changes to disk and returns once they are written; called before a send goes out, so its
+    /// `inFlight` mark is saved first. Nil with sample data and in tests that don't save.
+    @ObservationIgnored public var saveBeforeSending: (() async -> Void)?
     /// IDs per server request, so "Mark All as Read" on a big inbox doesn't send one huge request.
     public static let batchSize = 100
 
@@ -837,11 +840,22 @@ public final class MailStore {
             folders[a] = f
             serverAccounts.insert(a)
         }
-        outbox += meta.outbox.filter { mine.contains($0.account) }
         localAttachments.merge(meta.files) { current, _ in current }
+        var interrupted = false
+        for p in meta.outbox where mine.contains(p.account) {
+            // A send that was on its way when the app quit or crashed may have gone out: never sent again.
+            if p.inFlight == true, case let .send(d) = p.change {
+                keepInDrafts(d)
+                status = "“\(d.subject.isEmpty ? "(No Subject)" : d.subject)” may already have been sent: the app quit while "
+                    + "sending it. It's in Drafts on this Mac; check Sent before sending it again."
+                interrupted = true
+            } else {
+                outbox.append(p)
+            }
+        }
         loadedBoxes = []
-        // What was just read from disk doesn't need writing back.
-        syncChanged = false; foldersChanged = false; outboxChanged = false
+        // What was just read from disk doesn't need writing back; a send taken out of the outbox does.
+        syncChanged = false; foldersChanged = false; outboxChanged = interrupted
     }
 
     /// Launch, step 2: the mail of some mailboxes (the Inbox first), shown while the rest loads.
@@ -913,14 +927,7 @@ public final class MailStore {
         outbox.removeAll { $0.id == p.id }
         switch p.change {
         case let .send(d), let .saveDraft(d):
-            let acct = account(d.accountID)
-            let m = Message(accountID: d.accountID, mailbox: .drafts,
-                            from: Contact(name: acct?.name ?? "", email: acct?.address ?? ""),
-                            to: Contact.parseList(d.to), cc: Contact.parseList(d.cc),
-                            subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
-                            body: d.text, date: .now, isRead: true, attachments: d.attachments.map(\.attachment))
-            add(m)
-            if !d.attachments.isEmpty { keepFiles(d.attachments.map(\.data), for: m) }
+            keepInDrafts(d)
             status = "Couldn't send “\(d.subject)”: \(error). It's in Drafts on this Mac."
         default:
             // Only what this change set, and only while it still holds: later changes (still queued or sent)
@@ -954,6 +961,18 @@ public final class MailStore {
         }
     }
 
+    /// A message that didn't reach the server, or may not have: kept as a local message in Drafts, with its files.
+    private func keepInDrafts(_ d: Draft) {
+        let acct = account(d.accountID)
+        let m = Message(accountID: d.accountID, mailbox: .drafts,
+                        from: Contact(name: acct?.name ?? "", email: acct?.address ?? ""),
+                        to: Contact.parseList(d.to), cc: Contact.parseList(d.cc),
+                        subject: d.subject.isEmpty ? "(No Subject)" : d.subject,
+                        body: d.text, date: .now, isRead: true, attachments: d.attachments.map(\.attachment))
+        add(m)
+        if !d.attachments.isEmpty { keepFiles(d.attachments.map(\.data), for: m) }
+    }
+
     private func scheduleFlush() {
         // Not while loading: the server renames moved messages, and those not in memory yet would keep old IDs.
         guard flushTask == nil, loadedBoxes == nil, outbox.contains(where: canSend) else { return }
@@ -967,10 +986,17 @@ public final class MailStore {
     /// a send is never retried, because a timed-out send may have gone out.
     private func drain() async {
         while let p = outbox.first(where: canSend), let backend = backends[p.account] {
+            if case .send = p.change, let i = outbox.firstIndex(where: { $0.id == p.id }) {
+                // Marked and saved before the request goes out: a quit or crash meanwhile can't send it twice.
+                outbox[i].inFlight = true
+                await saveBeforeSending?()
+            }
             do {
                 try await perform(p, backend)
                 outbox.removeAll { $0.id == p.id }
             } catch where pauseIfSignInFailed(error, account: p.account) {
+                // Refused at sign-in: it didn't go out, and goes when the account works again.
+                if let i = outbox.firstIndex(where: { $0.id == p.id }) { outbox[i].inFlight = nil }
                 continue
             } catch let e as URLError {
                 // A send or an answer that timed out may have gone out; never repeat it.

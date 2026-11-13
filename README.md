@@ -71,7 +71,7 @@ Open Settings (⌘,) ▸ Accounts and sign in. The server can be a host name (`m
 Changes to Exchange mail show at once and are then written to the server in order: read state (without sending read receipts), flags, moves (Archive, Junk, Trash, drag & drop), deleting from Trash (recoverable on the server, like Outlook), Send and Save Draft.
 - Exchange knows only *flagged*, so flag colours stay on this Mac.
 - If the server refuses a change, it is undone and the reason shows under the window title.
-- Offline, changes wait until the next refresh. A message that fails to send is never resent automatically. It is kept in Drafts on this Mac instead, with its attachments, also after a relaunch.
+- Offline, changes wait until the next refresh. A message that fails to send is never resent automatically. It is kept in Drafts on this Mac instead, with its attachments, also after a relaunch. A send that was on its way when the app quit or crashed isn't sent again either: at the next launch it is kept in Drafts, and the status asks you to check Sent.
 - Exchange messages can't be dragged to another account yet.
 
 Exchange mail, sync positions, the folder tree and unsent changes are kept in a SQLite database, `~/Library/Application Support/MailReplica/Mail.sqlite`, readable only by you. There is one row per message, like Mail's Envelope Index, so:

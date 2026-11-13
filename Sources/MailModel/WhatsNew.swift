@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "If the app quits while a message is being sent, it is never sent a second time: it waits in Drafts and the app asks you to check Sent.",
             "Choosing Save when you close a forward whose attachments are still loading no longer throws the message away: it is saved once they are in.",
             "Reply and Reply All keep the right addresses after a message you opened is changed on another device, and the paperclip no longer comes back on emails without files.",
             "If the app can't find your Exchange password, your account and its mail stay; sign in again in Settings to enter it, and your changes go out then.",

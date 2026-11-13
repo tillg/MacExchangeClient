@@ -356,3 +356,16 @@ edited: 2026-11-13
 - **Decision:** `saveDraft` now returns whether it saved (`@discardableResult`). When the sheet's Save is refused, the window stays open with the status "The message is saved and closed once its attachments have loaded."; as soon as the files are in (`loadingOriginal` becomes nil), the window saves the draft as it is then (with the files and any later typing) and closes.
 - **Why:** The lead allowed "save … or wait"; saving at once without the files would contradict the existing test `forwardIsNotSentBeforeItsAttachmentsAreIn` (a forward isn't saved before its original files are in), which can't be changed. Waiting keeps both rules and never discards. The probe's expectation (saveDraft keeps the text at once) is therefore not adopted; the regression test checks the refusal is reported and that the later save keeps text and files.
 - **Alternatives:** Save the text at once without the original's files (rejected: pinned test above, and the forward would lose its files). Disable Save in the sheet (rejected: the user would have to choose between waiting by hand and losing the text).
+
+## 01:28 — A send under way is marked and saved first, and never repeated after a relaunch {#d-bug-095}
+
+- **Status:** decided
+- **Context:** BUG-095. A queued send stays in the outbox until the server answers, so the 15-second save or the save on quit stored it while its request was on the way. If the app quit or crashed before the next save, the next launch sent the mail again without asking.
+- **Decision:**
+  - `PendingChange` gets an optional `inFlight` (absent in older rows, which decode as before; tested with a literal old row).
+  - Before a `.send` request goes out, `drain` sets `inFlight` and awaits `saveBeforeSending`, which the app sets to a write of the current changes that returns once they are on disk (`AppSetup.saveAndWait`). Tests leave it nil.
+  - At the next launch `restore(meta)` doesn't queue a send marked in flight: it is kept as a local message in Drafts (with its files, as after a refused send), and the status says "“…” may already have been sent: the app quit while sending it. It's in Drafts on this Mac; check Sent before sending it again." The outbox is marked to be written, so a second relaunch finds one draft and nothing to send.
+  - A send refused at sign-in (`AuthenticationError`) provably didn't go out: its mark is cleared and it waits for the account as before.
+- **Why:** README: a message that fails to send is never resent automatically; a send interrupted by quitting is the same uncertain case as a timeout.
+- **Not covered:** Invite answers (`respond`, `reply`) and other changes in flight are still replayed after a crash; repeating a read/flag/move is harmless, a repeated answer may notify the organizer twice. The status line is cleared by the next successful mail check (filed separately as BUG-100), so the draft in Drafts is the lasting trace.
+- **Alternatives:** Mark without the extra save (rejected: a crash between the mark and the 15-second save would still resend). Ask the user at launch with a dialog (rejected: the store has no UI; Drafts plus status matches the existing timeout rule).
