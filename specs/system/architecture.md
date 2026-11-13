@@ -148,7 +148,9 @@ flowchart LR
   `send` goes out it is marked `inFlight` and `saveBeforeSending` writes the changes to disk and is awaited
   (`AppSetup.saveAndWait`). At launch `restore(meta)` keeps a send still marked in flight in Drafts on this Mac
   instead of queueing it, with a status to check Sent.
-  - `AuthenticationError`: the account is paused until relaunch; nothing more is sent or fetched for it.
+  - `AuthenticationError`: the account is paused until relaunch (or signing in again); nothing more is sent or
+    fetched for it. Its notice is the account's connection notice, so the first successful check after signing in
+    again clears it (BUG-223).
   - `URLError` on `send`, `respond` or `reply`: treated as refused (`failed`), never retried, since it may have gone out.
   - Any other `URLError`: status "Offline – changes will be sent to Exchange later"; the change and every later one
     of that account stay queued, in order, for the next refresh, while other accounts' changes go on.
