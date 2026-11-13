@@ -858,3 +858,10 @@ edited: 2026-11-13
 - **Status:** decided
 - **Context:** BUG-122. During launch only the Inboxes are in memory; Mark All Messages as Read on Flagged (or an account mailbox not loaded yet) marked only what was in memory, and the rest arrived unread.
 - **Decision:** While `isLoading`, the mailbox is remembered and `finishLoading` marks it all read once more, which also queues the server changes for the newly loaded messages. Mail that arrives later from the server is not included (the action covers what the mailbox held when it ran, plus what was stored then).
+
+## 07:20 — A mailbox selected while a check runs is checked by that check {#d-bug-125}
+
+- **Status:** decided
+- **Context:** BUG-125. The sidebar's `refresh()` on selection returned at once while a check ran, and the running check had fixed its mailboxes at its start, so the new mailbox waited for the next poll (up to 15 s).
+- **Decision:** The running check reads the mailboxes to check again after each folder (`quickCheckRoles`), per account, and covers a newly selected one before it ends; for an account it has already passed it goes round once more for the new mailbox only. A second `refresh` while one runs still returns at once.
+- **Alternatives:** queue a whole second check (rejected: it asks the Inbox again for nothing, and a caller waiting on it would wait for both).

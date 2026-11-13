@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "A mailbox you select while mail is being checked is checked right away too, instead of up to 15 seconds later.",
             "Mark All Messages as Read while \"Loading Mail…\" is shown also marks the mail that finishes loading afterwards.",
             "Archiving or flagging many opened messages while offline no longer slows down saving: the changes waiting to be sent take far less space.",
             "Mark All as Read, and actions that change nothing, save only the messages they actually change, so saving stays quick in a large mailbox.",

@@ -52,6 +52,9 @@ enum RX {
         env("<s:Fault><faultcode>a:\(code)</faultcode><faultstring>\(text)</faultstring></s:Fault>")
     }
     static func getItem(_ item: String) -> String { resp("GetItem", ok("GetItem", "<m:Items>\(item)</m:Items>")) }
+    static func sync(_ changes: String, token: String, last: Bool = true) -> String { EWSReply.sync(changes, token: token, last: last) }
+    static func create(_ item: String) -> String { EWSReply.create(item) }
+    static func summary(_ id: String) -> String { EWSReply.summary(id) }
     static func moved(_ new: [String]) -> String {
         resp("MoveItem", new.map { ok("MoveItem", "<m:Items><t:Message><t:ItemId Id=\"\($0)\" ChangeKey=\"CK\"/></t:Message></m:Items>") }.joined())
     }
@@ -337,6 +340,26 @@ struct MailStoreRaceTests {
             #expect(s.status == nil, "\(m.remoteID ?? "")")
             try await drained(server)
         }
+    }
+
+    /// README: the quick check runs "at once when you select a mailbox". A mailbox selected while a check runs is
+    /// checked by that check (the sidebar's own refresh returns at once while one runs) (BUG-125).
+    // file:// fixture
+    @Test func mailboxSelectedDuringCheckIsChecked() async throws {
+        let server = RaceServer([], hold: true)
+        defer { server.stop() }
+        let s = store(server)
+        for box in [MailboxKind.inbox, .archive] {
+            s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], token: "T0", more: false), account: acct.id, mailbox: box)
+        }
+        let first = Task { await s.refresh(history: false) }
+        try await waitFor { s.isRefreshing }
+        try await Task.sleep(for: .milliseconds(100))  // the Inbox request is waiting for the server
+        s.selectedMailbox = .account(acct.id, .archive)
+        await s.refresh(history: false)  // what the sidebar does on selection
+        try await serve(server, [RX.sync("", token: "T1"), RX.sync(RX.create(RX.summary("NEWARCH")), token: "T1")])
+        await first.value
+        #expect(s.messages.contains { $0.remoteID == "NEWARCH" && $0.mailbox == .archive }, "requests \(server.served)")
     }
 
     /// An invite's calendar load cancelled (the user moved on to another message) doesn't mark its day as

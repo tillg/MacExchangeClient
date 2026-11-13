@@ -1696,36 +1696,45 @@ public final class MailStore {
         // Write first, so the check doesn't briefly bring back the old state.
         scheduleFlush()
         await flushTask?.value
-        for (acct, backend) in backends where !paused.contains(acct) {
-            do {
-                if remoteFolders[acct] == nil { setRemoteFolders(try await backend.folders(), account: acct) }
-                for role in quickCheckRoles(acct) {
-                    guard let folder = remoteFolders[acct]?.first(where: { $0.role == role }) else { continue }
-                    if isComplete(acct, role) {
-                        do {
-                            var more = true
-                            while more {
-                                let asked = requestStamp
-                                let r = try await backend.sync(folder, token: syncToken(acct, role))
-                                apply(r, account: acct, mailbox: role, asked: asked)
-                                more = r.more
+        // The roles are read again after each folder: a mailbox selected while the check runs is checked by it,
+        // before it ends (a second check asked for meanwhile returns at once).
+        var checked: [UUID: Set<MailboxKind>] = [:]
+        func next(_ acct: UUID) -> MailboxKind? { quickCheckRoles(acct).first { !checked[acct, default: []].contains($0) } }
+        repeat {
+            for (acct, backend) in backends where !paused.contains(acct) && next(acct) != nil {
+                do {
+                    if remoteFolders[acct] == nil { setRemoteFolders(try await backend.folders(), account: acct) }
+                    while let role = next(acct) {
+                        checked[acct, default: []].insert(role)
+                        guard let folder = remoteFolders[acct]?.first(where: { $0.role == role }) else { continue }
+                        if isComplete(acct, role) {
+                            do {
+                                var more = true
+                                while more {
+                                    let asked = requestStamp
+                                    let r = try await backend.sync(folder, token: syncToken(acct, role))
+                                    apply(r, account: acct, mailbox: role, asked: asked)
+                                    more = r.more
+                                }
+                            } catch is SyncTokenRejected {
+                                resetSync(acct, role)
                             }
-                        } catch is SyncTokenRejected {
-                            resetSync(acct, role)
+                        } else {
+                            let asked = requestStamp
+                            let newest = try await backend.newest(in: folder, limit: Self.firstScreen)
+                            merge(newest, account: acct, mailbox: role, asked: asked)
                         }
-                    } else {
-                        let asked = requestStamp
-                        let newest = try await backend.newest(in: folder, limit: Self.firstScreen)
-                        merge(newest, account: acct, mailbox: role, asked: asked)
                     }
+                    // Only this account's own connection notice goes; another account's or "Couldn't send" stays.
+                    if let notice = connectionNotices.removeValue(forKey: acct), status == notice { status = historyError }
+                } catch where pauseIfSignInFailed(error, account: acct) {
+                    checked[acct, default: []].formUnion(quickCheckRoles(acct))
+                } catch {
+                    checked[acct, default: []].formUnion(quickCheckRoles(acct))
+                    connectionNotice("\(account(acct)?.name ?? "Account"): \(error.localizedDescription)", account: acct)
                 }
-                // Only this account's own connection notice goes; another account's or "Couldn't send" stays.
-                if let notice = connectionNotices.removeValue(forKey: acct), status == notice { status = historyError }
-            } catch where pauseIfSignInFailed(error, account: acct) {
-            } catch {
-                connectionNotice("\(account(acct)?.name ?? "Account"): \(error.localizedDescription)", account: acct)
             }
-        }
+        } while backends.keys.contains { !paused.contains($0) && next($0) != nil }
         if history { startHistory() }
     }
 
