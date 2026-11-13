@@ -97,11 +97,13 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
 - New Message (⌘N) opens a new compose window each time (as do Reply, Reply All, Forward, also twice for one message) for the first account (the toolbar button: the selected mailbox's or message's account). Fields To, Cc,
   Subject, From picker with more than one account, Message Size when files are attached. Send (⇧⌘D) needs a
   non-empty To; Save Draft (⌘S).
-- Reply rules (`draft(_:to:)`):
+- Reply rules (`draft(_:to:)`). Toolbar, menu bar and context menu go through `loadedDraft`, which first fetches the
+  body of a message never opened (a server summary has names without addresses and no text), so the draft has the
+  addresses and the quote; without a connection the draft is built from the summary.
   - Subject gets "Re: " or "Fwd: ". A leading prefix of the same kind — `Re:`/`AW:` for replies, `Fwd:`/`Fw:`/`WG:`
     for forwards, any case, with or without one space after the colon — is replaced by it, not stacked. A prefix of
     the other kind stays (`FW: x` → `Re: FW: x`).
-  - Body: an attribution line ("On <date>, Name <addr> wrote:") or a "Begin forwarded message:" block, then every
+  - Body: an attribution line ("On <date>, Name <addr> wrote:"; just "Name" when the address isn't known) or a "Begin forwarded message:" block, then every
     line of the plain-text body (split on any line ending: `\r\n`, `\n`, `\r`) prefixed with "> ", joined with `\n`.
   - Reply: To = the sender's address; when the sender is the account's own address (compared without case), the
     original To addresses instead (each once, mine left out; if none is left, the sender's address). Reply All: To = sender and To addresses, Cc = the original Cc, both minus
@@ -109,7 +111,8 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
     first occurrence kept, so To wins). Forward: To empty.
 - Original attachments: Forward always loads them. Replies follow Edit ▸ Include Attachments With Replies (Never,
   default; Ask: an alert when the window opens; When Adding Recipients: on leaving To/Cc or Return, if an address with
-  "@" wasn't on the original; Always). Ask and When Adding Recipients work for every reply; Always only for replies
+  "@" wasn't on the original; while the original's addresses aren't known, a recipient with the name of one of its
+  people counts as on it; Always). Ask and When Adding Recipients work for every reply; Always only for replies
   from the menu bar, since toolbar and context-menu replies don't pass the setting to `draft()`. The Include/Exclude Attachments button adds or removes them by hand. Send and Save are blocked
   while they load.
 - Attaching: Attach button, File ▸ Attach Files… (⇧⌘A), dropping or pasting files. A folder is sent as "Name.zip".

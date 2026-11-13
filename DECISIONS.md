@@ -721,3 +721,12 @@ edited: 2026-11-13
 - **Context:** BUG-151. `.tint` and `.borderedProminent` have no effect on a bordered menu button on macOS (checked with a snapshot).
 - **Decision:** The chosen answer's menu button gets an accent-coloured rounded outline (1.5 pt) drawn around it.
 - **Alternatives:** A checkmark symbol in the label (rejected: Accept already uses a checkmark).
+
+## 03:48 — Reply to an unopened message loads its body first; names stand in for unknown addresses {#d-bug-068}
+
+- **Status:** decided
+- **Context:** BUG-068. A server summary has names without addresses and no text, so a reply built from it had an empty To, "Name <>" and no quote. `draft()` is synchronous and used everywhere.
+- **Decision:** New `loadedDraft(_:to:includeAttachments:) async`: fetches the body when `needsBody`, then calls `draft()`. Toolbar, menu bar and the list's context menu use it; the window opens once the body is in. Offline, the draft is built from the summary, and the attribution shows the name alone. `addsNewRecipient` counts a recipient whose name matches a person of the original without an address as known.
+- **Why:** the reply is right as soon as it opens, as in Mail; no change to `Draft` or stored data.
+- **Not covered:** offline, the quote stays empty (the list preview is cut short and isn't quoted as if it were the message). The probe's synchronous expectation (an address with no body and no server) can't be met; the regression test loads the body from a `file://` fixture instead.
+- **Alternatives:** quote `serverPreview` (rejected: a cut-off text passed off as the message); open the window at once and fill it when the body arrives (rejected: the user may already be typing in To).

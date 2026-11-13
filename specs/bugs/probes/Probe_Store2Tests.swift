@@ -48,26 +48,6 @@ struct Probe_Store2Tests {
         #expect(s.status?.contains("send") != true, "status: \(s.status ?? "nil")")
     }
 
-
-    // MARK: Reply before body loaded
-
-    /// Reply from the list's context menu on a server message that was never opened: only the summary is there.
-    @Test func replyToUnopenedServerMessageHasAddressAndQuote() {
-        let s = store([])
-        s.merge([summary(work, "A")], account: work.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        let d = s.draft(.reply, to: id)
-        #expect(d.to.contains("@"), "to: '\(d.to)'")
-        #expect(d.body.contains("Friday"), "body: \(d.body)")
-    }
-
-    @Test func forwardOfUnopenedServerMessageQuotesIt() {
-        let s = store([])
-        s.merge([summary(work, "A")], account: work.id, mailbox: .inbox)
-        let d = s.draft(.forward, to: s.messages[0].id)
-        #expect(d.body.contains("Friday"), "body: \(d.body)")
-    }
-
     // MARK: Invites
 
     /// Respond with Comments, then the invite is gone (sync deleted it / erased) before Send: the comment and
@@ -339,24 +319,5 @@ struct Probe_Store2Tests {
         await s.includeOriginalAttachments(in: &d)
         #expect(d.attachments.count == 2 || d.loadingOriginal != nil,
                 "files: \(d.attachments.map(\.name)), loadingOriginal: \(String(describing: d.loadingOriginal)), status: \(s.status ?? "nil")")
-    }
-
-    /// Include Attachments With Replies ▸ When Adding Recipients: replying to the original sender of an unopened
-    /// message is not "adding a recipient".
-    @Test func replyToSenderOfUnopenedMessageIsNotANewRecipient() {
-        var m = summary(work, "A"); m.hasAttachments = true
-        let s = store([])
-        s.merge([m], account: work.id, mailbox: .inbox)
-        var d = s.draft(.reply, to: s.messages[0].id)
-        d.to = "Ann Lee <ann@x.com>"  // the sender, typed by hand because To was empty
-        s.setBody(MessageBody(text: "Hi", attachments: ["a.pdf"], from: Contact(name: "Ann Lee", email: "ann@x.com")),
-                  for: s.messages[0].id)  // what the server really has
-        let afterLoad = s.addsNewRecipient(d)
-        // Same question before the body was loaded:
-        let s2 = store([])
-        s2.merge([m], account: work.id, mailbox: .inbox)
-        var d2 = s2.draft(.reply, to: s2.messages[0].id); d2.to = "Ann Lee <ann@x.com>"
-        #expect(afterLoad == false)
-        #expect(s2.addsNewRecipient(d2) == false)
     }
 }
