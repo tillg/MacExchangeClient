@@ -77,7 +77,8 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
   `http(s):`; a `srcset=` value with an `http(s):` candidate anywhere in it; `href=` followed by `http(s):` inside a
   `<link …>` tag (not `<a href>`); `url(` followed by `http(s):`, optionally quoted with `"`, `'` or an entity
   (`&quot;`, `&apos;`, `&#34;`, `&#39;`, `&#x22;`, `&#x27;`); or `@import` followed by `http(s):`, optionally
-  quoted the same way. Text that only mentions `@import` doesn't count.
+  quoted the same way. Text that only mentions `@import` doesn't count. HTML with numeric character references is
+  checked again with them decoded, as the browser reads attributes (`src="&#104;ttp://…"`, BUG-190).
 - Allowed when the user clicked Load Remote Content for this message (kept until the view goes away), or when
   `RemoteImages.loadsAutomatically(from:account:)` says so for the Privacy setting:
   - Always: yes. Ask before downloading: no.

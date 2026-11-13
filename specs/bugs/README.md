@@ -35,7 +35,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [187](BUG-187-reply-all-note-to-self-empty-to.md) | P4 | compose | Reply All to a note sent only to myself opens with an empty To |
 | [188](BUG-188-fffc-in-quoted-text-becomes-file-mark.md) | P3 | compose | A U+FFFC character in the original's text is taken for a file mark: the forwarded picture is sent inline there, Exclude Attachments deletes it from the quote |
 | [189](BUG-189-remote-content-missed-svg-imageset-base.md) | P3 | rendering / privacy | SVG <image href>, CSS image-set() and <base href> relative pictures are not seen as remote content: no banner, they can never be loaded |
-| [190](BUG-190-remote-content-missed-entity-encoded.md) | P3 | rendering / privacy | An entity-encoded web address (src="&#104;ttps://…") is not seen as remote content: no banner |
 | [191](BUG-191-video-never-loads-after-load-remote-content.md) | P4 | rendering | A web video counts as remote content, but Load Remote Content never loads it (no media-src in the policy) |
 | [192](BUG-192-overnight-invite-calendar-until-midnight.md) | P3 | invites | An invite that runs past midnight reads the calendar only until midnight: conflicts after 00:00 are never shown |
 | [194](BUG-194-dotfile-attachment-saved-hidden.md) | P4 | attachments | An attachment named ".something.pdf" is saved as a hidden file the user can't find (deferred: conflicts with an existing test) |
