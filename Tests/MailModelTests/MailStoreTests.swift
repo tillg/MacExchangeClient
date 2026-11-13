@@ -1267,6 +1267,29 @@ struct MailStoreTests {
         #expect(files.first?.data.prefix(2) == Data("PK".utf8))
     }
 
+    /// A dropped or pasted Finder alias stands for its original: the file it points to is attached under the
+    /// original's name, a folder as a zip, not the alias's bookmark bytes (BUG-134).
+    @Test func finderAliasIsAttachedAsWhatItPointsTo() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("AliasTests-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let folder = dir.appendingPathComponent("Photos"), report = dir.appendingPathComponent("Report.pdf")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("a".utf8).write(to: folder.appendingPathComponent("a.txt"))
+        try Data("%PDF-1.4 real report".utf8).write(to: report)
+        func alias(_ target: URL) throws -> URL {
+            let url = dir.appendingPathComponent(target.lastPathComponent + " alias")
+            try URL.writeBookmarkData(try target.bookmarkData(options: .suitableForBookmarkFile, includingResourceValuesForKeys: nil,
+                                                              relativeTo: nil), to: url)
+            #expect(try url.resourceValues(forKeys: [.isAliasFileKey]).isAliasFile == true)  // a real alias
+            return url
+        }
+        let s = store([])
+        let files = s.files([try alias(report), try alias(folder)])
+        #expect(files.map(\.name) == ["Report.pdf", "Photos.zip"], "files: \(files.map(\.name)) status: \(s.status ?? "nil")")
+        #expect(files.first?.data == Data("%PDF-1.4 real report".utf8) && files.first?.contentType == "application/pdf")
+        #expect(files.last?.contentType == "application/zip" && files.last?.data.prefix(2) == Data("PK".utf8))
+    }
+
     /// Edit ▸ Include Attachments With Replies: Always adds them to a reply, Never and Ask don't by themselves.
     /// Forward always does. The draft remembers the original either way, for the Include Attachments button.
     @Test func repliesIncludeAttachmentsPerSetting() {

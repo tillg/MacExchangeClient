@@ -1810,7 +1810,15 @@ public final class MailStore {
     /// The files to attach: a folder as a zip of it. Reports the ones that can't be read.
     public func files(_ urls: [URL]) -> [DraftAttachment] {
         var files: [DraftAttachment] = [], skipped: [String] = []
-        for url in urls {
+        for var url in urls {
+            // A Finder alias (bookmark data, not a symbolic link) stands for its original: that file or folder is
+            // attached, under its own name.
+            let kind = try? url.resourceValues(forKeys: [.isAliasFileKey, .isSymbolicLinkKey])
+            if kind?.isAliasFile == true, kind?.isSymbolicLink != true {
+                // One whose original is gone can't be attached: its bytes mean nothing to the recipient.
+                guard let original = try? URL(resolvingAliasFileAt: url) else { skipped.append(url.lastPathComponent); continue }
+                url = original
+            }
             // A symbolic link to a folder goes as the folder, under the link's name, as the Finder does.
             let target = url.resolvingSymlinksInPath()
             let isFolder = (try? target.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
