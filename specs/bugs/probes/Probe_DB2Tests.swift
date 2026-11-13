@@ -44,25 +44,6 @@ struct Probe_DB2Tests {
 
     // MARK: Launch / accounts
 
-    /// An account that is no longer set up: launch reads its sync positions and folders only for configured
-    /// accounts (`restore(meta)` filters), but `finishLoading` takes every other row of the database.
-    @Test func probeMailOfAccountNoLongerSetUpIsNotLoaded() throws {
-        let url = tempURL(); defer { cleanup(url) }
-        let d = try MailDatabase(url: url)
-        try d.write(StoreChanges(upserts: [mail("work inbox", rid: "W1"), mail("old home inbox", account: home, rid: "H1"),
-                                           mail("old home archive", account: home, box: .archive, rid: "H2")],
-                                 sync: [SyncState(account: work.id, mailbox: .inbox, token: "w", complete: true),
-                                        SyncState(account: home.id, mailbox: .inbox, token: "h", complete: true)],
-                                 folders: [home.id: [Folder(box: .folder("hf"), name: "Home Folder")]]))
-        // Next launch: only Work is set up.
-        let s = try launch([work], from: url)
-        #expect(s.folders[home.id] == nil)              // control: meta is filtered
-        #expect(s.syncToken(home.id, .inbox) == nil)     // control
-        let foreign = s.messages.filter { $0.accountID == home.id }.map(\.subject)
-        #expect(foreign.isEmpty, "mail of a removed account loaded: \(foreign)")
-        #expect(s.visibleMessages.map(\.subject) == ["work inbox"], "All Inboxes shows \(s.visibleMessages.map(\.subject))")
-    }
-
     // MARK: Search query building
 
     /// Words the store keeps (Swift says they hold a letter or digit) but the index's tokenizer reads as

@@ -59,7 +59,8 @@ flowchart LR
 3. `loadMail`: without `Mail.sqlite`, `MailDatabase.importCache` moves `Cache.json` in (see [storage.md](storage.md)).
    Otherwise, on a detached task: open the database, read `meta()` and the Inbox of every account. The store
    `restore`s meta (sync tokens, folders, outbox; `loadedBoxes = []`), then the Inboxes. A second task reads the rest
-   (`messages(notIn:)`) and calls `finishLoading`, which allows flushing and starts the history sync. Then
+   (`messages(notIn:)`) and calls `finishLoading`, which allows flushing and starts the history sync. Both add only
+   mail of the accounts set up: the stored mail of an account no longer in the list stays on disk, unloaded. Then
    `prepareSearch()` builds the search index if the database is older, and `enableSearch` sets the store's `searcher`.
 4. While loading (`isLoading`), the quick check covers only mailboxes already in memory, and the outbox is not
    flushed: the server renames moved messages, and messages not yet in memory would keep old IDs.
