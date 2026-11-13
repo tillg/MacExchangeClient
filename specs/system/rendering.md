@@ -24,7 +24,9 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
 ## The HTML page (`HTMLPage.document`)
 
 - The message's HTML is wrapped, not parsed: a `Content-Security-Policy` meta tag first, `color-scheme: light`, a
-  style block (white background, `14px Helvetica`, margins 18/20/22 px, word breaking), then
+  style block (`14px Helvetica`, margins 18/20/22 px, word breaking; no background or text colour, as in Mail's
+  MUIWebDocument.css, so the mail's `<body bgcolor text>` apply, and otherwise the light colour scheme gives a white
+  page with black text), then
   `<div id="mail-replica-body">` around the HTML.
 - CSP without remote content: `default-src 'none'; style-src 'unsafe-inline'; img-src data:`. With remote content:
   `default-src 'none'; style-src * 'unsafe-inline'; img-src * data:; font-src * data:`. No scripts, frames or fetches in either case.

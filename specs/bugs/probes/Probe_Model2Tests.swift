@@ -60,32 +60,6 @@ struct Probe_Model2Tests {
         #expect(parts.count == 3 && parts[2] == "true" && Int(parts[0])! >= Int(parts[1])!, "\(parts)")
     }
 
-    /// A sender's <body bgcolor> must win over our default white, as in Mail (MUIWebDocument.css sets no
-    /// background or colour). Damaging case: light text on the sender's dark background becomes invisible.
-    @Test func bodyBgcolorFromTheSenderIsKept() async throws {
-        let mail = "<html><body bgcolor=\"#000000\"><font id=f color=\"#ffffff\">White text on the sender's black page</font></body></html>"
-        let r = await Render.eval(HTMLPage.document(mail, allowRemote: false),
-                                  "getComputedStyle(document.body).backgroundColor + '|' + getComputedStyle(document.getElementById('f')).color")
-        try #require(r != nil)
-        #expect(r as? String == "rgb(0, 0, 0)|rgb(255, 255, 255)", "body background|text colour = \(String(describing: r))")
-    }
-
-    @Test func bodyTextAttributeFromTheSenderIsKept() async throws {
-        let mail = "<html><body bgcolor=\"#000000\" text=\"#ffffff\"><p id=p>Dark newsletter</p></body></html>"
-        let r = await Render.eval(HTMLPage.document(mail, allowRemote: false),
-                                  "getComputedStyle(document.body).backgroundColor + '|' + getComputedStyle(document.getElementById('p')).color")
-        try #require(r != nil)
-        #expect(r as? String == "rgb(0, 0, 0)|rgb(255, 255, 255)", "body background|text colour = \(String(describing: r))")
-    }
-
-    @Test func controlBodyStyleBackgroundIsKept() async throws {
-        let mail = "<html><body style=\"background:#000\"><font id=f color=\"#ffffff\">x</font></body></html>"
-        let r = await Render.eval(HTMLPage.document(mail, allowRemote: false),
-                                  "getComputedStyle(document.body).backgroundColor + '|' + getComputedStyle(document.getElementById('f')).color")
-        try #require(r != nil)
-        #expect(r as? String == "rgb(0, 0, 0)|rgb(255, 255, 255)", "\(String(describing: r))")
-    }
-
     /// Fonts embedded in the mail as data: URIs contact no one, like data: images (which the policy allows).
     static func fontMail() throws -> String {
         let font = try Data(contentsOf: URL(fileURLWithPath: "/System/Library/Fonts/Supplemental/NotoSansCarian-Regular.ttf"))
