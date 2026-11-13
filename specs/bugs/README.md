@@ -96,3 +96,24 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [130](BUG-130-contenteditable-mail-is-editable.md) | P4 | HTMLPage | A mail with contenteditable can be edited in the message view (the reader can type into received mail) |
 | [131](BUG-131-embedded-pictures-hidden-when-remote-blocked.md) | P4 | HTMLPage | With remote content blocked, embedded (data:) pictures are hidden when given via srcset/<picture> or with a leading space in src |
 | [132](BUG-132-pending-search-shows-mailbox-instead-of-results.md) | P4 | MailStore | While the next search answer is on its way, the list jumps back to the plain mailbox (or "No Results") when the previous results came from memory |
+| [133](BUG-133-edited-opened-copy-forwarded-and-saved.md) | P2 | MailStore | After an opened attachment is edited (e.g. a form filled in Preview), Forward sends the edited copy and Save Attachment saves it instead of the file in the mail |
+| [134](BUG-134-finder-alias-attached-as-bookmark.md) | P3 | MailStore | A dropped or pasted Finder alias is attached as the alias file itself (about 940 bytes of bookmark data), not the file or folder it points to |
+| [135](BUG-135-nameless-attachments-hidden-or-not-listed.md) | P3 | EWS | Attachments without a name: an attached message with no subject saves as a hidden ".eml", and an attachment Exchange sends without Name is not listed at all |
+| [136](BUG-136-unsent-answer-trash-move-skipped.md) | P3 | Invite | Do Not Send a Response / Remove from Calendar skip the move to Deleted Items before the folder list is read: the answered invite comes back to the Inbox |
+| [137](BUG-137-selected-message-linear-scan-per-read.md) | P3 | MailStore | Clicking a message that arrived this session takes 0.43 s: selectedMessage scans all messages on each of its 7 reads per redraw |
+| [138](BUG-138-cancelled-loads-reported-as-errors.md) | P3 | MailStore | Moving on from a message before it has loaded shows "Couldn’t load message: cancelled" (also images, calendar, attachment previews) |
+| [139](BUG-139-stale-server-answer-undoes-sent-change.md) | P3 | MailStore | A check answer taken before a local change, arriving after that change reached Exchange, undoes it: a moved message comes back as a ghost for good, a flag loses its colour, read turns unread |
+| [140](BUG-140-body-requested-before-server-change-kept.md) | P3 | MailStore | A body requested before the server changed the message is stored as the body of the new version and never fetched again |
+| [141](BUG-141-refused-erase-after-rename-restores-old-id.md) | P3 | MailStore | A refused erase queued behind a move to Trash puts the message back with its old ItemId; the next Trash check then shows it twice |
+| [142](BUG-142-invite-time-drops-end-date.md) | P3 | Invite | Invite card shows only the start day for a meeting that ends on a later day |
+| [143](BUG-143-unloadable-picture-spins-forever.md) | P3 | Attachments | A picture attachment that can't be loaded shows a spinner forever |
+| [144](BUG-144-quick-look-shows-another-file.md) | P4 | MailStore | Space on an attachment that cannot be loaded opens Quick Look on a different attachment of the message |
+| [145](BUG-145-reference-attachment-listed-but-unopenable.md) | P4 | EWS | A cloud attachment (ReferenceAttachment, OneDrive/SharePoint link) is listed like a file but every open, save or Quick Look fails with "The server sent no content" |
+| [146](BUG-146-memory-search-per-keystroke-freeze.md) | P4 | MailStore | Search without the index (index build failed or still building, or "Search failed") freezes 0.6-1 s per keystroke on 180,000 messages |
+| [147](BUG-147-late-quick-look-replaces-newer.md) | P4 | MailStore | Quick Look jumps back to an earlier message’s attachment when its download finishes after you looked at another message |
+| [148](BUG-148-day-column-overnight-hours.md) | P4 | Invite | Day column of an overnight invite starts at 2 o'clock and the invite's slot is outside the grid |
+| [149](BUG-149-allday-invite-drawn-as-24h-block.md) | P4 | Invite | All-day invite is drawn in the day column as a 24-hour hatched block from 0:00 |
+| [150](BUG-150-day-column-spinner-never-stops.md) | P4 | Invite | Invite day column spins forever when the calendar can't be loaded |
+| [151](BUG-151-chosen-answer-not-highlighted.md) | P4 | Invite | Answered invite: the chosen answer button isn't highlighted (the tint has no effect) |
+| [152](BUG-152-vip-star-misaligns-sender.md) | P4 | MessageList | VIP star sits in the sender line, pushing the name out of line with subject and preview (and next to the unread dot) |
+| [153](BUG-153-list-fonts-not-13-11.md) | P4 | MessageList | README ✅ says list rows use 13 pt / 11 pt; subject, preview and date render at 12 pt |

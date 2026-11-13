@@ -386,3 +386,17 @@ edited: 2026-11-13
 - **Why:** Matching all `<link>` rather than certain `rel` values can't be bypassed by spelling the value differently, and nothing else a link loads (stylesheets, icons) is allowed while remote content is blocked anyway. Renaming only the tag start needs no parsing of attributes.
 - **Alternatives:** Remove only links whose `rel` names a hint (rejected: rel parsing is easy to get wrong). Turn hints off in the web view's preferences (rejected: no public `WKPreferences` switch for preconnect).
 - **Not covered:** DNS prefetching of plain `<a href>` hosts couldn't be observed with a loopback address; not changed.
+
+## 01:43 — Snapshots go through `tools/snapshot.sh` only {#d-safe-snapshot}
+
+- **Status:** decided (safety)
+- **Context:** The UI hunter found that the CLAUDE.md snapshot command (`MAIL_SNAPSHOT=… .build/debug/MailReplica`) is not sample-only on this machine. The app's defaults domain holds a saved Exchange account, so the command would create the real connection.
+- **Decision:** New `tools/snapshot.sh`: it copies the binary to `MailReplicaSnapshot`, which gets its own empty defaults domain, and always sets `MAIL_SAMPLE_DATA=1`. CLAUDE.md now points to the script.
+- **Why:** Unattended agents must never reach the real mailbox.
+
+## 01:43 — Bug hunt round 4: 21 bugs filed (BUG-133..153) {#d-hunt-4}
+
+- **Decision:**
+  - Two performance findings (a server deletion and the Delete key over budget) were dropped: they pass at current HEAD after the batch-4 fixes.
+  - The UI findings (BUG-*-UI) are proven by screenshot pairs in `specs/bugs/png/`, not by unit tests: the test target can't import the app.
+- **Count:** Rounds 2–4 found 101 new bugs (41 + 39 + 21).

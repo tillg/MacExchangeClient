@@ -20,11 +20,11 @@ This is a SwiftUI copy of the macOS Mail main window, built with SwiftPM. The da
 `screencapture` has no permission on this machine. Use the in-app hook instead. It selects the first message, saves a PNG of the whole window and quits:
 
 ```sh
-MAIL_SNAPSHOT=$PWD/tmp/snap.png .build/debug/MailReplica
-MAIL_SNAPSHOT=$PWD/tmp/snap-dark.png MAIL_SNAPSHOT_DARK=1 .build/debug/MailReplica
+tools/snapshot.sh $PWD/tmp/snap.png
+tools/snapshot.sh $PWD/tmp/snap-dark.png MAIL_SNAPSHOT_DARK=1
 ```
 
-Read the PNG before you say a visual change works. Artifacts go in `tmp/`, which is gitignored.
+Never run `.build/debug/MailReplica` directly to take a snapshot. The app's defaults hold a real Exchange account, so it would connect to it. `tools/snapshot.sh` runs a copy of the binary under its own empty defaults domain, with `MAIL_SAMPLE_DATA=1`. Read the PNG before you say a visual change works. Artifacts go in `tmp/`, which is gitignored.
 
 ## Layout
 

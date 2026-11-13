@@ -1,0 +1,68 @@
+--- /private/tmp/claude-64795839/-Users-tgartner-git-mail-replica/0bd8c261-6faa-49a6-b6f4-90fa2c18b653/scratchpad/r4ui-SampleData.orig.swift	2026-11-13 01:00:03
++++ /private/tmp/claude-64795839/-Users-tgartner-git-mail-replica/0bd8c261-6faa-49a6-b6f4-90fa2c18b653/scratchpad/copies/r4ui/Sources/MailReplica/SampleData.swift	2026-11-13 01:04:06
+@@ -86,6 +86,19 @@
+             Message(accountID: work.id, from: c("Elena Petrova", "elena@client.example"), to: meWork,
+                     subject: "Invoice 2026-114", body: "Please find our invoice for October attached.",
+                     date: ago(60), attachments: ["Invoice-2026-114.pdf"]).with(contoso),
++            // STRESS (r4ui probe)
++            Message(accountID: work.id, from: c("Maximilian Alexander Friedrich von Hohenzollern-Sigmaringen-Württemberg", "max@northwind.example"), to: meWork,
++                    subject: "Stress long: Re: Fwd: Quarterly planning for the Northwind platform migration including all regional teams and vendors",
++                    body: "Long sender and subject.", date: ago(0.05), flag: .green, attachments: ["Budget.xlsx"]),
++            Message(accountID: work.id, from: c("Nora Empty", "nora@northwind.example"), to: meWork,
++                    subject: "", body: "", date: ago(0.1)),
++            Message(accountID: icloud.id, from: c("محمد عبد الله الأحمد", "m@example.sa"), to: me,
++                    subject: "اجتماع الفريق غدا في الساعة العاشرة صباحا", body: "مرحبا أليكس،\n\nنلتقي غدا في المكتب.\n\nمحمد",
++                    date: ago(0.15)),
++            Message(accountID: work.id, from: c("Files Bot", "files@northwind.example"), to: meWork,
++                    subject: "Stress attachments", body: "Many files.", date: ago(0.2),
++                    attachments: (1...14).map { Attachment(name: "Report_section_\($0)_final_version_reviewed.pdf") }
++                        + ["empty.txt", "zz-missing-photo.jpg"]),
+         ]
+         // A made-up meeting invite for tomorrow, with a made-up day around it.
+         let cal = Calendar.current
+@@ -108,16 +121,42 @@
+             date: ago(1.5),
+             invite: Invite(start: at(10), end: at(11), organizer: c("Priya Raman", "priya@northwind.example"),
+                            required: [c("Alex Morgan", work.address)], isCancellation: true))
++        let multiDay = Message(
++            accountID: work.id, from: c("Priya Raman", "priya@northwind.example"), to: meWork,
++            subject: "Stress offsite three days", body: "Three-day offsite.", date: ago(0.25),
++            invite: Invite(start: at(9), end: at(2 * 24 + 17), location: "Lake House",
++                           organizer: c("Priya Raman", "priya@northwind.example"), required: [c("Alex Morgan", work.address)]))
++        let overnight = Message(
++            accountID: work.id, from: c("Jonas Weber", "jonas@northwind.example"), to: meWork,
++            subject: "Stress night deploy", body: "Deploy window over midnight.", date: ago(0.3),
++            invite: Invite(start: at(22), end: at(26), location: "Teams",
++                           organizer: c("Jonas Weber", "jonas@northwind.example"), required: [c("Alex Morgan", work.address)]))
++        let allDay = Message(
++            accountID: work.id, from: c("Mia Chen", "mia@northwind.example"), to: meWork,
++            subject: "Stress all day", body: "All-day event.", date: ago(0.35),
++            invite: Invite(start: tomorrow, end: at(24), isAllDay: true,
++                           organizer: c("Mia Chen", "mia@northwind.example"), required: [c("Alex Morgan", work.address)]))
++        var answeredInv = Invite(start: at(15), end: at(16), location: "Room 1",
++                           organizer: c("Mia Chen", "mia@northwind.example"),
++                           required: (1...12).map { c("Person Number \($0)", "p\($0)@northwind.example") })
++        answeredInv.response = .tentative
++        answeredInv.reply = InviteReply(response: .tentative, send: false, proposedStart: at(17), proposedEnd: at(18))
++        let answered = Message(
++            accountID: work.id, from: c("Mia Chen", "mia@northwind.example"), to: (1...30).map { c("Recipient Number \($0)", "r\($0)@x.example") },
++            subject: "Stress answered", body: "Answered invite.", date: ago(0.4), invite: answeredInv)
+         // Attachments get made-up content, so they open, and its size.
+         var files: [Message.ID: [Data]] = [:]
+-        let all = (msgs + [invite, cancelled]).map { m in
++        let all = (msgs + [invite, cancelled, multiDay, overnight, allDay, answered]).map { m in
+             var m = m
+-            files[m.id] = m.attachments.map { sampleFile($0.name, message: m.subject) }
++            files[m.id] = m.attachments.map { $0.name == "empty.txt" ? Data() : sampleFile($0.name, message: m.subject) }
+             m.attachments = zip(m.attachments, files[m.id]!).map { Attachment(name: $0.name, size: $1.count) }
+             return m
+         }
+         let store = MailStore(accounts: [icloud, work], messages: all)
+-        for (id, data) in files where !data.isEmpty { store.setAttachmentData(data, for: id) }
++        for (id, data) in files where !data.isEmpty {
++            let isStress = all.first { $0.id == id }?.subject == "Stress attachments"
++            store.setAttachmentData(isStress ? Array(data.dropLast()) : data, for: id)
++        }
+         store.setFolders([Folder(box: projects, name: "Projects", parent: .inbox),
+                           Folder(box: launch, name: "Northwind Launch", parent: projects),
+                           Folder(box: receipts, name: "Receipts", parent: .inbox),
