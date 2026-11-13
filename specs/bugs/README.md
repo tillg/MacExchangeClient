@@ -32,7 +32,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [069](BUG-069-invite-answer-for-vanished-invite-silently-dropped.md) | P3 | Invite | Respond with Comments: if the invite is gone by the time you press Send, the answer and comment vanish without a word |
 | [070](BUG-070-draft-of-removed-account-sent-from-another-account.md) | P3 | MailStore | A message written for an account that no longer exists is silently sent (or saved) from the first other account |
 | [071](BUG-071-forward-released-without-original-files.md) | P3 | MailStore | A forward whose original files can't be fetched becomes sendable without them, with no message at all when the body couldn't be loaded |
-| [074](BUG-074-deletion-during-pending-move-forgotten.md) | P3 | MailStore | A server deletion that arrives while a move is queued is ignored for good; when the move then fails the message stays as a ghost |
 | [075](BUG-075-pending-change-swallows-unrelated-server-changes.md) | P3 | MailStore | A queued change of one property throws away the server's changes to the other properties of that message (flag, read state) |
 | [076](BUG-076-launch-quick-check-duplicates-offline-move.md) | P3 | MailStore | At launch, the Inbox check duplicates a message that was moved offline last session (its queued move is restored, the message is not in memory yet) |
 | [077](BUG-077-removed-server-folder-mail-lingers.md) | P3 | MailStore | Mail of a folder removed on the server stays: shown in Flagged and search, and a selected removed folder has a blank title |

@@ -88,8 +88,9 @@ flowchart LR
   naming the same person keeps the loaded one) or its paperclip state. A summary that names other people (a draft
   edited elsewhere) replaces the contacts and drops the loaded body, which is fetched again when shown; a message with a pending outbox change keeps its local
   read state, flag and mailbox; an upsert for a message gone here (erased) while a change for it is queued is
-  skipped, so a page fetched before the erase reached the server doesn't bring it back. A deletion reported for a message with a pending move is ignored; other deletions
-  win. If nothing changed, `messages` is not reassigned.
+  skipped, so a page fetched before the erase reached the server doesn't bring it back. A deletion reported for a message with a pending move is held, not applied
+  (`deletedWhileMoving`, in memory): the move makes its source report it. A move that goes through drops it; a
+  refused move removes the message instead of moving it back. Other deletions win. If nothing changed, `messages` is not reassigned.
 - **Sync from the start** (no token: a new folder, after the conversation upgrade): when it begins, the store notes
   the server IDs the folder holds (`unlisted`); each page ticks off what it lists. When the pass completes, the
   folder's server messages it didn't list are removed (deleted or moved elsewhere meanwhile). One with a queued

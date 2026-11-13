@@ -36,18 +36,6 @@ struct Probe_SyncTests {
 
     // MARK: Merging server updates
 
-    /// The Inbox sync says A was deleted (elsewhere) while a local move of A was queued. The move then fails
-    /// (the item is gone): A must not stay in the Inbox forever – no later sync will report it again.
-    @Test func deletionSeenDuringAPendingMoveIsNotForgotten() {
-        let s = synced(["A"])
-        let a = id(s, "A")
-        s.archive([a])
-        s.apply(page(del: ["A"], token: "t1"), account: work.id, mailbox: .inbox)
-        s.failed(s.outbox[0], "The specified object was not found in the store.")
-        s.apply(page(token: "t2"), account: work.id, mailbox: .inbox)
-        #expect(s.message(a) == nil, "deleted on the server but shown in \(s.message(a)?.mailbox.rawValue ?? "-")")
-    }
-
     /// A message deleted elsewhere: its queued read/flag changes can't be written any more and must leave the outbox
     /// (else they are sent, refused, and show "Exchange refused a change").
     @Test func serverDeletionDropsTheMessagesQueuedChanges() {
