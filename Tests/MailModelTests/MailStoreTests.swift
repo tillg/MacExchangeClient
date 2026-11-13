@@ -1876,4 +1876,22 @@ struct MailStoreTests {
         s.toggleFlag([a.id, b.id])
         #expect(s.message(a.id)?.flag == .red && s.message(b.id)?.flag == .red)
     }
+
+    /// BUG-188: U+FFFC in the original's text is the attachment mark in a draft; quoted, it becomes U+FFFD, so a
+    /// forward doesn't place the original's picture there, and Exclude Attachments leaves the quote alone.
+    @Test func objectReplacementCharacterInTheOriginalIsNotAFileMark() async {
+        var m = msg(work, subject: "Pic")
+        m.body = "Look \u{FFFC} here"
+        m.attachments = [Attachment(name: "a.png", size: 4, contentType: "image/png")]
+        m.hasAttachments = true
+        let s = store([m])
+        s.downloadsFolder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        s.setAttachmentData([Data([1, 2, 3, 4])], for: m.id)
+        var d = s.draft(.forward, to: m.id)
+        await s.includeOriginalAttachments(in: &d)
+        #expect(d.attachments.count == 1)
+        #expect(d.placedPictures == [])
+        d.excludeOriginalAttachments()
+        #expect(d.body.contains("Look \u{FFFD} here"))
+    }
 }

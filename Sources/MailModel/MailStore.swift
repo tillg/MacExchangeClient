@@ -2081,7 +2081,9 @@ public final class MailStore {
         let subject = prefix + m.subject.replacing(existing, with: "", maxReplacements: 1)
         let df = DateFormatter(); df.dateStyle = .medium; df.timeStyle = .short
         // Any line ending: Exchange bodies use CRLF, which is one Character in Swift, not "\n".
-        let quoted = m.body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map { "> \($0)" }
+        // U+FFFC marks a file in a draft's text: in the quoted original it becomes U+FFFD (BUG-188).
+        let quoted = m.body.replacingOccurrences(of: "\u{FFFC}", with: "\u{FFFD}")
+            .split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map { "> \($0)" }
             .joined(separator: "\n")
         // A summary not loaded yet has names without addresses: no empty "<>".
         let sender = m.from.formatted

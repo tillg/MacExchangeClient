@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Forwarding a message whose text holds an unusual placeholder character no longer puts its picture in the wrong place.",
             "A search no longer makes a \"Couldn't send\" or sign-in notice disappear; it shows again when the search is cleared.",
             "Toggle Flag on many selected messages in a large mailbox is instant again.",
             "The message list shows a date, not a weekday, for mail from exactly a week ago or dated in the future.",
