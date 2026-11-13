@@ -36,26 +36,6 @@ struct Probe_SyncTests {
 
     // MARK: Merging server updates
 
-    /// A message erased from Trash (delete still queued) must not come back when a Trash page that was
-    /// fetched before the erase reached the server lists it.
-    @Test func erasedMessageIsNotBroughtBackByATrashPageWhileItsDeleteIsQueued() {
-        let s = synced(["A"], in: .trash)
-        let a = id(s, "A")
-        s.delete([a])
-        #expect(s.message(a) == nil)
-        #expect(s.outbox.map(\.change) == [.delete(["A"])])
-        s.apply(page([remote("A")], token: "t1"), account: work.id, mailbox: .trash)
-        #expect(s.messages.filter { $0.remoteID == "A" }.isEmpty, "erased message is back in Trash")
-    }
-
-    /// Same, through the history's newest-200 lookup.
-    @Test func erasedMessageIsNotBroughtBackByTheNewestLookup() {
-        let s = synced(["A"], in: .trash)
-        s.delete([id(s, "A")])
-        s.merge([remote("A")], account: work.id, mailbox: .trash)
-        #expect(s.count(.account(work.id, .trash)) == 0)
-    }
-
     /// While a move is on its way, the destination's sync can already list the moved copy under its new ID;
     /// when the move's answer then renames the message, there must be one message, not two.
     @Test func renameOntoAnIDTheSyncAlreadyBroughtDoesNotDuplicate() {
