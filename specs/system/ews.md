@@ -114,7 +114,8 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
   (`application/octet-stream`, missing or empty), and a `ContentId` (trimmed of `<`, `>`, space) in the wanted set,
   inline or not; keyed by that ID. A generic type is replaced by the one for the `Name`'s extension (`UTType`), else
   stays `application/octet-stream`.
-- **Invite** (`parseInvite`): built for any item with `Start` and `End` (not only meeting requests): location, all-day,
+- **Invite** (`parseInvite`): built for a `MeetingRequest` or `MeetingCancellation` (as `message()`'s `isInvite`) with
+  `Start` and `End`: location, all-day,
   organizer, required and optional `Attendee/Mailbox`; `isCancellation` when the element is `MeetingCancellation`.
 - **Events:** `LegacyFreeBusyStatus` Free/Tentative/Busy → same; OOF and WorkingElsewhere → away; else unknown.
 - **Folders:**

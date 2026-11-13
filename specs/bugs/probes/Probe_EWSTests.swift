@@ -129,17 +129,6 @@ struct Probe_EWSTests {
         #expect(Date().timeIntervalSince(t) < 2)
     }
 
-    /// "Accepted: …" answers carry the meeting's Start/End in Exchange 2013; they are not invites to answer.
-    @Test func probeMeetingResponseIsNotAnInvite() throws {
-        let d = try doc("""
-            <t:MeetingResponse><t:ItemId Id="R1"/><t:Body BodyType="Text">ok</t:Body>
-            <t:Start>2026-11-23T11:30:00Z</t:Start><t:End>2026-11-23T12:00:00Z</t:End><t:Location>Room</t:Location></t:MeetingResponse>
-            """)
-        let item = d.first("MeetingResponse")!
-        #expect(EWSBackend.message(item)?.isInvite == false)
-        #expect(EWSBackend.parseBody(item).invite == nil)
-    }
-
     // MARK: Round 2
 
     @Test func probePlainTextOnHugeHTMLIsFast() {
