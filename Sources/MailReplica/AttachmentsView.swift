@@ -17,7 +17,8 @@ struct AttachmentsView: View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(Array(message.attachments.enumerated()), id: \.offset) { i, a in
                 if a.isPicture && !asIcon.contains(i) {
-                    AttachmentPicture(message: message, index: i, selected: selected == i)
+                    // A picture that can't be loaded goes to the icons: it can still be opened (trying again) or saved.
+                    AttachmentPicture(message: message, index: i, selected: selected == i) { asIcon.insert(i) }
                         .modifier(AttachmentActions(message: message, index: i, asIcon: $asIcon, selected: $selected))
                 }
             }
@@ -92,6 +93,8 @@ private struct AttachmentPicture: View {
     let message: Message
     let index: Int
     let selected: Bool
+    /// The file couldn't be had or isn't a picture NSImage can draw: no endless spinner.
+    let failed: () -> Void
     @State private var image: NSImage?
 
     var body: some View {
@@ -108,7 +111,9 @@ private struct AttachmentPicture: View {
         .help(message.attachments[index].nameAndSize)
         .task(id: message.id) {
             image = nil
-            if let url = await store.attachmentFile(index, of: message.id) { image = NSImage(contentsOf: url) }
+            let url = await store.attachmentFile(index, of: message.id)
+            if Task.isCancelled { return }  // another message was selected: nothing failed
+            if let picture = url.flatMap(NSImage.init(contentsOf:)) { image = picture } else { failed() }
         }
     }
 }
