@@ -142,7 +142,8 @@ flowchart LR
     later"), and with a back-off none of them is sent before it has passed (`busyUntil`, in memory, in `canSend`).
   - `PartlyRefused` (some items of a batch refused): the new IDs of the moved items are applied (`renameRemote`) and
     only the refused items go to `failed`; their `previous` messages are matched to the change's IDs by position.
-  - Any other error: `failed` — a send or draft is kept as a local message in Drafts, its files stored with it. Other changes restore only
+  - Any other error: `failed` — a send or draft is kept as a local message in Drafts, its files stored with it; the status
+    says "Couldn't send “…”" or "Couldn't save the draft “…”" ("(No Subject)" without one). Other changes restore only
     the property they set, and only while it still holds the value they set: read state (`setRead`), flag
     (`setFlagged`), mailbox (`move`), the invite (and the mailbox, if still in Trash) for invite answers. A later
     change to the same message stays. Only a refused erase (`delete`) re-adds a message that is gone; a message

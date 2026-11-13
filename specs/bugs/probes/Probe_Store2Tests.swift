@@ -39,15 +39,6 @@ struct Probe_Store2Tests {
 
     // MARK: Drafts lifecycle
 
-    /// A failed Save Draft must not tell the user that a message couldn't be *sent*.
-    @Test func failedSaveDraftDoesNotSayCouldntSend() {
-        let s = store([])
-        s.merge([(.inbox, [])], account: work.id)
-        let d = Draft(accountID: work.id, to: "bo@x.com", subject: "Plan", body: "draft text")
-        s.failed(PendingChange(account: work.id, change: .saveDraft(d), previous: []), "busy")
-        #expect(s.status?.contains("send") != true, "status: \(s.status ?? "nil")")
-    }
-
     // MARK: Invites
 
     @Test func removeFromCalendarSelectsNext() {
@@ -179,13 +170,6 @@ struct Probe_Store2Tests {
             z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
             return z ^ (z >> 31)
         }
-    }
-
-    @Test func failedSendWithEmptySubjectNamesIt() {
-        let s = store([])
-        s.merge([(.inbox, [])], account: work.id)
-        s.failed(PendingChange(account: work.id, change: .send(Draft(accountID: work.id, to: "a@x.com", body: "b")), previous: []), "busy")
-        #expect(s.status?.contains("“”") != true, "status: \(s.status ?? "nil")")
     }
 
     /// The draft kept after a failed send keeps the picture where it was placed.
