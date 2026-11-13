@@ -2111,7 +2111,8 @@ public final class MailStore {
     /// wasn't on the original message.
     public func addsNewRecipient(_ d: Draft) -> Bool {
         guard let id = d.original, let m = message(id) else { return false }
-        let original = [m.from] + m.to + m.cc
+        // Reply-To counts as the original's: a reply goes there by itself (BUG-239).
+        let original = [m.from] + m.to + m.cc + (m.replyTo ?? [])
         var known = Set(original.map { $0.email.lowercased() })
         if let me = account(m.accountID)?.address { known.insert(me.lowercased()) }
         // Before its body is loaded, the original has names without addresses: a recipient of that name is known.
