@@ -1102,7 +1102,13 @@ public final class MailStore {
                 await saveBeforeSending?()
             }
             do {
-                try await perform(p, backend)
+                do { try await perform(p, backend) } catch let e as LeftOnServer {
+                    // A half message in the server's Drafts: erased later (`merge` keeps it out meanwhile). The
+                    // server just failed twice, so the account waits until the next drain.
+                    outbox.append(PendingChange(account: p.account, change: .delete([e.remoteID]), previous: []))
+                    unreachable.insert(p.account)
+                    throw e.error
+                }
                 outbox.removeAll { $0.id == p.id }
                 // The move went through: the deletions its source reported were its own.
                 if case let .move(ids, _) = p.change { deletedWhileMoving[p.account]?.subtract(ids) }

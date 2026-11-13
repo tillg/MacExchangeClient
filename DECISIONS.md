@@ -567,3 +567,10 @@ edited: 2026-11-13
 - **Decision:** A folder of the account's tree (restored from disk or read earlier) that the new folder list doesn't have is gone: its messages are removed (memory and disk), its sync token, completion and history notes are dropped, and if it was the selected mailbox, the account's Inbox is selected. When the list arrives while launch is still loading, the folder's stored mail loaded afterwards is left out and removed from disk.
 - **Why:** README syncs "your own mail folders"; a folder that doesn't exist on the server has no mail. Folders moved into Deleted Items keep their ID and stay (BUG-025).
 - **Alternatives:** Select All Inboxes (rejected: the Inbox of the same account is closer to where the user was). Keep the mail until the user acts (rejected: it can't be reached in the sidebar).
+
+## 02:52 — A half message left in Exchange's Drafts is erased later {#d-bug-105}
+
+- **Status:** decided
+- **Context:** BUG-105. With files, send and Save Draft create the item first; when a later step failed, the clean-up delete was a `try?`, so a failed clean-up left a copy without files in Exchange's Drafts for good.
+- **Decision:** When the clean-up fails, `EWSBackend` throws `LeftOnServer` (item ID + the original error). `drain` queues an erase of that item for the account (saved with the outbox), sets the account aside for the rest of this drain (the server just failed twice, and the "Couldn't send" notice stays), then handles the original error as before. A queued change already keeps the item out of Drafts pages (d-bug-072). The erase is the same soft delete as the clean-up; an item that is already gone counts as erased.
+- **Alternatives:** Retry the delete at once in the backend (rejected: the server just refused). Hide the item by ID in the backend (rejected: lost at quit; the outbox is saved).

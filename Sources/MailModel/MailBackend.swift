@@ -158,6 +158,15 @@ public struct PartlyRefused: Error, LocalizedError {
     public var errorDescription: String? { refused.values.sorted().first }
 }
 
+/// A send or Save Draft failed after it had created an item on the server, and removing that item failed too.
+/// `error` is what made it fail; the item is erased later, so no half message stays in the server's Drafts.
+public struct LeftOnServer: Error, LocalizedError {
+    public var remoteID: String
+    public var error: Error
+    public init(remoteID: String, error: Error) { self.remoteID = remoteID; self.error = error }
+    public var errorDescription: String? { error.localizedDescription }
+}
+
 /// The server can't take requests right now (throttling, or a gateway's error page instead of an answer). Nothing was
 /// refused: changes stay queued and are tried again later.
 public struct ServerBusy: Error, LocalizedError {

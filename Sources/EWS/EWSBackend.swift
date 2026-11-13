@@ -322,8 +322,7 @@ public struct EWSBackend: MailBackend {
         do { try await client.call(Self.sendItemRequest(item)) } catch {
             // The app keeps the message in Drafts on this Mac; don't leave a second copy in Exchange's Drafts.
             // If it did go out, the item is in Sent Items under a new ID and this delete misses it.
-            try? await delete([item.id])
-            throw error
+            try await deleteOrHandBack(item.id, after: error)
         }
     }
 
@@ -344,9 +343,15 @@ public struct EWSBackend: MailBackend {
             else { throw EWSError(code: "ErrorAttachmentNotCreated", message: "Exchange didn't take the attachments") }
             return root
         } catch {
-            try? await delete([item.id])  // no half message in Exchange's Drafts
-            throw error
+            try await deleteOrHandBack(item.id, after: error)  // no half message in Exchange's Drafts
         }
+    }
+
+    /// Removes an item created for a send or save that then failed, and throws `failure`. If the removal fails too,
+    /// throws `LeftOnServer`, so the item is erased later.
+    private func deleteOrHandBack(_ id: String, after failure: Error) async throws -> Never {
+        do { try await delete([id]) } catch { throw LeftOnServer(remoteID: id, error: failure) }
+        throw failure
     }
 
     public func maxMessageSize(from address: String) async throws -> Int? {
