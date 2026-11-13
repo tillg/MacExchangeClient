@@ -136,7 +136,8 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
 
 - Settings ▸ Accounts: list of accounts; Add Exchange Account (email, `DOMAIN\user`, password, server). Sign In
   checks the credentials with a folder request before saving, stores the password in the Keychain, removes the
-  sample accounts and runs a quick check. Accounts can't be removed or edited in the app.
+  sample accounts (never an account set up in Settings, even without a password) and runs a quick check. Signing in
+  with the email, username and server of a saved account reconnects that account instead of adding another. Accounts can't be removed or edited in the app.
 - Settings ▸ Viewing: conversations on/off. Settings ▸ Privacy: Download external images — Always, My organisation
   (default), Ask before downloading ([rendering.md](rendering.md)).
 - Mailbox ▸ Get New Mail (⇧⌘N). Message ▸ Send (⇧⌘D) in the menu bar is always disabled; the compose toolbar has it.

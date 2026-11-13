@@ -50,7 +50,8 @@ flowchart LR
 
 1. `AppSetup.makeStore()`: if Exchange accounts are saved (UserDefaults `exchangeAccounts`) and `MAIL_SAMPLE_DATA`
    is not set, an empty store gets one `EWSBackend` per account (password from the Keychain; without one the
-   account is added without a backend and the status says so). Otherwise the store gets `SampleData.store()`, and
+   account is added without a backend, still as a server account whose changes wait, and the status says
+   "Password needed for …"). Otherwise the store gets `SampleData.store()`, and
    nothing is read from or written to disk.
 2. `pollForMail()` (`MailReplicaApp.swift`) runs `AppSetup.loadMail`, then loops: `store.refresh()`,
    `AppSetup.saveChanges(store)`, sleep 15 s. It is off while `MAIL_SNAPSHOT` is set.

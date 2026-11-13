@@ -97,32 +97,6 @@ struct Probe_Store2Tests {
 
     // MARK: Accounts
 
-    /// An Exchange account whose password is missing (connected without a backend) is not sample data: signing in
-    /// a second account must not remove it while its mail stays in All Inboxes.
-    @Test func removeLocalAccountsKeepsExchangeAccountWithoutPassword() {
-        var r = msg(work); r.remoteID = "R1"
-        let sample = msg(home, subject: "sample")
-        let s = MailStore(accounts: [work, home], messages: [sample])
-        s.merge([r], account: work.id, mailbox: .inbox)  // work's mail came from the server (or the database)
-        s.removeLocalAccounts()
-        let orphans = s.messages.filter { m in !s.accounts.contains { $0.id == m.accountID } }
-        #expect(orphans.isEmpty, "messages without account: \(orphans.count); accounts: \(s.accounts.map(\.name))")
-    }
-
-    /// The same account's draft kept after a failed send (local, stored) is dropped from memory but not from disk.
-    @Test func removeLocalAccountsDoesNotDropStoredDraftsOnlyFromMemory() {
-        let s = MailStore(accounts: [work, home], messages: [])
-        s.merge([(.inbox, [])], account: work.id)  // work: Exchange account (here without password/backend)
-        s.failed(PendingChange(account: work.id, change: .send(Draft(accountID: work.id, to: "a@x.com", subject: "S")),
-                               previous: []), "busy")
-        let kept = s.messages[0].id
-        _ = s.takeChanges()
-        s.removeLocalAccounts()
-        let removed = s.takeChanges().removed
-        #expect(s.message(kept) != nil || removed.contains(kept),
-                "in memory: \(s.message(kept) != nil), removed from disk: \(removed.contains(kept))")
-    }
-
     /// Signing in a further account resets what the user is looking at although nothing was removed.
     @Test func removeLocalAccountsWithNothingLocalKeepsTheView() {
         let s = MailStore(accounts: [], messages: [])
