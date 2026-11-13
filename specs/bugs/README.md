@@ -10,10 +10,8 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [104](BUG-104-answered-invite-shows-unanswered-after-sync.md) | P3 | Invite | An invite answered here shows "Please respond" again once Exchange has moved it to Deleted Items |
 | [146](BUG-146-memory-search-per-keystroke-freeze.md) | P4 | MailStore | Search without the index (index build failed or still building, or "Search failed") freezes 0.6-1 s per keystroke on 180,000 messages |
 | [154](BUG-154-mark-all-read-keeps-hidden-selection.md) | P3 | MailStore / selection | Mark All as Read with the unread filter (or in Unread) leaves the selected messages selected after they leave the list |
-| [157](BUG-157-same-first-name-senders-shown-as-one.md) | P3 | Models / ConversationRow | Two different senders with the same first name show as one sender's full name |
 | [158](BUG-158-delete-in-folder-inside-trash-moves-to-trash.md) | P4 | MailStore / actions | Delete in a folder inside Trash moves the mail to Trash instead of erasing it |
 | [159](BUG-159-invite-answer-selection-depends-on-hidden-member.md) | P4 | MailStore / conversations | Answering an invite moves the selection to another conversation, but only when the selection holds the invite rather than its row |
-| [160](BUG-160-conversation-first-names-wrong-for-corporate-names.md) | P3 | Models / ConversationRow | The conversation row shows "Jan (mgm-tp)" / "Sergio Luis" / "Jan Jikeli" instead of first names |
 | [161](BUG-161-background-check-ignores-throttling.md) | P3 | Sync | Exchange throttling during the background check of off-screen folders doesn't set the account aside: every other folder is asked again |
 | [162](BUG-162-mail-folder-in-non-mail-folder-shown-or-archive.md) | P4 | EWS | A mail folder inside Contacts, Calendar or Tasks shows at the top level, and one named Archive becomes the account's Archive |
 | [163](BUG-163-archive-removed-on-server-keeps-mail.md) | P3 | Sync | An Archive folder deleted on the server keeps its mail and sync position in Archive for good |

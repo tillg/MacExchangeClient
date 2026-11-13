@@ -41,13 +41,6 @@ struct Probe_R5A {
         #expect(s.selection.isSubset(of: visible), "selection \(s.selection.count) hidden after Mark All as Read")
     }
 
-    // R5A-04
-    /// Two different people who share a first name are shown as one sender's full name, as for a single-sender row.
-    @Test func twoSendersWithTheSameFirstNameAreNotShownAsOne() {
-        let names = [Contact(name: "Jan Jikeli", email: "jan.j@x.com"), Contact(name: "Jan Müller", email: "jan.m@x.com")]
-        #expect(ConversationRow.senders(names) != "Jan Jikeli")
-    }
-
     // R5A-05
     /// Mail in a folder inside Trash is deleted mail (DECISIONS d-bug-025); Delete there should erase it, as in Trash,
     /// not move it to Trash for a second Delete.
@@ -90,13 +83,4 @@ struct Probe_R5A {
         #expect(s.listSelection == [row], "selection moved to \(s.selection.compactMap { s.message($0)?.subject })")
     }
 
-    // R5A-07
-    /// The row shows senders' first names. Corporate display names "Last, First (Org)" and names with a no-break
-    /// space (which `Contact.initials` already handles) don't give the first name.
-    @Test func conversationSendersAreFirstNamesForCorporateAndNoBreakSpaceNames() {
-        let corp = [Contact(name: "Jikeli, Jan (mgm-tp)", email: "j@x.com"), Contact(name: "Lerena, Sergio Luis", email: "s@x.com")]
-        #expect(ConversationRow.senders(corp) == "Jan & Sergio")
-        let nbsp = [Contact(name: "Jan\u{00A0}Jikeli", email: "j@x.com"), Contact(name: "Bob Ray", email: "b@x.com")]
-        #expect(ConversationRow.senders(nbsp) == "Jan & Bob")
-    }
 }

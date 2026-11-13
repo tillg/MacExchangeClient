@@ -40,8 +40,9 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
   "Yesterday", weekday within 7 days, else short date), subject, paperclip, flag, two-line preview.
 - With conversations on, a conversation is one row (`ConversationRow`): its newest message in the list stands for it,
   with a count badge. Sender (`ConversationRow.senders`): one sender's full name, else first names newest first
-  ("Jan, Sergio & Till"); "Last, First" gives the part after the last comma; a name that is empty or only commas and
-  blanks shows the address.
+  ("Jan, Sergio & Till"), one per address (two Jans are "Jan & Jan", BUG-157); the first word after the last comma
+  of "Last, First (Org)", any blank splitting words (BUG-160); a name that is empty or only commas and blanks shows
+  the address.
 - Selecting exactly one message marks it read (one main-loop turn later), and the message view loads it.
 - A message that was unread when opened stays in the list with the unread filter and in Unread while it is selected
   (it is judged as unread there; sidebar counts use the real state). It leaves once the selection moves on, the
