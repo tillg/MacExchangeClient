@@ -74,6 +74,16 @@ public enum ServerChange: Hashable, Codable, Sendable {
     }
 }
 
+extension ServerChange {
+    /// A send or an invite answer: after a timeout or "busy" it may still have gone out, so it is never repeated.
+    var mayHaveGoneOut: Bool {
+        switch self {
+        case .send, .respond, .reply: true
+        default: false
+        }
+    }
+}
+
 public struct PendingChange: Hashable, Codable, Sendable {
     public var id = UUID()
     public let account: UUID

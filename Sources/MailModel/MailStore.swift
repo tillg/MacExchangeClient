@@ -1467,18 +1467,16 @@ public final class MailStore {
                 if let i = outbox.firstIndex(where: { $0.id == p.id }) { outbox[i].inFlight = nil }
                 continue
             } catch let e as URLError {
-                // A send or an answer that timed out may have gone out; never repeat it.
-                if case .send = p.change { failed(p, e.localizedDescription); continue }
-                if case .respond = p.change { failed(p, e.localizedDescription); continue }
-                if case .reply = p.change { failed(p, e.localizedDescription); continue }
-                connectionNotice("Offline – changes will be sent to Exchange later", account: p.account)
+                // A send or an answer that timed out may have gone out; never repeat it. Either way the account's
+                // other changes wait too (BUG-164).
+                if p.change.mayHaveGoneOut { failed(p, e.localizedDescription) }
+                else { connectionNotice("Offline – changes will be sent to Exchange later", account: p.account) }
                 unreachable.insert(p.account)
             } catch let e as ServerBusy {
-                // Not refused, just not now. A send or an answer may still have gone out; never repeat it.
-                if case .send = p.change { failed(p, e.localizedDescription); continue }
-                if case .respond = p.change { failed(p, e.localizedDescription); continue }
-                if case .reply = p.change { failed(p, e.localizedDescription); continue }
-                connectionNotice("Exchange is busy – changes will be sent later", account: p.account)
+                // Not refused, just not now. A send or an answer may still have gone out; never repeat it. The
+                // account's other changes wait for the back-off too (BUG-164).
+                if p.change.mayHaveGoneOut { failed(p, e.localizedDescription) }
+                else { connectionNotice("Exchange is busy – changes will be sent later", account: p.account) }
                 unreachable.insert(p.account)
                 if let wait = e.retryAfter { busyUntil[p.account] = Date.now.addingTimeInterval(wait) }
             } catch let e as PartlyRefused {
@@ -2083,6 +2081,11 @@ public final class MailStore {
                     resetSync(acct, role)  // synced from the start by the next history run
                 } catch {
                     if pauseIfSignInFailed(error, account: acct) || error is URLError { break }
+                    // Throttled: the account's other folders wait too, for the back-off (BUG-161).
+                    if let wait = (error as? ServerBusy)?.retryAfter {
+                        busyUntil[acct] = Date.now.addingTimeInterval(wait)
+                        break
+                    }
                 }
             }
         }

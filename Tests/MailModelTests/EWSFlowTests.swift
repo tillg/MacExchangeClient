@@ -160,6 +160,18 @@ enum EWSReply {
     static func resp(_ op: String, _ messages: String) -> String {
         env("<m:\(op)Response \(ns)><m:ResponseMessages>\(messages)</m:ResponseMessages></m:\(op)Response>")
     }
+    /// Exchange throttling: an ErrorServerBusy fault that asks to wait `ms` milliseconds.
+    static func throttled(ms: Int = 60_000) -> String {
+        """
+        <?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>\
+        <s:Fault><faultcode xmlns:a="http://schemas.microsoft.com/exchange/services/2006/types">a:ErrorServerBusy</faultcode>\
+        <faultstring xml:lang="en-US">The server cannot service this request right now. Try again later.</faultstring><detail>\
+        <e:ResponseCode xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">ErrorServerBusy</e:ResponseCode>\
+        <e:Message xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">The server cannot service this request right now. Try again later.</e:Message>\
+        <t:MessageXml xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">\
+        <t:Value Name="BackOffMilliseconds">\(ms)</t:Value></t:MessageXml></detail></s:Fault></s:Body></s:Envelope>
+        """
+    }
     static func fault(_ code: String, _ text: String) -> String {
         """
         <?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>\
@@ -609,6 +621,31 @@ struct EWSFlowTests {
         s.toggleRead([a])
         try await waitFor { server.served == 2 && s.outbox.isEmpty }
         #expect(s.message(a)?.isRead == false, "status: \(s.status ?? "")")
+    }
+
+    /// BUG-161: the background check of complete folders off screen stops for the account when Exchange throttles it,
+    /// instead of asking every other folder too.
+    @Test func backgroundCheckStopsAtThrottling() async throws {
+        let server = ScriptedServer([], fallback: EWSReply.throttled())
+        defer { server.stop() }
+        let s = store(server)
+        for box in [MailboxKind.inbox, .drafts, .sent, .trash] { complete(s, box) }
+        await s.syncHistory()
+        #expect(server.served == 1, "a throttled account was asked \(server.served) times in one background run")
+    }
+
+    /// BUG-164: a send that Exchange throttles goes to Drafts as before, and the account's other changes wait for the
+    /// back-off instead of going out at once.
+    @Test func throttledSendHoldsTheAccountsOtherChanges() async throws {
+        let server = ScriptedServer([EWSReply.throttled()], fallback: EWSReply.resp("UpdateItem", EWSReply.ok("UpdateItem")))
+        defer { server.stop() }
+        let (s, a) = storeWithA(server)
+        s.send(Draft(accountID: acct.id, to: "bob@x.com", subject: "Report", body: "Hi"))
+        s.toggleRead([a])
+        try await waitFor { s.messages.contains { $0.mailbox == .drafts } }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(server.served == 1, "\(server.served) requests went to a server that asked to wait 60 s")
+        #expect(s.outbox.map(\.change) == [.setRead(["A"], true)])
     }
 }
 
