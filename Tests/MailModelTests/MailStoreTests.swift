@@ -1935,4 +1935,12 @@ struct MailStoreTests {
         #expect(d.attachments.isEmpty)
         #expect(s.status?.contains("no longer available") == true)
     }
+
+    /// BUG-178: the window subtitle in Mail's words (`MessagesStatusFormat`): "1 message", "2 messages, 1 unread".
+    @Test func mailboxSubtitleCountsInMailsWords() {
+        #expect(MailStore.mailboxSubtitle(count: 1, unread: 0) == "1 message")
+        #expect(MailStore.mailboxSubtitle(count: 2, unread: 0) == "2 messages")
+        #expect(MailStore.mailboxSubtitle(count: 1, unread: 1) == "1 message, 1 unread")
+        #expect(MailStore.mailboxSubtitle(count: 0, unread: 0) == "0 messages")
+    }
 }

@@ -1256,6 +1256,13 @@ public final class MailStore {
     /// True while launch is still loading stored mail.
     public var isLoading: Bool { loadedBoxes != nil }
 
+    /// The window's subtitle for a mailbox, in Mail's words (`MessagesStatusFormat`, one/other): "1 message",
+    /// "12 messages, 3 unread" (BUG-178).
+    public static func mailboxSubtitle(count n: Int, unread u: Int) -> String {
+        let messages = n == 1 ? "1 message" : "\(n) messages"
+        return u > 0 ? "\(messages), \(u) unread" : messages
+    }
+
     /// Launch, step 0: the database is about to be read. From now on the store counts as loading, so a check started
     /// meanwhile (a mailbox clicked) doesn't start the history before the stored sync positions are in (BUG-224).
     public func beginLoading() {

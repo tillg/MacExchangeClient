@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "The window title says \"1 message\" instead of \"1 messages\".",
             "Opening the next unread message in a large mailbox with conversations on is quicker.",
             "Clicking a mailbox while \"Loading Mail…\" is shown no longer leaves mail you deleted elsewhere in the list.",
             "Search finds words inside Thai text and in older Japanese mail with half-width characters.",
