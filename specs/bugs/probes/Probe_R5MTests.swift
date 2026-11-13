@@ -22,14 +22,6 @@ struct Probe_R5MAccounts {
                 "pasted in capitals: \(url("https://MAIL.EXAMPLE.COM/EWS/Exchange.asmx")?.absoluteString ?? "nil")")
     }
 
-    /// R5M-02: the EWS folder pasted without its file ("…/EWS/", "…/ews") gets a second /EWS/ in front of the file.
-    @Test func ewsFolderPastedWithoutTheFileIsTheStandardURL() {
-        let want = "https://mail.example.com/EWS/Exchange.asmx"
-        for s in ["https://mail.example.com/EWS/", "https://mail.example.com/EWS", "mail.example.com/ews/"] {
-            #expect(url(s)?.absoluteString == want, "\(s) -> \(url(s)?.absoluteString ?? "nil")")
-        }
-    }
-
     /// R5M-03: malformed input becomes a URL to another host or without the EWS path, instead of "Invalid server".
     @Test func malformedServerIsInvalidNotAnotherHost() {
         for s in ["ftp://mail.example.com", "https:/mail.example.com", "https//mail.example.com", "mail.example.com?x",

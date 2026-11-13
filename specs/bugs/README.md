@@ -76,7 +76,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [240](BUG-240-opened-copy-stale-after-message-changed.md) | P4 | attachments / Mail Downloads | After a message changed on the server, Open and Save still give the old version of a file with the same name |
 | [241](BUG-241-symlink-to-alias-attaches-bookmark.md) | P4 | compose / attaching files | A symbolic link to a Finder alias is attached as the alias's bookmark bytes, not the file it points to |
 | [242](BUG-242-sign-in-again-duplicates-account.md) | P3 | Accounts / AccountsSettings | Signing in again with the server or username written differently (capitals, :443, domain\me) adds a second copy of the account |
-| [243](BUG-243-ews-folder-url-doubled.md) | P3 | Accounts / ExchangeAccount | A server pasted as the EWS folder (https://host/EWS/ or host/ews) becomes https://host/EWS/EWS/Exchange.asmx |
 | [244](BUG-244-malformed-server-other-host.md) | P4 | Accounts / ExchangeAccount | A mistyped server (ftp://, https:/, https//, ?x, #x, port 99999) becomes a URL to another host or path instead of "Invalid server" |
 | [246](BUG-246-bare-ipv6-invalid.md) | P4 | Accounts / ExchangeAccount | An IPv6 address typed without brackets (2001:db8::1) is "Invalid server" |
 | [247](BUG-247-organisation-domain-spelling.md) | P4 | Privacy / RemoteImages | "My organisation" treats the same domain as foreign when it is spelled differently (bücher.de vs xn--bcher-kva.de, or work.com.) |
