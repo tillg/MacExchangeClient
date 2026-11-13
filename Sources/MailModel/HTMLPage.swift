@@ -109,14 +109,16 @@ public enum RemoteImages: String, CaseIterable, Sendable {
     }
 
     /// Whether a mail from `sender` to `account` shows its remote content without the banner.
-    /// "Organisation" is the account's mail domain and its subdomains, plus Exchange's internal X.500 addresses.
+    /// "Organisation" is the account's mail domain and its subdomains, plus Exchange's internal X.500 addresses
+    /// (`/o=…` without `@`).
     public func loadsAutomatically(from sender: Contact, account: Account) -> Bool {
         switch self {
         case .always: return true
         case .ask: return false
         case .organisation:
             let email = sender.email.lowercased()
-            if email.hasPrefix("/o=") { return true }
+            // X.500 addresses have no domain; "/o=…@domain" is an internet address in that domain.
+            if email.hasPrefix("/o="), !email.contains("@") { return true }
             guard let domain = Self.domain(email), let own = Self.domain(account.address.lowercased()) else { return false }
             return domain == own || domain.hasSuffix("." + own)
         }

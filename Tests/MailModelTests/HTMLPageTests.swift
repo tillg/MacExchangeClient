@@ -108,6 +108,13 @@ struct HTMLPageTests {
             from: from("/O=NORTHWIND/OU=EXCHANGE ADMINISTRATIVE GROUP/CN=RECIPIENTS/CN=AMORGAN"), account: me))
     }
 
+    /// An internet address may start with "/o=" (`/` and `=` are allowed in its local part): with an `@domain` it is
+    /// an address in that domain, not an X.500 one.
+    @Test func slashOAddressWithAnotherDomainIsNotOrganisation() {
+        #expect(!RemoteImages.organisation.loadsAutomatically(from: from("/o=northwind/cn=it@evil.example"), account: me))
+        #expect(RemoteImages.organisation.loadsAutomatically(from: from("/o=northwind/cn=it@northwind.example"), account: me))
+    }
+
     @Test func alwaysAndAsk() {
         #expect(RemoteImages.always.loadsAutomatically(from: from("news@tidewater.example"), account: me))
         #expect(!RemoteImages.ask.loadsAutomatically(from: from("ci-noreply@northwind.example"), account: me))

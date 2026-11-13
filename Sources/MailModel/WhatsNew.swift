@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Senders outside your organisation can no longer pass as colleagues with a specially made address, so their pictures from the internet stay blocked until you allow them.",
             "When Exchange is busy or briefly unavailable, your changes (read, flags, moves, deletions) wait and go out later instead of being undone.",
             "Text in signatures and other tables in emails is no longer larger than the text around it.",
             "When something between you and Exchange answers with an error page instead of Exchange, a message you send is kept in Drafts instead of disappearing, and a mailbox no longer counts as fully loaded.",
