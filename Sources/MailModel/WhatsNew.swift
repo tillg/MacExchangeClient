@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Replies to your invitations, such as \"Accepted: …\", no longer show Accept, Tentative and Decline buttons, also for those read before.",
             "Invitations and cancellations you sent yourself no longer show Accept, Decline or Remove from Calendar, as in Outlook.",
             "If a cancelled meeting is off your calendar but its message can't be moved to Trash, the status line now says so.",
             "A mailbox you select while mail is being checked is checked right away too, instead of up to 15 seconds later.",

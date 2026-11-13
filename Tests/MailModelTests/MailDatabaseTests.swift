@@ -58,6 +58,19 @@ struct MailDatabaseTests {
         #expect(Set(back) == [full, plain])
     }
 
+    /// A meeting response ("Accepted: …") stored with an invite, as bodies loaded before BUG-038 were, reads without
+    /// it: no answer buttons on someone's answer.
+    @Test func aStaleInviteOnAMeetingResponseIsDroppedOnLoad() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        var m = full
+        m.isInvite = false
+        try MailDatabase(url: url).write(StoreChanges(upserts: [m]))
+        let back = try #require(try reopen(url).messages().first)
+        #expect(back.invite == nil)
+        #expect(back.body == m.body)
+    }
+
     /// A NUL character in a subject or body is stored, not the end of the text, and a search with one never throws.
     @Test func nulCharacterInSubjectAndBodySurvives() throws {
         let url = tempURL()

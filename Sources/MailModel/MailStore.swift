@@ -868,7 +868,9 @@ public final class MailStore {
                     if old.bodyLoaded && !m.bodyLoaded, old.serverPreview == nil || m.serverPreview == old.serverPreview,
                        let from = Self.keeping([m.from], old: [old.from])?.first,
                        let to = Self.keeping(m.to, old: old.to), let cc = Self.keeping(m.cc, old: old.cc) {
-                        m.body = old.body; m.attachments = old.attachments; m.invite = old.invite; m.bodyLoaded = true
+                        m.body = old.body; m.attachments = old.attachments; m.bodyLoaded = true
+                        // A meeting response loaded before BUG-038 carries an invite; the server says it's none.
+                        m.invite = m.isInvite == false ? nil : old.invite
                         m.html = old.html; m.htmlChecked = old.htmlChecked
                         m.from = from; m.to = to; m.cc = cc; m.hasAttachments = old.hasAttachments
                     }

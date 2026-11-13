@@ -401,6 +401,22 @@ struct MailStoreSyncTests {
         #expect(s.message(a)?.hasAttachments == false)
     }
 
+    /// A meeting response whose body brought an invite (as before BUG-038) loses it when the server lists it as no
+    /// invite, and the body is kept: someone's "Accepted: …" has no answer buttons.
+    @Test func laterSummaryOfAMeetingResponseDropsAStaleInvite() {
+        var sum = remote("A"); sum.isInvite = false
+        let s = MailStore(accounts: [work], messages: [])
+        s.apply(SyncResult(upserts: [sum], deletedRemoteIDs: [], token: "t0", more: false), account: work.id, mailbox: .inbox)
+        let a = id(s, "A")
+        s.setBody(MessageBody(text: "Full", attachments: [], invite: Invite(start: .now, end: .now, location: "")), for: a)
+        #expect(s.canAnswer(a))  // the stale state this cleans up
+        sum.isRead = true
+        s.apply(SyncResult(upserts: [sum], deletedRemoteIDs: [], token: "t1", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.invite == nil)
+        #expect(s.message(a)?.body == "Full")
+        #expect(!s.canAnswer(a))
+    }
+
     /// When the summary's names differ from the loaded ones (a draft edited elsewhere), the server changed the
     /// message: the new names show and the body is fetched again, so addresses are never left empty unnoticed.
     @Test func summaryWithOtherRecipientsFetchesTheBodyAgain() {

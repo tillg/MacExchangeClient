@@ -585,8 +585,9 @@ public final class MailDatabase: @unchecked Sendable {
                         attachments: attachments(files),
                         remoteID: r.optionalText(3), hasAttachments: bits & attach != 0, serverPreview: r.optionalText(16),
                         bodyLoaded: bits & loaded != 0)
-        m.invite = r.isNull(17) ? nil : try? JSONDecoder().decode(Invite.self, from: r.data(17))
         m.isInvite = r.isNull(19) ? nil : r.int(19) == 1
+        // Not an invite (a meeting response whose body was loaded before BUG-038): its stored invite is stale.
+        m.invite = r.isNull(17) || m.isInvite == false ? nil : try? JSONDecoder().decode(Invite.self, from: r.data(17))
         m.html = r.optionalText(18)
         m.htmlChecked = r.isNull(20) ? nil : r.int(20) == 1
         m.conversationID = r.optionalText(21)
