@@ -99,6 +99,8 @@ public final class MailStore {
     /// Mailboxes whose stored mail is in memory while launch is still loading; nil once everything is.
     @ObservationIgnored private var loadedBoxes: Set<String>?
     private var flushTask: Task<Void, Never>?
+    /// Accounts whose server asked to wait (throttling): their changes aren't sent before then.
+    @ObservationIgnored private var busyUntil: [UUID: Date] = [:]
     /// Writes the changes to disk and returns once they are written; called before a send goes out, so its
     /// `inFlight` mark is saved first. Nil with sample data and in tests that don't save.
     @ObservationIgnored public var saveBeforeSending: (() async -> Void)?
@@ -1019,6 +1021,14 @@ public final class MailStore {
                 if case .reply = p.change { failed(p, e.localizedDescription); continue }
                 status = "Offline – changes will be sent to Exchange later"
                 unreachable.insert(p.account)
+            } catch let e as ServerBusy {
+                // Not refused, just not now. A send or an answer may still have gone out; never repeat it.
+                if case .send = p.change { failed(p, e.localizedDescription); continue }
+                if case .respond = p.change { failed(p, e.localizedDescription); continue }
+                if case .reply = p.change { failed(p, e.localizedDescription); continue }
+                status = "Exchange is busy – changes will be sent later"
+                unreachable.insert(p.account)
+                if let wait = e.retryAfter { busyUntil[p.account] = Date.now.addingTimeInterval(wait) }
             } catch let e as PartlyRefused {
                 // The other items changed on the server: they keep the change (and moved ones their new IDs).
                 renameRemote(e.moved, account: p.account)
@@ -1034,7 +1044,9 @@ public final class MailStore {
         prune()
     }
 
-    private func canSend(_ p: PendingChange) -> Bool { backends[p.account] != nil && !paused.contains(p.account) }
+    private func canSend(_ p: PendingChange) -> Bool {
+        backends[p.account] != nil && !paused.contains(p.account) && (busyUntil[p.account] ?? .distantPast) <= .now
+    }
 
     /// Stops all requests for an account whose sign-in failed. Returns false for any other error.
     func pauseIfSignInFailed(_ error: Error, account acct: UUID) -> Bool {

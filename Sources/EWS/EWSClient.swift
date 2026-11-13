@@ -35,18 +35,24 @@ public final class EWSClient: Sendable {
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if status == 401 { throw AuthenticationError() }
+        // A page that isn't an Exchange answer (unreadable, or without any result: a gateway's 503 page, an empty
+        // body) means Exchange didn't act on the request: nothing was refused, so changes wait and are tried again.
         let doc: XMLDocument
         do { doc = try XMLDocument(data: Self.sanitize(data)) } catch {
             // The parser's message names line and column only, never content.
-            throw EWSError(code: "HTTP \(status)",
-                           message: "Unreadable EWS response (\(data.count) bytes): \(error.localizedDescription)")
+            throw ServerBusy("Unreadable EWS response (\(data.count) bytes, HTTP \(status)): \(error.localizedDescription)")
         }
         if let fault = doc.first("Fault") {
-            throw EWSError(code: fault.text("ResponseCode") ?? "SOAP fault", message: fault.text("faultstring") ?? "Server error")
+            let code = fault.text("ResponseCode") ?? "SOAP fault", message = fault.text("faultstring") ?? "Server error"
+            if code == "ErrorServerBusy" {
+                let ms = doc.all("Value").first { $0.attr("Name") == "BackOffMilliseconds" }?.stringValue.flatMap { Double($0) }
+                throw ServerBusy("\(message) (\(code))", retryAfter: ms.map { $0 / 1000 })
+            }
+            throw EWSError(code: code, message: message)
         }
-        // Every EWS answer has a ResponseCode per item. Without one (an empty body, a proxy's page) nothing was done.
+        // Every EWS answer has a ResponseCode per item.
         guard doc.first("ResponseCode") != nil else {
-            throw EWSError(code: "HTTP \(status)", message: "The server's answer holds no Exchange result")
+            throw ServerBusy("The server's answer holds no Exchange result (HTTP \(status))")
         }
         if strict, let bad = doc.all("ResponseCode").first(where: { $0.stringValue != "NoError" }) {
             let text = bad.parent?.text("MessageText") ?? "Request failed"

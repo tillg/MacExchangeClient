@@ -158,6 +158,16 @@ public struct PartlyRefused: Error, LocalizedError {
     public var errorDescription: String? { refused.values.sorted().first }
 }
 
+/// The server can't take requests right now (throttling, or a gateway's error page instead of an answer). Nothing was
+/// refused: changes stay queued and are tried again later.
+public struct ServerBusy: Error, LocalizedError {
+    public var message: String
+    /// How long the server asked to wait, if it said.
+    public var retryAfter: TimeInterval?
+    public init(_ message: String, retryAfter: TimeInterval? = nil) { self.message = message; self.retryAfter = retryAfter }
+    public var errorDescription: String? { message }
+}
+
 /// The server rejected the credentials. Backends throw this so the store stops retrying: repeated
 /// wrong passwords lock domain accounts.
 public struct AuthenticationError: Error, LocalizedError {

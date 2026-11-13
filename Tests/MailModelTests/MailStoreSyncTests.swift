@@ -615,4 +615,60 @@ struct MailStoreSyncTests {
         #expect(!s.isComplete(work.id, .inbox))
         #expect(s.syncToken(work.id, .inbox) == nil)
     }
+
+    // MARK: A busy server keeps changes queued (BUG-061)
+
+    /// Exchange throttling: a SOAP fault ErrorServerBusy with BackOffMilliseconds. // file:// fixture
+    let serverBusy = """
+        <?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>\
+        <s:Fault><faultcode xmlns:a="http://schemas.microsoft.com/exchange/services/2006/types">a:ErrorServerBusy</faultcode>\
+        <faultstring xml:lang="en-US">The server cannot service this request right now. Try again later.</faultstring>\
+        <detail><e:ResponseCode xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">ErrorServerBusy</e:ResponseCode>\
+        <e:Message xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">The server cannot service this request right now. Try again later.</e:Message>\
+        <t:MessageXml xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"><t:Value Name="BackOffMilliseconds">29774</t:Value></t:MessageXml>\
+        </detail></s:Fault></s:Body></s:Envelope>
+        """
+
+    /// A load balancer's 503 page (HTTP.sys "Service Unavailable", not well-formed XML). // file:// fixture
+    let serviceUnavailablePage = "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\"\"http://www.w3.org/TR/html4/strict.dtd\">\r\n<HTML><HEAD><TITLE>Service Unavailable</TITLE>\r\n<META HTTP-EQUIV=\"Content-Type\" Content=\"text/html; charset=us-ascii\"></HEAD>\r\n<BODY><h2>Service Unavailable</h2>\r\n<hr><p>HTTP Error 503. The service is unavailable.</p>\r\n</BODY></HTML>\r\n"
+
+    @Test func serverBusyIsReportedAsSuch() async throws {
+        let b = backend(try responseFile(serverBusy))
+        do { try await b.setRead(["A"], true); Issue.record("no error") } catch let e as ServerBusy {
+            #expect(e.retryAfter == 29.774)
+        }
+    }
+
+    /// Throttling doesn't undo the change: it stays queued, and isn't tried again before the back-off has passed.
+    @Test func serverBusyKeepsTheChangeQueued() async throws {
+        let file = try responseFile(serverBusy)
+        let s = MailStore(accounts: [], messages: [])
+        s.add(work, backend: backend(file))
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX")], account: work.id)
+        s.apply(page(["A"], token: "T1"), account: work.id, mailbox: .inbox)
+        s.toggleRead([id(s, "A")])
+        await s.refresh(history: false)
+        #expect(s.message(id(s, "A"))?.isRead == true, "status: \(s.status ?? "")")
+        #expect(s.outbox.map(\.change) == [.setRead(["A"], true)])
+        try Data(success.utf8).write(to: file)
+        await s.refresh(history: false)
+        #expect(s.outbox.map(\.change) == [.setRead(["A"], true)], "tried again within the back-off")
+    }
+
+    /// A gateway's 503 page isn't a refusal either; the change goes with the next refresh.
+    @Test func serviceUnavailablePageKeepsTheChangeQueued() async throws {
+        let file = try responseFile(serviceUnavailablePage)
+        let s = MailStore(accounts: [], messages: [])
+        s.add(work, backend: backend(file))
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX")], account: work.id)
+        s.apply(page(["A"], token: "T1"), account: work.id, mailbox: .inbox)
+        s.toggleRead([id(s, "A")])
+        await s.refresh(history: false)
+        #expect(s.message(id(s, "A"))?.isRead == true, "status: \(s.status ?? "")")
+        #expect(s.outbox.map(\.change) == [.setRead(["A"], true)])
+        try Data(success.utf8).write(to: file)
+        await s.refresh(history: false)
+        #expect(s.outbox.isEmpty)
+        #expect(s.message(id(s, "A"))?.isRead == true)
+    }
 }

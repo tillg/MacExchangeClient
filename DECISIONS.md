@@ -430,3 +430,16 @@ edited: 2026-11-13
 - **Decision:** After the Fault check, `call` (strict or not) throws when the answer has no `ResponseCode` at all ("The server's answer holds no Exchange result", code "HTTP <status>"). Every operation the app uses answers with a `ResponseCode` per item, so no real answer is affected.
 - **Why:** README: a message that fails to send is kept in Drafts; a non-answer is a failure, not a success.
 - **Alternatives:** Reject any non-2xx status first (rejected: Exchange sends SOAP faults with HTTP 500, which must still be read).
+
+## 01:58 — A busy server or a non-answer keeps changes queued {#d-bug-061}
+
+- **Status:** decided
+- **Context:** BUG-061. Throttling (`ErrorServerBusy` fault with `BackOffMilliseconds`) or a gateway's 503 page undid the user's change as "Exchange refused a change". Only `URLError` kept changes queued.
+- **Decision:**
+  - New MailModel error `ServerBusy` (message, optional `retryAfter`). `EWSClient.call` throws it for an `ErrorServerBusy` fault (with its back-off), for an unreadable answer and for an answer without any `ResponseCode` (the BUG-060 case, which threw `EWSError` until now). The general rule: a body that isn't an Exchange answer means Exchange didn't act, so nothing was refused. The 503 page in the test arrives over `file://` (no HTTP status), so the rule can't depend on the status code.
+  - `drain` treats `ServerBusy` like a network error: that account's changes stay queued, in order, for the next refresh, and other accounts go on. Status "Exchange is busy – changes will be sent later". A back-off is kept in memory per account (`busyUntil`, checked in `canSend`), so no change of that account is sent before it has passed. Not persisted: after a relaunch the back-off has long passed.
+  - Send, invite answer and reply on `ServerBusy` go to `failed` (Drafts) as on a network error, also for a clean `ErrorServerBusy` fault: one rule for every uncertain answer, and the README promises a failed send is never resent automatically.
+  - Time-outs are `URLError`s and already kept changes queued.
+- **Why:** README: offline, changes wait; refused changes are undone. Throttling and a gateway page are neither a refusal.
+- **Alternatives:** Requeue a send on a clean `ErrorServerBusy` fault (rejected for now: one rule is simpler, and Drafts keeps the message). Retry by itself after the back-off (rejected: the next refresh does it).
+- **Not covered:** An unreadable answer that keeps coming (a wrong server URL answering with a web page) keeps changes queued for every refresh, like an unreachable server.
