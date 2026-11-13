@@ -121,8 +121,6 @@ struct Probe_Race4Tests {
         while !cond() && ContinuousClock.now < end { try await Task.sleep(for: .milliseconds(10)) }
     }
 
-    // MARK: A. A load cancelled because the user moved on is reported as an error
-
     // MARK: D. Quick Look of an earlier message takes over when its file arrives late
 
     /// Space on message A (its attachment still downloading), then on message B (file at hand): Quick Look shows B.
@@ -173,6 +171,4 @@ struct Probe_Race4Tests {
         try #require(s.outbox.isEmpty)
         #expect(s.messages.isEmpty && s.status == nil, "status \(s.status ?? "nil")")
     }
-
-    // MARK: A (continued): the in-flight variant
 }
