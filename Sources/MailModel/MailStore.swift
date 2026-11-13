@@ -725,12 +725,19 @@ public final class MailStore {
     /// Move to Junk; when every message is already in Junk, Not Junk (back to the Inbox).
     /// Junk on these messages means Not Junk (back to the Inbox): all of them are in Junk. The buttons then say so,
     /// as Mail's do (BUG-182).
+    /// Asked by the toolbar and menus on every redraw: looks at the list on screen (cached), not at all mail.
     public func isAllJunk(_ ids: Set<Message.ID>) -> Bool {
-        !ids.isEmpty && !messages.contains { ids.contains($0.id) && $0.mailbox != .junk }
+        guard !ids.isEmpty else { return false }
+        if case .account(_, .junk) = selectedMailbox, normalizedSearch.isEmpty { return true }
+        let rows = visibleMessages
+        guard rows.contains(where: { ids.contains($0.id) }) else {
+            return !messages.contains { ids.contains($0.id) && $0.mailbox != .junk }  // not on screen: rare, all mail
+        }
+        return !rows.contains { ids.contains($0.id) && $0.mailbox != .junk }
     }
 
     public func toggleJunk(_ ids: Set<Message.ID>) {
-        let allJunk = isAllJunk(ids)
+        let allJunk = !messages.contains { ids.contains($0.id) && $0.mailbox != .junk }
         keepingSelectionVisible(ids) { update(ids) { $0.mailbox = allJunk ? .inbox : .junk } }
     }
 
@@ -2252,11 +2259,20 @@ public final class MailStore {
     /// addresses, no text): the body is fetched first, so the draft has the addresses and the quote.
     public func loadedDraft(_ kind: ReplyKind, to id: Message.ID, includeAttachments: IncludeAttachments = .never) async -> Draft {
         if message(id)?.needsBody == true { await loadBody(id) }
-        // A body loaded before Reply-To was asked for: fetched once now, quietly; offline the reply uses what's stored.
+        // A body loaded before Reply-To was asked for: fetched once now, quietly, for at most 3 s and not while the
+        // account has a connection problem; otherwise the reply uses what's stored. A rejected password pauses the
+        // account, as everywhere (BUG-170).
         if kind != .forward, let m = message(id), m.bodyLoaded, m.replyTo == nil, let rid = m.remoteID,
-           let backend = backends[m.accountID], !paused.contains(m.accountID),
-           let b = try? await backend.body(remoteID: rid), message(id)?.serverPreview == m.serverPreview {
-            setBody(b, for: id)
+           let backend = backends[m.accountID], !paused.contains(m.accountID), connectionNotices[m.accountID] == nil {
+            let fetch = Task { try await backend.body(remoteID: rid) }
+            let limit = Task { try? await Task.sleep(for: .seconds(3)); fetch.cancel() }
+            do {
+                let b = try await fetch.value
+                if message(id)?.serverPreview == m.serverPreview { setBody(b, for: id) }
+            } catch {
+                _ = pauseIfSignInFailed(error, account: m.accountID)
+            }
+            limit.cancel()
         }
         return draft(kind, to: id, includeAttachments: includeAttachments)
     }

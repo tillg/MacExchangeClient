@@ -237,4 +237,17 @@ struct MailStorePerformanceTests {
         #expect(s.message(unread[1])?.isRead == true)
         #expect(t < 0.1)  // about 0.04s; 0.39s when it built the list again
     }
+
+    /// BUG-182 follow-up: the Junk button's title is asked on every redraw; it stays cheap in a big mailbox.
+    @Test func junkButtonTitleStaysCheapAt210kMessages() {
+        let s = bigStore(times: 3)
+        s.selectedMailbox = .account(work.id, .sent)
+        let ids = Set(s.visibleMessages.prefix(3).map(\.id))
+        let start = Date()
+        for _ in 0..<10 { _ = s.isAllJunk(ids) }
+        let t = Date().timeIntervalSince(start) / 10
+        print(String(format: "PERF isAllJunk %.4fs", t))
+        #expect(!s.isAllJunk(ids))
+        #expect(t < 0.02)
+    }
 }
