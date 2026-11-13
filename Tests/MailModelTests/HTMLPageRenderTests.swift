@@ -70,6 +70,14 @@ struct HTMLPageRenderTests {
         #expect(Set(levels.compactMap { $0.last }).count == 3, "each level has its own colour: \(r)")
     }
 
+    /// Mail caps pictures sent by Apple Mail (`img.Apple-web-attachment`) at the page width.
+    @Test func appleMailPictureFitsTheWindow() async {
+        let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        let mail = #"<div>Look:</div><div><img class="Apple-web-attachment Singleton" id="i" width="3024" height="40" src="data:image/png;base64,\#(png)"></div>"#
+        let r = await eval(HTMLPage.document(mail, allowRemote: false), "document.getElementById('i').getBoundingClientRect().width + '|' + document.documentElement.scrollWidth")
+        #expect(r == "560|600", "picture width|page scroll width = \(r)")
+    }
+
     nonisolated static let blockedVectors: [String] = [
         #"<link rel="preconnect" href="BASE/preconnect">"#,
         "<link/\u{301} rel=preconnect href=BASE/preconnect-mark>",

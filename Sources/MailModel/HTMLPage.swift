@@ -28,7 +28,8 @@ public enum HTMLPage {
             : "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
         // WebKit draws a blocked image as an outlined box with its alt text. Mail shows nothing but keeps the space.
         let blocked = allowRemote ? "" : #"img:not([src^="data:" i]) { visibility: hidden; }"#
-        // Like Mail's MUIWebDocument.css, with Mail's default message font. No colours, as there: the sender's
+        // Like Mail's MUIWebDocument.css, with Mail's default message font. Its `max-width` for Apple Mail's pictures
+        // is written `max-inline-size` (the same in horizontal text): no other image is limited to its container. No colours, as there: the sender's
         // `<body bgcolor text>` apply, and without them the light colour scheme gives a white page and black text.
         return """
             \(doctype)
@@ -41,6 +42,8 @@ public enum HTMLPage {
             blockquote[type=cite] { padding-left: 8px; margin: 0; border-left: 2px solid \(quoteColours[0]); color: \(quoteColours[0]); }
             blockquote[type=cite] blockquote[type=cite] { border-left-color: \(quoteColours[1]); color: \(quoteColours[1]); }
             blockquote[type=cite] blockquote[type=cite] blockquote[type=cite] { border-left-color: \(quoteColours[2]); color: \(quoteColours[2]); }
+            img.Apple-web-attachment { vertical-align: top !important; max-inline-size: 100% !important; }
+            video.Apple-web-attachment { max-inline-size: 100% !important; }
             img[src^="cid:"] { display: none; }
             \(blocked)
             #\(bodyID) { display: flow-root; }
