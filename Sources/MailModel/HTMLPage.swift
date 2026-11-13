@@ -18,9 +18,10 @@ public enum HTMLPage {
 
     /// The app's script for the message's height (app scripts run with content JavaScript off): the bottom of the
     /// root element, whose box holds the body with its margins. Not our wrapper: a stray `</div>` in the mail closes
-    /// it early, and what follows lands outside it.
+    /// it early, and what follows lands outside it. Counted from the page's top, not the view's: a form field with
+    /// `autofocus` scrolls the page at load.
     public static let measureScript = """
-        Math.ceil(document.documentElement.getBoundingClientRect().bottom)
+        Math.ceil(document.documentElement.getBoundingClientRect().bottom + window.scrollY)
         """
 
     /// `inline` replaces `cid:` references with the message's own images, as `data:` URIs the policy allows.

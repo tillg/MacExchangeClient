@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Emails with a form to fill in, such as surveys, show in full instead of only a thin strip at the end.",
             "Emails with untidy formatting are no longer cut off partway: you can read them to the end.",
             "A message you erased from Trash no longer comes back for a moment while the server is still deleting it.",
             "An email can no longer blank out its own text when you open it.",

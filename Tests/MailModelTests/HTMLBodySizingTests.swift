@@ -58,6 +58,16 @@ struct HTMLBodySizingTests {
         #expect(h >= content && content > 600, "measured \(h), page \(content)")
     }
 
+    /// A form field with `autofocus` scrolls the 1-pt page down to it at load: the measurement must not depend on
+    /// where the page is scrolled.
+    @Test func autofocusFieldDoesNotShortenTheMeasurement() async {
+        let p = await BodyPage("<p>\(String(repeating: "Survey intro text. ", count: 200))</p><form><input autofocus name=q></form>")
+        let scroll = await p.eval("window.scrollY")
+        let content = await p.contentHeight()
+        let h = await p.measure()
+        #expect(h >= content, "measured \(h), page \(content), scrollY \(scroll)")
+    }
+
     /// The view gets shorter again when the window is widened (a fresh load at the new width is the reference).
     @Test func plainMailShrinksWhenTheWindowWidens() async {
         let mail = "<p>\(String(repeating: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ", count: 40))</p>"
