@@ -1,4 +1,5 @@
 import Foundation
+import WebKit
 
 /// The page an HTML body is shown in. Mail is untrusted: our Content-Security-Policy comes first, so it covers
 /// everything the message brings. It allows no scripts, frames or requests, and nothing from the web unless `allowRemote`.
@@ -66,6 +67,27 @@ public enum HTMLPage {
             </style>
             <div id="\(bodyID)">\(html)</div>
             """
+    }
+
+    /// The message the page sends when its size changed after load (lazy pictures, an opened `<details>`).
+    public static let resizeMessage = "mailReplicaResize"
+
+    /// Runs in the app's own script world, which content JavaScript being off doesn't stop. Observes the root box
+    /// (the measured height) and the body (which holds absolutely placed content).
+    public static let resizeScript = """
+        (() => {
+            const o = new ResizeObserver(() => window.webkit.messageHandlers.\(resizeMessage).postMessage(0));
+            o.observe(document.documentElement);
+            o.observe(document.body);
+        })();
+        """
+
+    /// Has `handler` told whenever the size of a page loaded with `controller`'s configuration changes.
+    @MainActor
+    public static func observeResizes(_ controller: WKUserContentController, handler: WKScriptMessageHandler) {
+        controller.add(handler, contentWorld: .defaultClient, name: resizeMessage)
+        controller.addUserScript(WKUserScript(source: resizeScript, injectionTime: .atDocumentEnd,
+                                              forMainFrameOnly: true, in: .defaultClient))
     }
 
     /// Makes `vh`, `vw` and the other viewport units of the page in `webView` (a `WKWebView`) resolve against `size`

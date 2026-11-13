@@ -37,6 +37,11 @@ private struct MailWebView: NSViewRepresentable {
         // Mail is written for a white page: Outlook sets dark text and no background.
         v.appearance = NSAppearance(named: .aqua)
         v.navigationDelegate = context.coordinator
+        // Measures again when the page changes size after load (lazy pictures, an opened <details>). Only with viewport
+        // units pinned to the window: otherwise a 100vh block would grow with every measurement.
+        if HTMLPage.pinViewportUnits(of: v, to: CGSize(width: 1, height: 800)) {
+            HTMLPage.observeResizes(v.configuration.userContentController, handler: context.coordinator)
+        }
         v.onWidthChange = { [weak coordinator = context.coordinator, weak v] in
             if let v { coordinator?.measure(v) }
         }
@@ -53,7 +58,7 @@ private struct MailWebView: NSViewRepresentable {
         v.loadHTMLString(HTMLPage.document(html, allowRemote: allowRemote, inline: inline), baseURL: nil)
     }
 
-    @MainActor final class Coordinator: NSObject, WKNavigationDelegate {
+    @MainActor final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: MailWebView
         var loaded: Inputs?
         let navigation = BodyNavigation()
@@ -67,6 +72,10 @@ private struct MailWebView: NSViewRepresentable {
         }
 
         func webView(_ v: WKWebView, didFinish navigation: WKNavigation!) { measure(v) }
+
+        func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
+            if let v = message.webView { measure(v) }
+        }
 
         func webView(_ v: WKWebView, didCommit navigation: WKNavigation!) { self.navigation.didCommit() }
 

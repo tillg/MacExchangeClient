@@ -5,14 +5,18 @@ import WebKit
 
 /// A real `WKWebView` configured and sized as `MailWebView` (HTMLBodyView.swift) does: loaded at the view's width
 /// and 1 pt tall (where HTMLBodyView starts), measured with `HTMLPage.measureScript`, then given that height.
+/// With `HTMLPage.resizeScript` installed, each of its messages is measured and sized again, as the app does.
 @MainActor
-final class BodyPage {
-    let v: WKWebView
+final class BodyPage: NSObject, WKScriptMessageHandler {
+    var v: WKWebView!
+    private(set) var remeasured = 0
 
     init(_ mail: String, width: CGFloat = 600) async {
+        super.init()
         let config = WKWebViewConfiguration()
         config.defaultWebpagePreferences.allowsContentJavaScript = false
         config.websiteDataStore = .nonPersistent()
+        HTMLPage.observeResizes(config.userContentController, handler: self)
         v = WKWebView(frame: NSRect(x: 0, y: 0, width: width, height: 1), configuration: config)
         v.appearance = NSAppearance(named: .aqua)
         HTMLPage.pinViewportUnits(of: v, to: CGSize(width: width, height: 700))
@@ -20,6 +24,13 @@ final class BodyPage {
         try? await Task.sleep(for: .milliseconds(200))
         while v.isLoading { try? await Task.sleep(for: .milliseconds(50)) }
         try? await Task.sleep(for: .milliseconds(150))
+    }
+
+    nonisolated func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
+        MainActor.assumeIsolated {
+            remeasured += 1
+            Task { _ = await self.settle() }
+        }
     }
 
     func eval(_ js: String) async -> Double { ((try? await v.evaluateJavaScript(js)) as? NSNumber)?.doubleValue ?? -1 }
@@ -110,6 +121,36 @@ struct HTMLBodySizingTests {
         let again = await p.measure()
         let lastBottom = await p.eval("document.getElementById('last').getBoundingClientRect().bottom")
         #expect(lastBottom <= h && again == h, "measured \(h), last line ends at \(lastBottom), measured again \(again)")
+    }
+
+    /// Content that grows after load: lazy pictures (loaded once the view has grown to them) and an opened
+    /// `<details>`. The view must grow with it.
+    @Test func lazyPicturesAreMeasured() async {
+        let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        let p = await BodyPage(#"<p>Top</p><img loading="lazy" style="display:block" src="data:image/png;base64,\#(png)" width="1" height="1"><img loading="lazy" style="display:block;width:300px" src="data:image/png;base64,\#(png)"><p>End</p>"#)
+        _ = await p.settle()
+        try? await Task.sleep(for: .milliseconds(1500))
+        let content = await p.contentHeight()
+        #expect(content <= p.v.frame.height, "view \(p.v.frame.height), page \(content)")
+    }
+
+    @Test func openingDetailsGrowsTheView() async {
+        let p = await BodyPage(#"<details id="d"><summary>Show order</summary>\#(String(repeating: "<p>Item</p>", count: 20))</details><p>End</p>"#)
+        let closed = await p.settle()
+        _ = await p.eval("document.getElementById('d').open = true; 1")  // what a click on the summary does
+        try? await Task.sleep(for: .milliseconds(1500))
+        let content = await p.contentHeight()
+        #expect(content <= p.v.frame.height && p.v.frame.height > closed, "closed \(closed), view \(p.v.frame.height), page \(content)")
+    }
+
+    /// Re-measuring on every change must settle: a `100vh` block doesn't grow with the view it is measured in.
+    @Test func remeasuringSettles() async {
+        let p = await BodyPage(#"<div style="height:100vh">Hero</div><p>End</p>"#)
+        _ = await p.settle()
+        try? await Task.sleep(for: .milliseconds(1500))
+        let count = p.remeasured, height = p.v.frame.height
+        try? await Task.sleep(for: .milliseconds(1500))
+        #expect(p.remeasured == count && p.v.frame.height == height && count < 10, "re-measured \(p.remeasured) times, view \(p.v.frame.height)")
     }
 
     /// The view gets shorter again when the window is widened (a fresh load at the new width is the reference).
