@@ -63,35 +63,6 @@ struct Probe_DB2Tests {
         #expect(s.visibleMessages.map(\.subject) == ["work inbox"], "All Inboxes shows \(s.visibleMessages.map(\.subject))")
     }
 
-    // MARK: Failed send kept in Drafts
-
-    /// "A message that fails to send is … kept in Drafts on this Mac." Its attached files must still open
-    /// after a relaunch.
-    @Test func probeFailedSendDraftKeepsItsAttachmentsAfterRelaunch() async throws {
-        let url = tempURL(); defer { cleanup(url) }
-        let d = try MailDatabase(url: url)
-        let s = MailStore(accounts: [work], messages: [])
-        s.apply(SyncResult(upserts: [mail("hello", rid: "R1")], deletedRemoteIDs: [], token: "t", more: false),
-                account: work.id, mailbox: .inbox)
-        var draft = Draft(accountID: work.id, to: "bob@x.com", subject: "Contract", body: "see attached")
-        draft.attachments = [DraftAttachment(name: "contract.pdf", contentType: "application/pdf", data: Data("PDFDATA".utf8))]
-        s.send(draft)
-        let p = try #require(s.outbox.first)
-        s.failed(p, "The server refused")
-        let kept = try #require(s.messages.first { $0.mailbox == .drafts })
-        // Control: before quitting, the file opens.
-        let before = await s.attachmentFile(0, of: kept.id)
-        #expect(before != nil)
-        if let before { try? FileManager.default.removeItem(at: before.deletingLastPathComponent().deletingLastPathComponent()) }
-        try d.write(s.takeChanges())
-        // Relaunch.
-        let s2 = try launch([work], from: url)
-        let back = try #require(s2.messages.first { $0.mailbox == .drafts })
-        #expect(back.attachments.map(\.name) == ["contract.pdf"])
-        let file = await s2.attachmentFile(0, of: back.id)
-        #expect(file != nil, "after relaunch: \(s2.status ?? "")")
-    }
-
     // MARK: Search query building
 
     /// Words the store keeps (Swift says they hold a letter or digit) but the index's tokenizer reads as

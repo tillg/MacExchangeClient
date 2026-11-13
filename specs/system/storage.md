@@ -19,6 +19,7 @@ cache), `Sources/MailReplica/AccountsSettings.swift` (`AppSetup`: when it is rea
 | Passwords | Keychain generic password, service `MailReplica-EWS`, account = username |
 | Settings | UserDefaults (`@AppStorage`): `showConversations`, `remoteImages`, `includeAttachmentsWithReplies`, `showContactPhoto` |
 | Opened attachments | `$TMPDIR/Mail Downloads/<message id>/<index>/<file name>`, quarantined |
+| Files of drafts kept after a failed send | `files` table of `Mail.sqlite` (sample data: memory only) |
 | Inline images, calendar days, MailTips size | Memory only |
 | Old cache | `Cache.json` in the same folder, renamed `Cache.json.imported` after import |
 
@@ -56,6 +57,9 @@ One connection, `journal_mode=WAL`, `synchronous=NORMAL`.
 - **`folders`**: `account`, `box`, `name`, `parent`, `position` (the order to restore).
 - **`outbox`**: `position` PK, `change` BLOB = `PendingChange` as JSON. Rows that don't decode are skipped on read. Rows
   whose `previous` messages hold attachments as plain names (older builds) decode.
+- **`files`**: `(message, position)` PK, `data` BLOB: the file content of messages kept only on this Mac (a send or
+  draft Exchange refused, kept in Drafts). Read by `meta()`; rows go with their message. Created with
+  `CREATE TABLE IF NOT EXISTS`, so older databases get it on open.
 
 ### Encodings
 

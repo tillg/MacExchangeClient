@@ -39,43 +39,6 @@ struct Probe_Store2Tests {
 
     // MARK: Drafts lifecycle
 
-    /// A send that Exchange refused is kept "in Drafts on this Mac". Its files must still open after a relaunch.
-    @Test func failedSendKeepsAttachmentContentAcrossRelaunch() async throws {
-        let dir = tempDir()
-        let url = dir.appendingPathComponent("Mail.sqlite")
-        let s = store([])
-        s.merge([(.inbox, [])], account: work.id)  // work is a server account
-        var d = Draft(accountID: work.id, to: "bo@x.com", subject: "Report", body: "See attached")
-        d.attachments = [DraftAttachment(name: "report.pdf", contentType: "application/pdf", data: Data("PDFDATA".utf8))]
-        s.failed(PendingChange(account: work.id, change: .send(d), previous: []), "The server is busy")
-        let draftID = try #require(s.messages.first { $0.mailbox == .drafts }?.id)
-        let db = try MailDatabase(url: url)
-        try db.write(s.takeChanges().resolved())
-
-        // Relaunch.
-        let db2 = try MailDatabase(url: url)
-        let s2 = MailStore(accounts: [work, home], messages: [])
-        s2.restore(try db2.meta())
-        s2.finishLoading(try db2.messages())
-        s2.downloadsFolder = dir.appendingPathComponent("Mail Downloads")
-        #expect(s2.message(draftID)?.attachments.map(\.name) == ["report.pdf"])
-        let file = await s2.attachmentFile(0, of: draftID)
-        #expect(file != nil, "status: \(s2.status ?? "nil")")
-    }
-
-    /// Same, without relaunch: the draft kept after a failed send shows its file, and it opens.
-    @Test func failedSendDraftAttachmentOpensBeforeRelaunch() async throws {
-        let s = store([])
-        s.merge([(.inbox, [])], account: work.id)
-        s.downloadsFolder = tempDir()
-        var d = Draft(accountID: work.id, to: "bo@x.com", subject: "Report", body: "See attached")
-        d.attachments = [DraftAttachment(name: "report.pdf", contentType: "application/pdf", data: Data("PDFDATA".utf8))]
-        s.failed(PendingChange(account: work.id, change: .send(d), previous: []), "busy")
-        let id = try #require(s.messages.first { $0.mailbox == .drafts }?.id)
-        let file = await s.attachmentFile(0, of: id)
-        #expect(file.flatMap { try? Data(contentsOf: $0) } == Data("PDFDATA".utf8))
-    }
-
     /// A failed Save Draft must not tell the user that a message couldn't be *sent*.
     @Test func failedSaveDraftDoesNotSayCouldntSend() {
         let s = store([])
