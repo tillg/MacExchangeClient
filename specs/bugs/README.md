@@ -74,7 +74,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [136](BUG-136-unsent-answer-trash-move-skipped.md) | P3 | Invite | Do Not Send a Response / Remove from Calendar skip the move to Deleted Items before the folder list is read: the answered invite comes back to the Inbox |
 | [137](BUG-137-selected-message-linear-scan-per-read.md) | P3 | MailStore | Clicking a message that arrived this session takes 0.43 s: selectedMessage scans all messages on each of its 7 reads per redraw |
 | [138](BUG-138-cancelled-loads-reported-as-errors.md) | P3 | MailStore | Moving on from a message before it has loaded shows "Couldn’t load message: cancelled" (also images, calendar, attachment previews) |
-| [139](BUG-139-stale-server-answer-undoes-sent-change.md) | P3 | MailStore | A check answer taken before a local change, arriving after that change reached Exchange, undoes it: a moved message comes back as a ghost for good, a flag loses its colour, read turns unread |
 | [140](BUG-140-body-requested-before-server-change-kept.md) | P3 | MailStore | A body requested before the server changed the message is stored as the body of the new version and never fetched again |
 | [141](BUG-141-refused-erase-after-rename-restores-old-id.md) | P3 | MailStore | A refused erase queued behind a move to Trash puts the message back with its old ItemId; the next Trash check then shows it twice |
 | [142](BUG-142-invite-time-drops-end-date.md) | P3 | Invite | Invite card shows only the start day for a meeting that ends on a later day |

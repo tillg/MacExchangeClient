@@ -91,7 +91,11 @@ flowchart LR
   naming the same person keeps the loaded one) or its paperclip state. A summary that names other people (a draft
   edited elsewhere) replaces the contacts and drops the loaded body, which is fetched again when shown; a message with a pending outbox change keeps the property
   that change sets (read state for `setRead`, flag for `setFlagged`, mailbox for a move or an invite answer, all of
-  them for an erase) and takes the server's read state, flag and mailbox for the others (`Guarded`); an upsert for a message gone here (erased) while a change for it is queued is
+  them for an erase) and takes the server's read state, flag and mailbox for the others (`Guarded`). The same
+  holds for a change already written after the answer was requested: every server read notes `requestStamp` before
+  its request and passes it as `asked`; each written change notes per server ID and property the stamp after its
+  write (`written`, in memory), so an older answer keeps that property and doesn't bring back an ID erased or moved
+  away since; an upsert for a message gone here (erased) while a change for it is queued is
   skipped, so a page fetched before the erase reached the server doesn't bring it back (likewise at launch, for a
   message moved offline whose stored copy isn't in memory yet: `finishLoading` then adds that copy, once). A deletion reported for a message with a pending move is held, not applied
   (`deletedWhileMoving`, in memory): the move makes its source report it. A move that goes through drops it; a
