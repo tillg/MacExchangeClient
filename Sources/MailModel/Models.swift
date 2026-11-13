@@ -240,9 +240,11 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
         // directly or with an entity (`&quot;`, `&#39;`, as Outlook writes inside style attributes); `@import` of a
         // quoted web address (`@import url(…)` is a url()). Text that merely mentions `@import` loads nothing.
         let quote = #"(?:["']|&quot;|&apos;|&#0*3[49];|&#x0*2[27];)?"#
-        return html.range(of: #"(src|background|poster)\s*=\s*["']?\s*https?:|srcset\s*=\s*["']?[^"'>]*https?:"#
-                          + #"|<link\b[^>]*\bhref\s*=\s*["']?\s*https?:|url\(\s*"# + quote + #"\s*https?:|@import\s*"# + quote + #"\s*https?:"#,
-                          options: [.regularExpression, .caseInsensitive]) != nil
+        let remote = #"(src|background|poster)\s*=\s*["']?\s*https?:|srcset\s*=\s*["']?[^"'>]*https?:"#
+            + #"|<link\b[^>]*\bhref\s*=\s*["']?\s*https?:|url\(\s*"# + quote + #"\s*https?:|@import\s*"# + quote + #"\s*https?:"#
+        func found(_ s: String) -> Bool { s.range(of: remote, options: [.regularExpression, .caseInsensitive]) != nil }
+        // The browser decodes character references first: "&#104;ttp://" is a web address too (BUG-190).
+        return found(html) || (html.contains("&#") && found(HTMLPage.decodingCharacterReferences(html)))
     }
 
     /// First lines of the body, as shown under the subject in the list. The list reads it on every render and

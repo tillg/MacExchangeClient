@@ -28,6 +28,15 @@ struct MessageTests {
         #expect(message("Hi\r\n> quoted\r\n\nBye ").preview == "Hi Bye")
     }
 
+    /// BUG-190: a web address written with character references (as the browser decodes them) is remote content too.
+    @Test func entityEncodedWebAddressIsRemoteContent() {
+        func html(_ h: String) -> Message { var m = message(""); m.html = h; return m }
+        #expect(html(#"<img src="&#104;ttp://t.example/p.png">"#).hasRemoteContent)
+        #expect(html(#"<img src="&#x68;ttps://t.example/p.png">"#).hasRemoteContent)
+        #expect(html(#"<img src="h&#116;tps://t.example/p.png">"#).hasRemoteContent)
+        #expect(!html(#"<img src="cid:a&#64;b">"#).hasRemoteContent)
+    }
+
     /// Every way a mail can load something from the web makes the Load Remote Content banner appear.
     @Test func remoteContentIncludesSrcsetLinkPosterAndEntityQuotedURL() {
         func html(_ h: String) -> Message { var m = message(""); m.html = h; return m }
