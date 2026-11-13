@@ -126,6 +126,13 @@ struct EWSParsingTests {
         #expect(Date().timeIntervalSince(t) < 5)
     }
 
+    @Test func emptyTextBodyFallsBackToHTML() throws {
+        let d = try doc("""
+            <t:Message><t:ItemId Id="A"/><t:Body BodyType="HTML">&lt;p&gt;Hello&lt;/p&gt;</t:Body><t:TextBody BodyType="Text"/></t:Message>
+            """)
+        #expect(EWSBackend.parseBody(d.first("Message")!).text == "Hello")
+    }
+
     @Test func plainTextBodyHasNoHTML() throws {
         let d = try doc(#"<t:Message><t:ItemId Id="ID1"/><t:Body BodyType="Text">Hi there</t:Body></t:Message>"#)
         let b = EWSBackend.parseBody(try #require(d.first("Message")))

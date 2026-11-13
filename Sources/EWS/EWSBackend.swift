@@ -608,7 +608,9 @@ public struct EWSBackend: MailBackend {
         let attachments = listedAttachments(item).map(\.attachment)
         let body = item.child("Body")
         let html = body?.attr("BodyType") == "HTML" ? body?.stringValue : nil
-        let text = item.child("TextBody")?.stringValue ?? html.map(plainText) ?? body?.stringValue ?? ""
+        // An empty TextBody next to an HTML body says nothing: the text comes from the HTML then.
+        let textBody = item.child("TextBody")?.stringValue.flatMap { $0.allSatisfy(\.isWhitespace) && html != nil ? nil : $0 }
+        let text = textBody ?? html.map(plainText) ?? body?.stringValue ?? ""
         return MessageBody(text: text, attachments: attachments,
                            from: item.child("From").map(contact),
                            to: item.child("ToRecipients").map(mailboxes) ?? [],

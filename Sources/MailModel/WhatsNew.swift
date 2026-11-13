@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Some formatted emails no longer come out empty when you reply to them or search their text.",
             "If the server refuses to erase a message you deleted twice in a row, it comes back to Trash once, and you can erase or move it again.",
             "In replies to and searches of emails that come only as formatted text, accented letters and symbols such as € show correctly, table cells no longer run together, and hidden notes no longer leak into the text.",
             "Exchange accounts are shown by their email address instead of all being called \"Exchange\", so you can tell two accounts apart.",
