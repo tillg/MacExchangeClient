@@ -22,7 +22,9 @@ struct InviteCard: View {
                     }
                 }
                 .padding(.top, 2)
-                if invite.isCancellation == true {
+                if !store.canAnswer(message.id) {
+                    // Your own invite or cancellation: nothing to answer, as in Outlook.
+                } else if invite.isCancellation == true {
                     // Outlook offers only this for a cancellation.
                     Button { store.removeFromCalendar(message.id) } label: {
                         Label("Remove from Calendar", systemImage: "xmark").font(.system(size: 12))
@@ -52,7 +54,7 @@ struct InviteCard: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
 
-            if invite.isCancellation != true {
+            if invite.isCancellation != true, store.canAnswer(message.id) {
                 if let r = invite.response {
                     banner(answered(r), "checkmark.circle", .blue)
                 } else {

@@ -872,3 +872,11 @@ edited: 2026-11-13
 - **Context:** BUG-126. The quick check, the history and the background checks followed "more" without checking that the SyncState moved on; a server repeating the same page made the check never end (every later check skipped) and the history ask forever.
 - **Decision:** A page that says "more" with the token that was sent throws `SamePageAgain` ("The server sent the same page again"). The page is still applied. Quick check: that account's check ends with a status notice, as for other errors. History: the folder goes on the failed list for this run, with the status. Background check: that folder stops until the next run.
 - **Why:** the same guard the folder list has ("never the same page twice"). No user-visible change with a correct server, so no What's New line.
+
+## 08:34 — No answer buttons on your own invites and cancellations {#d-own-invite}
+
+- **Status:** decided
+- **Context:** User report: the own sent cancellation ("Canceled: …", in Sent) showed Remove from Calendar; clicking it moved it to Trash and it came back seconds later. The view showed the button for every cancellation. Exchange refuses RemoveItem for the organizer's own meeting (`ErrorCalendarIsOrganizerForRemove`), so the change was undone (with the "Exchange refused a change" status). A second path was silent: if RemoveItem went through but the follow-up move to Deleted Items was refused, `moveToTrash` swallowed the error and the message reappeared at the next check.
+- **Decision:** `MailStore.canAnswer` is false for an invite or cancellation in Sent or whose sender is the account's address; the card then shows no answer buttons and no "Please respond.", and `respond` / `removeFromCalendar` do nothing. A refused move to Trash after the answer sets a status ("Couldn't move “…” to Trash on the server: …"); "item not found" (the server moved it already) stays silent.
+- **Why:** Outlook offers Accept/Tentative/Decline/Propose and Remove from Calendar only on received items. The organizer cancels a meeting by sending the cancellation; there is nothing to remove.
+- **Alternatives:** keep the button and treat the refusal as normal (rejected: a button that always fails); queue the refused trash move again (rejected: a refusal won't change on retry).

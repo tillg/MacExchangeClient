@@ -360,6 +360,63 @@ struct EWSFlowTests {
         #expect(progress == nil, "history still running, progress \(String(describing: progress))")
     }
 
+    /// A meeting cancellation in `box`, from `from`.
+    func cancellation(_ s: MailStore, _ rid: String, in box: MailboxKind, from: String) -> Message.ID {
+        var m = Message(accountID: acct.id, mailbox: box, from: Contact(name: from, email: from), to: [],
+                        subject: "Canceled: Janos & Till", body: "", date: .now, remoteID: rid, bodyLoaded: false)
+        m.invite = Invite(start: .now, end: .now.addingTimeInterval(1800), isCancellation: true)
+        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "T1", more: false), account: acct.id, mailbox: box)
+        return s.messages.first { $0.remoteID == rid }!.id
+    }
+
+    /// Your own cancellation in Sent offers no Remove from Calendar (only a received one does, as in Outlook), and
+    /// removing it anyway changes nothing and asks the server nothing.
+    @Test func ownSentCancellationCantBeRemovedFromTheCalendar() async throws {
+        let server = ScriptedServer([])
+        defer { server.stop() }
+        let s = store(server)
+        let sent = cancellation(s, "S1", in: .sent, from: "me@work.com")
+        let received = cancellation(s, "R1", in: .inbox, from: "janos@work.com")
+        let mine = cancellation(s, "R2", in: .inbox, from: "Me@Work.com")
+        #expect(!s.canAnswer(sent))
+        #expect(s.canAnswer(received))
+        #expect(!s.canAnswer(mine))
+        s.removeFromCalendar(sent)
+        s.respond(.accept, to: sent)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(s.message(sent)?.mailbox == .sent)
+        #expect(s.outbox.isEmpty)
+        #expect(server.served == 0)
+    }
+
+    /// Exchange refuses Remove from Calendar (the organizer can't remove their own meeting): the cancellation comes
+    /// back and the status line says why.
+    @Test func refusedRemoveFromCalendarComesBackWithTheReason() async throws {
+        let server = ScriptedServer([EWSReply.resp("CreateItem", EWSReply.err("CreateItem", "ErrorCalendarIsOrganizerForRemove",
+                                                                              "The organizer can't remove the meeting."))])
+        defer { server.stop() }
+        let s = store(server)
+        let id = cancellation(s, "R1", in: .inbox, from: "janos@work.com")
+        s.removeFromCalendar(id)
+        #expect(s.message(id)?.mailbox == .trash)
+        try await waitFor { s.message(id)?.mailbox == .inbox }
+        #expect(s.status?.contains("The organizer can't remove the meeting.") == true, "\(String(describing: s.status))")
+        #expect(s.outbox.isEmpty)
+    }
+
+    /// The meeting is off the calendar, but Exchange refuses to move the cancellation to Deleted Items: the status
+    /// line says so, instead of the message quietly coming back at the next check.
+    @Test func refusedTrashMoveAfterRemoveFromCalendarIsReported() async throws {
+        let server = ScriptedServer([EWSReply.created("X1"),
+                                     EWSReply.resp("MoveItem", EWSReply.err("MoveItem", "ErrorAccessDenied", "Access is denied."))])
+        defer { server.stop() }
+        let s = store(server)
+        let id = cancellation(s, "R1", in: .inbox, from: "janos@work.com")
+        s.removeFromCalendar(id)
+        try await waitFor { server.served == 2 && s.outbox.isEmpty }
+        #expect(s.status?.contains("Access is denied.") == true, "\(String(describing: s.status))")
+    }
+
     /// Two Exchange accounts are named after their addresses, so their Inboxes can be told apart.
     @Test func twoExchangeAccountsCanBeToldApart() {
         let one = ExchangeAccount(email: "till@work.com", username: "W\\till", server: "mail.work.com")

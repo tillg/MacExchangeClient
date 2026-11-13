@@ -1318,6 +1318,7 @@ public final class MailStore {
     /// Moves an answered invite (or a removed cancellation) to Deleted Items after its answer went out, reading the
     /// folder list first if it isn't known yet. If the server already moved it, the move fails and nothing else
     /// happens. If the server can't be reached or is busy, the move is queued as an ordinary change and goes later.
+    /// Any other refusal is shown: the message stays in its folder on the server and comes back at the next check.
     private func moveToTrash(_ id: String, account: UUID, _ b: any MailBackend) async {
         do {
             if remoteFolders[account] == nil { setRemoteFolders(try await b.folders(), account: account) }
@@ -1326,6 +1327,9 @@ public final class MailStore {
         } catch where error is URLError || error is ServerBusy || error is AuthenticationError {
             if let wait = (error as? ServerBusy)?.retryAfter { busyUntil[account] = Date.now.addingTimeInterval(wait) }
             outbox.append(PendingChange(account: account, change: .move([id], to: .trash), previous: []))
+        } catch where !error.localizedDescription.contains("ErrorItemNotFound") {
+            let subject = messages.first { $0.accountID == account && $0.remoteID == id }?.subject ?? ""
+            status = "Couldn't move “\(subject)” to Trash on the server: \(error.localizedDescription)"
         } catch {}
     }
 
@@ -1430,6 +1434,14 @@ public final class MailStore {
         }
     }
 
+    /// Whether an invite or cancellation can be answered (or removed from the calendar): only one you received, as
+    /// in Outlook. Your own, in Sent or sent from the account's address, has no answer buttons.
+    public func canAnswer(_ id: Message.ID) -> Bool {
+        guard let m = message(id), m.invite != nil, m.mailbox != .sent else { return false }
+        guard let own = account(m.accountID)?.address, !own.isEmpty else { return true }
+        return m.from.email.caseInsensitiveCompare(own) != .orderedSame
+    }
+
     /// Answers an invite: shown at once, then sent. Exchange tells the organizer and updates the calendar.
     public func respond(_ r: InviteResponse, to id: Message.ID) {
         answer(id, response: r, reply: nil) { .respond($0, r) }
@@ -1458,7 +1470,7 @@ public final class MailStore {
     /// (no move request: the server moves it itself). The next message is selected, as after Delete.
     private func answer(_ id: Message.ID, response: InviteResponse?, reply: InviteReply?,
                         _ change: (String) -> ServerChange) {
-        guard let old = message(id), old.invite != nil else { return }
+        guard let old = message(id), canAnswer(id) else { return }
         let apply: (Set<Message.ID>) -> Void = { _ in
             guard let i = self.messages.firstIndex(where: { $0.id == id }) else { return }
             self.changedIDs.insert(id)
