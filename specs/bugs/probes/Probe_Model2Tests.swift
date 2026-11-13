@@ -93,17 +93,4 @@ struct Probe_Model2Tests {
 
     // MARK: freeURL
 
-    @Test func saveNextToADanglingSymlinkDoesNotPickItsName() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("probe-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        try FileManager.default.createSymbolicLink(atPath: dir.appendingPathComponent("report.pdf").path,
-                                                   withDestinationPath: "/nonexistent/old-report.pdf")
-        let source = dir.appendingPathComponent("download.pdf")
-        try Data([1, 2, 3]).write(to: source)
-        let url = MailStore.freeURL(for: "report.pdf", in: dir)
-        // saveAttachment copies to this URL; it must not fail.
-        #expect(throws: Never.self) { try FileManager.default.copyItem(at: source, to: url) }
-        #expect(url.lastPathComponent == "report 2.pdf", "\(url.lastPathComponent)")
-    }
 }

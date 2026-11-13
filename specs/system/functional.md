@@ -90,7 +90,8 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
   Double-click opens, Space opens Quick Look, drag to Finder copies, Control-click: Open Attachment, Open With, Quick
   Look, Save Attachment…, Save to Downloads Folder, View as Icon / View in Place. File ▸ Save Attachments… and Quick
   Look Attachments… (⌘Y). Files are fetched on first open into a temporary "Mail Downloads/<message>/<index>/" folder
-  with the quarantine flag; saving never overwrites ("name 2.pdf"). Opening again reuses that file, edits included.
+  with the quarantine flag; saving never overwrites ("name 2.pdf"; a broken link or alias
+  with the name counts as taken). Opening again reuses that file, edits included.
   Save, the save panel, drag-out and Forward use it only while its size and modification date are as written;
   after an app changed it (Preview filling in a form) they fetch the content again into an `Original/` folder beside it.
 
