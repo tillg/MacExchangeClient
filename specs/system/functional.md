@@ -36,8 +36,8 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
   (and the opened message, see below).
   While searching, the list shows search results instead and ignores the unread filter ([search.md](search.md)).
 - Row: unread dot, or for a VIP sender a star in the same column (accent while unread, grey when read), optional
-  avatar, sender (13 pt semibold; subject, preview and date 12 pt) (for Sent and Drafts "To: " + first recipient), date (time today,
-  "Yesterday", weekday within 7 days, else short date), subject, paperclip, flag, two-line preview.
+  avatar, sender (13 pt semibold; subject, preview and date 12 pt) (for Sent and Drafts "To: " + first recipient), date (`ListDate`: time today,
+  "Yesterday", the weekday 2–6 calendar days back, else short date, also for a future date; BUG-220), subject, paperclip, flag, two-line preview.
 - With conversations on, a conversation is one row (`ConversationRow`): its newest message in the list stands for it,
   with a count badge. Sender (`ConversationRow.senders`): one sender's full name, else first names newest first
   ("Jan, Sergio & Till"), one per address (two Jans are "Jan & Jan", BUG-157); the first word after the last comma
