@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Signing in again with the server or user name written differently (capitals, :443) no longer adds the account a second time.",
             "Searching with punctuation between words (\"Q3 - report\", \"report, q3\") finds the same mail while search is still being prepared.",
             "Forwarding a message whose text holds an unusual placeholder character no longer puts its picture in the wrong place.",
             "A search no longer makes a \"Couldn't send\" or sign-in notice disappear; it shows again when the search is cleared.",

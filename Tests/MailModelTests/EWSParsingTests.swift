@@ -803,4 +803,15 @@ struct EWSParsingTests {
         let m = try doc(#"<t:Message><t:ItemId Id="M1"/><t:Subject>Mail</t:Subject></t:Message>"#)
         #expect(EWSBackend.message(try #require(m.first("Message")))?.isRead == false)
     }
+
+    /// BUG-242: the same server written in other letter case or with its default port is the same URL, so signing in
+    /// again reconnects the account instead of adding a second copy.
+    @Test func serverURLIgnoresHostCaseAndDefaultPort() {
+        func url(_ s: String) -> URL? { ExchangeAccount(email: "", username: "", server: s).ewsURL }
+        let plain = url("mail.example.com")
+        #expect(url("Mail.Example.com") == plain)
+        #expect(url("mail.example.com:443") == plain)
+        #expect(url("https://MAIL.EXAMPLE.COM/EWS/Exchange.asmx") == plain)
+        #expect(url("mail.example.com:8443")?.port == 8443)
+    }
 }

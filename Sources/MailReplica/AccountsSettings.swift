@@ -177,7 +177,9 @@ struct AccountsSettings: View {
         // Signing in again (e.g. to enter a missing password) keeps the account and its mail.
         let typed = ExchangeAccount(email: email, username: username, server: server)
         let account = saved.first {
-            $0.email.caseInsensitiveCompare(email) == .orderedSame && $0.username == username && $0.ewsURL == typed.ewsURL
+            // Usernames (DOMAIN\\user) compare without case, as Windows does (BUG-242).
+            $0.email.caseInsensitiveCompare(email) == .orderedSame && $0.username.caseInsensitiveCompare(username) == .orderedSame
+                && $0.ewsURL == typed.ewsURL
         } ?? typed
         guard let url = account.ewsURL else { message = "Invalid server"; return }
         guard let pw = password.isEmpty ? account.password : password else {

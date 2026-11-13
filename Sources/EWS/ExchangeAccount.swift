@@ -32,8 +32,11 @@ public struct ExchangeAccount: Codable, Hashable, Sendable {
         let path = s.lowercased().hasSuffix(".asmx") && s.contains("/") ? "" : standard
         // A user or password in the field ("me:pw@host") makes it invalid, so it is never saved (BUG-245).
         guard let url = URL(string: "https://\(s)\(path)"), url.host?.isEmpty == false, url.user == nil,
-              url.password == nil else { return nil }
-        return url
+              url.password == nil, var c = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        // The same server however it is written: host in lower case, no default port (BUG-242).
+        c.host = c.host?.lowercased()
+        if c.port == 443 { c.port = nil }
+        return c.url
     }
 
     /// Named after its address, so two accounts can be told apart in the sidebar, titles and notices. The address
