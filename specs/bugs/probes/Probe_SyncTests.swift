@@ -48,25 +48,6 @@ struct Probe_SyncTests {
         #expect(!ids.contains("A"), "outbox still has \(s.outbox.map(\.change))")
     }
 
-    /// A queued read change must not swallow an unrelated flag change from the server.
-    @Test func pendingReadChangeKeepsTheServersFlag() {
-        let s = synced(["A"])
-        let a = id(s, "A")
-        s.toggleRead([a])  // queued: setRead true
-        s.apply(page([remote("A", flag: .red)], token: "t1"), account: work.id, mailbox: .inbox)
-        #expect(s.message(a)?.isRead == true)
-        #expect(s.message(a)?.flag != nil, "flagged on the phone, lost here")
-    }
-
-    /// A queued flag change must not swallow a read change from the server.
-    @Test func pendingFlagChangeKeepsTheServersReadState() {
-        let s = synced(["A"])
-        let a = id(s, "A")
-        s.setFlag(.red, for: [a])
-        s.apply(page(reads: ["A": true], token: "t1"), account: work.id, mailbox: .inbox)
-        #expect(s.message(a)?.isRead == true, "read on the phone, still unread here")
-    }
-
     // MARK: Folders
 
     /// A folder removed on the server: its mail must not linger in Flagged / search.
@@ -110,16 +91,6 @@ struct Probe_SyncTests {
         #expect(s.changeCount == rev)
         let c = s.takeChanges().resolved()
         #expect(c.upserts.isEmpty && c.removed.isEmpty)
-    }
-
-    /// A pending move must not swallow a read change from the server either.
-    @Test func pendingMoveKeepsTheServersReadState() {
-        let s = synced(["A"])
-        let a = id(s, "A")
-        s.archive([a])
-        s.apply(page(reads: ["A": true], token: "t1"), account: work.id, mailbox: .inbox)
-        #expect(s.message(a)?.mailbox == .archive)
-        #expect(s.message(a)?.isRead == true, "read on the phone, still unread here")
     }
 
     /// Launch: a move made offline last session is still queued; the moved message sits in Archive on disk

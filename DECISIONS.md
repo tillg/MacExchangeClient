@@ -552,6 +552,7 @@ edited: 2026-11-13
 - **Decision:** An inline attachment that isn't a picture (`image/` type, or generic type with an image or unknown extension) is listed. Such files come after the non-inline ones, not in server order.
 - **Why:** Attachments are fetched by position (`attachment(remoteID:index:)`) against the list stored with the body; appending keeps every stored position valid, inserting would open the wrong file for bodies loaded before.
 - **Not covered:** an inline picture the body doesn't reference (a text mail with an inline photo) stays unlisted, as the pinned tests require.
+
 ## 02:35 — A queued change protects only the property it changes {#d-bug-075}
 
 - **Status:** decided
