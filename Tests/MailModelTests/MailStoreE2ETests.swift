@@ -60,6 +60,47 @@ struct MailStoreE2ETests {
         #expect(s.takeChanges().resolved().upserts.isEmpty)
     }
 
+    /// Archiving a whole opened Inbox (2,870 messages, half with bodies) keeps the outbox small: the queued
+    /// changes don't carry the message bodies, so one more flag doesn't rewrite megabytes.
+    @Test func archivingAWholeInboxKeepsTheOutboxSmall() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let s = MailStore(accounts: [a], messages: [])
+        let db = try MailDatabase(url: url)
+        let html = "<html><body>" + String(repeating: "<p>Quarterly numbers and some text</p>", count: 500) + "</body></html>"
+        s.apply(page((0..<2870).map { i in
+            var m = server("R\(i)", read: true, minutes: i)
+            if i % 2 == 0 {
+                m.body = String(repeating: "Plain text line of the body. ", count: 150)
+                m.html = html; m.htmlChecked = true; m.bodyLoaded = true
+            }
+            return m
+        }), account: a.id, mailbox: .inbox)
+        try db.write(s.takeChanges())
+        s.selectedMailbox = .account(a.id, .inbox)
+        s.selection = Set(s.visibleMessages.map(\.id))
+        s.archiveSelection()
+        try db.write(s.takeChanges())
+        s.setFlag(.red, for: [s.messages[0].id])  // one more change while offline
+        let changes = s.takeChanges()
+        let bytes = try (changes.outbox ?? []).reduce(0) { $0 + (try JSONEncoder().encode($1)).count }
+        try db.write(changes)
+        #expect(bytes < 2_000_000, "flagging one message rewrites \(bytes / 1_000_000) MB of outbox")
+    }
+
+    /// A refused move still puts the message back where it was, from the slim copy kept in the outbox.
+    @Test func refusedArchiveOfAnOpenedMessageIsUndone() {
+        let s = MailStore(accounts: [a], messages: [])
+        var m = server("R1", read: true)
+        m.body = "The whole text"; m.bodyLoaded = true
+        s.apply(page([m]), account: a.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        s.archive([id])
+        s.failed(s.outbox[0], "refused")
+        #expect(s.message(id)?.mailbox == .inbox)
+        #expect(s.message(id)?.body == "The whole text")
+    }
+
     // MARK: Selection (BUG-119)
 
     /// With the unread filter on (Trash), two selected unread messages marked read leave the list and the

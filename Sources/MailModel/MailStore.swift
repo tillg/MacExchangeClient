@@ -501,7 +501,7 @@ public final class MailStore {
         func add(_ acct: UUID, _ k: ChangeKind, _ old: Message) {
             let key = "\(acct)/\(k)"
             if groups[key] == nil { order.append((acct, k)) }
-            groups[key, default: []].append(old)
+            groups[key, default: []].append(Self.undoCopy(old))
         }
         for (old, new) in changed {
             if old.isRead != new.isRead { add(old.accountID, .read(new.isRead), old) }
@@ -517,6 +517,14 @@ public final class MailStore {
                 }
             }
         }
+    }
+
+    /// What a queued read, flag or move change keeps to undo itself: the message without its content. The undo
+    /// only puts back read state, flag and mailbox, and the outbox is saved whole on every change.
+    private static func undoCopy(_ m: Message) -> Message {
+        var c = m
+        c.body = ""; c.html = nil; c.htmlChecked = nil; c.attachments = []; c.serverPreview = nil; c.bodyLoaded = false
+        return c
     }
 
     private func enqueue(_ olds: [Message], account: UUID, _ make: ([String]) -> ServerChange) {

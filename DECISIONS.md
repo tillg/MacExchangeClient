@@ -844,3 +844,11 @@ edited: 2026-11-13
 - **Decision:** `toggleRead` and `setFlag` go through `keepingSelectionVisible` like moves, with `selectNext: false`: selected messages that leave the list leave the selection; when that was the whole selection, nothing is selected (not the next message, as after a move). Messages that stay in the list (an opened one kept by the unread filter) stay selected.
 - **Why:** selecting the next message would open it and mark it read, which would chain through an unread list. Mail's exact behaviour here isn't checked (⚠️).
 - **Alternatives:** select the next message as after Delete (rejected: see above).
+
+## 07:10 — Queued read, flag and move changes keep slim undo copies {#d-bug-121}
+
+- **Status:** decided
+- **Context:** BUG-121. Each queued change kept whole messages in `previous` (body, HTML, files) only to undo read state, flag or mailbox; archiving an opened Inbox of 2,870 messages made a 35 MB outbox, which is saved whole on every outbox change.
+- **Decision:** Read, flag and move changes keep copies without body, HTML, attachment list and preview (`undoCopy`). The undo of a refused change only puts back read state, flag and mailbox, so it is unchanged. Erases (a refused erase puts the whole message back) and invite answers keep whole messages. The same archive now makes an outbox well under 2 MB.
+- **Why:** no storage change: `PendingChange` and its JSON are the same, only smaller; rows written before still decode and undo as before (`outboxRowWithAttachmentNamesOnlyStillLoads` reads such a row).
+- **Not covered:** the outbox table is still rewritten whole when it changes; with slim copies that is small. Writing only changed rows would need a new table layout.
