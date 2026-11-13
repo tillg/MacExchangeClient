@@ -564,11 +564,13 @@ public final class MailStore {
 
     /// Runs `action` on the selection, then selects the message that followed it in the list – as Mail does.
     /// A selection that wasn't in the list (hidden by the unread filter or a search) isn't kept selected
-    /// once the action takes it out of the list.
+    /// once the action takes it out of the list. An action that changes none of them keeps the selection.
     public func actOnSelection(_ action: (Set<Message.ID>) -> Void) {
         let list = visibleMessages.map(\.id)
         let ids = selection
+        let before = messages.filter { ids.contains($0.id) }
         action(ids)
+        guard messages.filter({ ids.contains($0.id) }) != before else { return }
         let remaining = Set(visibleMessages.map(\.id))
         selection = Self.following(ids, in: list, remaining: remaining) ?? ids.intersection(remaining)
     }

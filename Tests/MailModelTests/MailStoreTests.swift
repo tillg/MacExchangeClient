@@ -382,6 +382,17 @@ struct MailStoreTests {
         #expect(s.selection == [z.id])
     }
 
+    @Test func archivingInArchiveKeepsTheSelection() {
+        // Nothing changed, so nothing left the list: the selection stays (and the next message isn't opened).
+        let a = msg(work, .archive, subject: "a", minutesAgo: 1), b = msg(work, .archive, subject: "b", minutesAgo: 2)
+        let s = store([a, b])
+        s.selectedMailbox = .account(work.id, .archive)
+        s.selection = [a.id]
+        s.archiveSelection()
+        #expect(s.message(a.id)?.mailbox == .archive)
+        #expect(s.selection == [a.id])
+    }
+
     @Test func dropOnCurrentMailboxChangesNothing() {
         let m = msg(work)
         let s = store([m])
