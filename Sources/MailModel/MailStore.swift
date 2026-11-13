@@ -553,15 +553,16 @@ public final class MailStore {
 
     /// Runs a move or delete of `ids`. Selected messages it takes out of the list (or erases) don't stay
     /// selected, so a second Delete can't erase a message the user never saw in Trash. When that was the whole
-    /// selection, the message that followed it in the list is selected, as after Delete.
-    private func keepingSelectionVisible(_ ids: Set<Message.ID>, _ body: () -> Void) {
+    /// selection, the message that followed it in the list is selected, as after Delete (unless `selectNext` is
+    /// false: a read or flag change only lets go of them, so no other message is opened and marked read).
+    private func keepingSelectionVisible(_ ids: Set<Message.ID>, selectNext: Bool = true, _ body: () -> Void) {
         guard !selection.isDisjoint(with: ids) else { body(); return }
         let list = visibleMessages.map(\.id), before = selection
         body()
         let remaining = Set(visibleMessages.map(\.id))
         let gone = before.intersection(ids).subtracting(remaining)
         guard !gone.isEmpty, selection == before else { return }
-        selection = gone == before ? Self.following(before, in: list, remaining: remaining) ?? [] : before.subtracting(gone)
+        selection = gone == before && selectNext ? Self.following(before, in: list, remaining: remaining) ?? [] : before.subtracting(gone)
     }
 
     /// The message after the last of `ids` in `list` that is still in it (else the one before), as Mail selects
@@ -573,11 +574,13 @@ public final class MailStore {
         return next.map { [$0] } ?? []
     }
 
-    public func setFlag(_ c: FlagColor?, for ids: Set<Message.ID>) { update(ids) { $0.flag = c } }
+    public func setFlag(_ c: FlagColor?, for ids: Set<Message.ID>) {
+        keepingSelectionVisible(ids, selectNext: false) { update(ids) { $0.flag = c } }
+    }
 
     public func toggleRead(_ ids: Set<Message.ID>) {
         let anyUnread = messages.contains { ids.contains($0.id) && !$0.isRead }
-        update(ids) { $0.isRead = anyUnread }
+        keepingSelectionVisible(ids, selectNext: false) { update(ids) { $0.isRead = anyUnread } }
     }
 
     public func markSelectionRead() {

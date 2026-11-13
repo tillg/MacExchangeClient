@@ -836,3 +836,11 @@ edited: 2026-11-13
 - **Status:** decided
 - **Context:** BUG-093. A deletion done elsewhere wins over a pending read or flag change, but the change stayed queued and was sent, refused and reported ("Exchange refused a change").
 - **Decision:** When a sync reports messages deleted (not those held for a pending move), their IDs and undo copies leave the account's queued `setRead`/`setFlagged` entries; an entry left with no ID goes. Other kinds (move, erase, answers, sends) are untouched.
+
+## 07:00 — Read and flag changes let go of messages they take out of the list, without selecting the next {#d-bug-119}
+
+- **Status:** decided
+- **Context:** BUG-119. With the unread filter on, Mark as Read (or Clear Flag in Flagged) took the selected messages out of the list but left them selected; in Trash the next Delete erased them unseen.
+- **Decision:** `toggleRead` and `setFlag` go through `keepingSelectionVisible` like moves, with `selectNext: false`: selected messages that leave the list leave the selection; when that was the whole selection, nothing is selected (not the next message, as after a move). Messages that stay in the list (an opened one kept by the unread filter) stay selected.
+- **Why:** selecting the next message would open it and mark it read, which would chain through an unread list. Mail's exact behaviour here isn't checked (⚠️).
+- **Alternatives:** select the next message as after Delete (rejected: see above).
