@@ -12,6 +12,12 @@ struct DebugSnapshot: ViewModifier {
     func body(content: Content) -> some View {
         content.task {
             guard let out = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT"] else { return }
+            // MAIL_SNAPSHOT_MAILBOX=Work/inbox opens that account's mailbox (its raw name) instead of All Inboxes.
+            if let box = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_MAILBOX"]?.split(separator: "/"), box.count == 2,
+               let acct = store.accounts.first(where: { $0.name == box[0] }) {
+                store.selectedMailbox = .account(acct.id, MailboxKind(rawValue: String(box[1])))
+                try? await Task.sleep(for: .milliseconds(300))  // the mailbox change clears the selection first
+            }
             // MAIL_SNAPSHOT_SUBJECT picks a message by subject; otherwise the first one.
             let wanted = ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_SUBJECT"]
             if let m = store.visibleMessages.first(where: { wanted == nil || $0.subject == wanted }) {

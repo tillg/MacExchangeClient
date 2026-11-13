@@ -484,3 +484,40 @@ public struct Attachment: Hashable, Codable, Sendable, ExpressibleByStringLitera
         return cut + ending
     }
 }
+
+/// What the list row of a conversation shows, as in Mail: who wrote ("Jan & Sergio"), the conversation's first
+/// subject, a badge with the number of messages, and the dot, flag and paperclip of any of them.
+public struct ConversationRow: Equatable, Sendable {
+    public let count: Int
+    public let senders: String
+    public let subject: String
+    public let isRead: Bool
+    public let flag: FlagColor?
+    public let hasAttachments: Bool
+
+    /// `members`: the conversation's messages in the list, newest first.
+    public init(_ members: [Message]) {
+        count = members.count
+        senders = Self.senders(members.map(\.from))
+        subject = members.last?.subject ?? ""
+        isRead = members.allSatisfy(\.isRead)
+        flag = members.lazy.compactMap(\.flag).first
+        hasAttachments = members.contains(where: \.hasAttachments)
+    }
+
+    /// First names, newest first, each once: "Jan & Sergio", "Jan, Sergio & Till". "Gartner, Till" is Till; a sender
+    /// without a name shows the address. A single sender shows the full name, as on a single message.
+    static func senders<C: Collection>(_ contacts: C) -> String where C.Element == Contact {
+        var names: [String] = [], fullName: String?
+        for c in contacts {
+            let full = c.name.trimmingCharacters(in: .whitespaces)
+            let first = full.isEmpty ? c.email
+                : full.contains(",") ? String(full.split(separator: ",").last!).trimmingCharacters(in: .whitespaces)
+                : String(full.split(separator: " ").first!)
+            if !names.contains(first) { names.append(first) }
+            if fullName == nil { fullName = full.isEmpty ? c.email : full }
+        }
+        guard names.count > 1 else { return fullName ?? "" }
+        return names.dropLast().joined(separator: ", ") + " & " + names.last!
+    }
+}

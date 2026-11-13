@@ -171,7 +171,7 @@ struct MoveMenu: View {
 
     /// Into that account's mailbox; `drop` refuses to move server mail to another account.
     private func move(_ acct: UUID, _ kind: MailboxKind) {
-        store.drop(store.selection, on: .account(acct, kind))
+        store.drop(store.withConversations(store.selection), on: .account(acct, kind))
     }
 
 }
@@ -182,18 +182,18 @@ struct FlagMenu: View {
     var body: some View {
         Menu {
             ForEach(FlagColor.allCases, id: \.self) { c in
-                Button { store.setFlag(c, for: store.selection) } label: {
+                Button { store.setFlag(c, for: store.withConversations(store.selection)) } label: {
                     Label(c.title, systemImage: "flag.fill")
                 }
                 .tint(c.color)
             }
             Divider()
-            Button("Clear Flag") { store.setFlag(nil, for: store.selection) }
+            Button("Clear Flag") { store.setFlag(nil, for: store.withConversations(store.selection)) }
         } label: {
             Label("Flag", systemImage: "flag")
         } primaryAction: {
-            let flagged = store.selection.contains { store.message($0)?.flag != nil }
-            store.setFlag(flagged ? nil : .red, for: store.selection)
+            let flagged = store.withConversations(store.selection).contains { store.message($0)?.flag != nil }
+            store.setFlag(flagged ? nil : .red, for: store.withConversations(store.selection))
         }
         .help("Flag selected messages")
     }

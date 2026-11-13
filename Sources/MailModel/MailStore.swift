@@ -22,8 +22,15 @@ public final class MailStore {
         }
     }
     public var selection: Set<Message.ID> = [] {
-        didSet { if !openedUnread.isSubset(of: selection) { openedUnread.formIntersection(selection) } }
+        didSet {
+            // The messages of a selected conversation row count as selected too.
+            guard !openedUnread.isEmpty else { return }
+            let kept = withConversations(selection)
+            if !openedUnread.isSubset(of: kept) { openedUnread.formIntersection(kept) }
+        }
     }
+    /// The list shows each conversation as one row (Settings ▸ Viewing ▸ Show messages as conversations).
+    public var groupsConversations = false
     public var filterUnread = false { didSet { if filterUnread != oldValue && !openedUnread.isEmpty { openedUnread = [] } } }
     /// Messages that were unread when opened. As in Mail, they stay in the unread-filtered list and in Unread
     /// while selected, and leave once the selection moves on or the filter or mailbox changes.
@@ -60,6 +67,7 @@ public final class MailStore {
     public private(set) var folders: [UUID: [Folder]] = [:] {
         didSet {
             foldersChanged = true
+            folderTree = [:]
             if folders != oldValue { foldersInTrash = Self.foldersInTrash(folders); revision &+= 1 }
         }
     }
@@ -134,15 +142,31 @@ public final class MailStore {
 
     public func account(_ id: UUID) -> Account? { accounts.first { $0.id == id } }
 
+    /// Each account's folders by parent (sorted) and their names, made once per change of `folders`: the sidebar,
+    /// the Move menu and the toolbar ask for them on every redraw.
+    @ObservationIgnored private var folderTree: [UUID: (children: [MailboxKind?: [Folder]], names: [MailboxKind: String])] = [:]
+
+    private func tree(_ account: UUID) -> (children: [MailboxKind?: [Folder]], names: [MailboxKind: String]) {
+        let list = folders[account] ?? []  // read first: registers the dependency for SwiftUI even when the cache answers
+        if let t = folderTree[account] { return t }
+        var children: [MailboxKind?: [Folder]] = [:], names: [MailboxKind: String] = [:]
+        for f in list {
+            children[f.parent, default: []].append(f)
+            if names[f.box] == nil { names[f.box] = f.name }
+        }
+        for k in children.keys { children[k]!.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending } }
+        folderTree[account] = (children, names)
+        return (children, names)
+    }
+
     /// The folders directly in `parent` (nil: at the top of the account), by name as Finder sorts.
     public func children(of parent: MailboxKind?, account: UUID) -> [Folder] {
-        (folders[account] ?? []).filter { $0.parent == parent }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        tree(account).children[parent] ?? []
     }
 
     /// The mailbox's name: the standard title, or the folder's own.
     public func name(of box: MailboxKind, in account: UUID) -> String {
-        box.isStandard ? box.title : folders[account]?.first { $0.box == box }?.name ?? ""
+        box.isStandard ? box.title : tree(account).names[box] ?? ""
     }
 
     /// Sets an account's folder tree (for local accounts; server accounts get theirs from the server).
@@ -256,7 +280,64 @@ public final class MailStore {
     }
 
     private struct ListKey: Equatable {
-        var mailbox: MailboxRef, query: String, filterUnread: Bool, hits: Int, openedUnread: Set<Message.ID>
+        var mailbox: MailboxRef, query: String, filterUnread: Bool, hits: Int, openedUnread: Set<Message.ID>, grouped = false
+    }
+
+    /// The conversation rows of the list made for `key`: each row's messages in the list (newest first, the row's own
+    /// first), and the row each of them is shown in. Only conversations with more than one message in the list.
+    @ObservationIgnored private var threadCache: (revision: Int, key: ListKey, members: [Message.ID: [Message]],
+                                                  rowOf: [Message.ID: Message.ID])?
+
+    /// One row per conversation (by account, as All Inboxes spans several): its newest message in the list stands
+    /// for it. A message without a conversation is a row of its own. One pass over the list, cached with it.
+    private func grouping(_ list: [Message], _ key: ListKey) -> [Message] {
+        struct Conversation: Hashable { let account: UUID; let id: String }
+        var slot: [Conversation: Int] = [:], rows: [Message] = [], members: [Int: [Message]] = [:]
+        for m in list {
+            guard let c = m.conversationID else { rows.append(m); continue }
+            let k = Conversation(account: m.accountID, id: c)
+            if let i = slot[k] { members[i, default: [rows[i]]].append(m) } else { slot[k] = rows.count; rows.append(m) }
+        }
+        var byRow: [Message.ID: [Message]] = [:], rowOf: [Message.ID: Message.ID] = [:]
+        for (i, ms) in members {
+            byRow[rows[i].id] = ms
+            for m in ms { rowOf[m.id] = rows[i].id }
+        }
+        threadCache = (revision, key, byRow, rowOf)
+        return rows
+    }
+
+    /// The conversation rows of the list on screen.
+    private var threads: (members: [Message.ID: [Message]], rowOf: [Message.ID: Message.ID]) {
+        guard groupsConversations else { return ([:], [:]) }
+        _ = visibleMessages
+        guard let t = threadCache, t.revision == revision, t.key == listCache?.key else { return ([:], [:]) }
+        return (t.members, t.rowOf)
+    }
+
+    /// What the row of a conversation shows: nil for a row that is a single message.
+    public func conversationRow(_ id: Message.ID) -> ConversationRow? {
+        threads.members[id].map(ConversationRow.init)
+    }
+
+    /// The messages these list rows stand for: a conversation row's messages in the list, with the row's own.
+    /// Everything the list hands to an action goes through here, so it acts on the whole conversation, as in Mail.
+    public func withConversations(_ ids: Set<Message.ID>) -> Set<Message.ID> {
+        let t = threads
+        guard !t.members.isEmpty else { return ids }
+        var all = ids
+        for id in ids { if let ms = t.members[t.rowOf[id] ?? id] { all.formUnion(ms.map(\.id)) } }
+        return all
+    }
+
+    /// The selection as rows of the list: a selected message that a newer one of its conversation now stands for
+    /// (a reply arrived) is shown as that row. Setting it selects the rows.
+    public var listSelection: Set<Message.ID> {
+        get {
+            let rowOf = threads.rowOf
+            return rowOf.isEmpty ? selection : Set(selection.map { rowOf[$0] ?? $0 })
+        }
+        set { selection = newValue }
     }
 
     /// Messages for the list pane: mailbox (or whole account/all mail while searching),
@@ -272,7 +353,7 @@ public final class MailStore {
         let q = useIndex ? hits?.query ?? memoryQuery ?? "" : typed
         let opened = openedUnread
         let key = ListKey(mailbox: selectedMailbox, query: q, filterUnread: filterUnread, hits: hits == nil ? -1 : hitsGeneration,
-                          openedUnread: opened)
+                          openedUnread: opened, grouped: groupsConversations && q.isEmpty)
         _ = messages.count  // registers the dependency for SwiftUI even when the cache answers
         if let c = listCache, c.revision == revision, c.key == key { return c.list }
         if let hits, !q.isEmpty {
@@ -282,7 +363,7 @@ public final class MailStore {
         }
         if !q.isEmpty { memoryQuery = q }
         let words = Self.searchWords(q)
-        let list = messages.filter { m in
+        let found = messages.filter { m in
             if !q.isEmpty {
                 guard inSearchScope(m), !isDeleted(m), m.mailbox != .junk else { return false }
                 return Self.matches(m, words)
@@ -297,6 +378,7 @@ public final class MailStore {
             return true
         }
         .sorted(by: Self.newestFirst)
+        let list = key.grouped ? grouping(found, key) : found
         listCache = (revision, key, list)
         return list
     }
@@ -448,7 +530,7 @@ public final class MailStore {
     public func conversation(of id: Message.ID) -> [Message] {
         _ = messages.count  // registers the dependency for SwiftUI even when the cache answers
         if let c = conversationCache, c.revision == revision, c.id == id { return c.list }
-        guard let m = message(id) else { return [] }
+        guard let m = selectedMessage?.id == id ? selectedMessage : message(id) else { return [] }
         var list = [m]
         if let conv = m.conversationID {
             let skip: Set<MailboxKind> = [.trash, .junk, .drafts]
@@ -599,7 +681,7 @@ public final class MailStore {
 
     public func markSelectionRead() {
         var opened: [Message.ID] = []
-        update(selection) { m in
+        update(withConversations(selection)) { m in
             if !m.isRead { opened.append(m.id) }
             m.isRead = true
         }
@@ -620,10 +702,10 @@ public final class MailStore {
     /// once the action takes it out of the list. An action that changes none of them keeps the selection.
     public func actOnSelection(_ action: (Set<Message.ID>) -> Void) {
         let list = visibleMessages.map(\.id)
-        let ids = selection
-        let before = messages.filter { ids.contains($0.id) }
-        action(ids)
-        guard messages.filter({ ids.contains($0.id) }) != before else { return }
+        let ids = listSelection, all = withConversations(ids)
+        let before = messages.filter { all.contains($0.id) }
+        action(all)
+        guard messages.filter({ all.contains($0.id) }) != before else { return }
         let remaining = Set(visibleMessages.map(\.id))
         selection = Self.following(ids, in: list, remaining: remaining) ?? ids.intersection(remaining)
     }
@@ -674,13 +756,14 @@ public final class MailStore {
         }
         guard !moving.isEmpty else { return false }
         let movingAt = at.filter { moving.contains(messages[$0].id) }
-        if ids == selection {
-            // As `actOnSelection`: the selection moves on to the message that followed it. Every message in `moving`
+        let rows = listSelection
+        if !rows.isEmpty, ids == withConversations(rows) {
+            // As `actOnSelection`: the selection moves on to the row that followed it. Every message in `moving`
             // changes, so there is no need to compare the messages before and after.
             let list = visibleMessages.map(\.id)
             update(at: movingAt, change)
             let remaining = Set(visibleMessages.map(\.id))
-            selection = Self.following(ids, in: list, remaining: remaining) ?? ids.intersection(remaining)
+            selection = Self.following(rows, in: list, remaining: remaining) ?? rows.intersection(remaining)
         } else {
             keepingSelectionVisible(moving) { update(at: movingAt, change) }
         }

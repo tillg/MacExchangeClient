@@ -12,6 +12,8 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "The window responds faster in an account with many folders: the sidebar and the Move menu no longer slow down every click.",
+            "A conversation is now one row in the message list, with a blue number showing how many messages it holds, as in Apple Mail. Deleting, moving or flagging the row does it to all of them.",
             "PDF attachments are now shown in the message, every page, as pictures already were. Control-click one to show it as an icon instead.",
             "Dropping messages on a mailbox in a large account takes far less time before the window responds again.",
             "Replies to your invitations, such as \"Accepted: …\", no longer show Accept, Tentative and Decline buttons, also for those read before.",

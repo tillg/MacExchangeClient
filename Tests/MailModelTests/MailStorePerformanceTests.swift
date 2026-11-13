@@ -23,6 +23,7 @@ struct MailStorePerformanceTests {
                 msgs.append(Message(accountID: work.id, mailbox: box, from: Contact(name: "S\(n % 500)", email: "s\(n % 500)@x.com"),
                                     to: [], subject: "Subject \(n)", body: "", date: Date(timeIntervalSince1970: Double(n * 60)),
                                     isRead: n % 30 != 0, remoteID: "R\(n)", serverPreview: "Preview \(n)", bodyLoaded: false))
+                msgs[msgs.count - 1].conversationID = "AAQkADAwATM0MDAAMS1iZWE4LWVmZjYtMDACLTAwCgAQAG5lc3QtY29udmVyc2F0aW9uLWlk\(n / 3)"
             }
         }
         return MailStore(accounts: [work], messages: msgs)
@@ -128,6 +129,7 @@ struct MailStorePerformanceTests {
     @Test func droppingTheSelectionStaysFastAt210kMessages() {
         let t = (0..<3).map { _ in
             let s = bigStore(times: 3)
+            s.groupsConversations = true  // as in the app
             s.selectedMailbox = .account(work.id, .inbox)
             let id = s.visibleMessages[5].id
             s.selection = [id]
@@ -151,5 +153,59 @@ struct MailStorePerformanceTests {
         }.min()!
         print(String(format: "PERF renameRemote 1 in 210k %.3fs", t))
         #expect(t < 0.1)
+    }
+
+    /// One row per conversation: grouping goes over the list once more. Every three messages are a conversation here.
+    @Test func groupedSentListStaysFastAt70kMessages() {
+        let t = seconds { s in
+            s.groupsConversations = true
+            s.selectedMailbox = .account(work.id, .sent)
+            _ = s.visibleMessages
+        }
+        let s = bigStore()
+        s.groupsConversations = true
+        s.selectedMailbox = .account(work.id, .sent)
+        print(String(format: "PERF grouped sent list %.3fs", t))
+        #expect(s.visibleMessages.count == 18_000)
+        #expect(t < Self.limit)
+    }
+
+    /// Every redraw builds the sidebar and the Move menu: each folder's subfolders and name, for an account with
+    /// 400 folders (20 top-level ones with 19 subfolders each).
+    @Test func folderTreeStaysFastWith400Folders() {
+        var folders: [Folder] = []
+        for t in 0..<20 {
+            let top = MailboxKind.folder("T\(t)")
+            folders.append(Folder(box: top, name: "Folder \(t)"))
+            for c in 0..<19 { folders.append(Folder(box: .folder("T\(t)-\(c)"), name: "Sub \(c)", parent: top)) }
+        }
+        let t = seconds { s in
+            s.setFolders(folders, account: work.id)
+            for _ in 0..<3 {  // the sidebar, the Move menu and the toolbar each go over the tree
+                for f in [nil] + folders.map(\.box) as [MailboxKind?] {
+                    for c in s.children(of: f, account: work.id) { _ = s.name(of: c.box, in: work.id) }
+                }
+            }
+        }
+        print(String(format: "PERF folder tree 400 folders x3 %.3fs", t))
+        #expect(t < 0.05)
+    }
+
+    /// After a change (a message marked read), the next conversation costs one pass over all mail, at 210k with
+    /// conversation IDs as long as Exchange's. An index of all conversations, made again after each change, took
+    /// 0.12s here against 0.05s for the pass, and mail changes on almost every click (marked read, body loaded).
+    @Test func conversationAfterAChangeStaysFastAt210kMessages() {
+        let s = bigStore(times: 3)
+        let ids = s.messages.filter { $0.mailbox == .sent }.prefix(5).map(\.id)
+        _ = s.conversation(of: ids[0])
+        var total = 0.0
+        for id in ids {
+            s.toggleRead([id])
+            let start = Date()
+            _ = s.conversation(of: id)
+            total += Date().timeIntervalSince(start)
+        }
+        print(String(format: "PERF conversation after change in 210k %.3fs each", total / 5))
+        #expect(total / 5 < 0.1)
     }
 }

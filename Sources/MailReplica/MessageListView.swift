@@ -6,6 +6,8 @@ struct MessageListView: View {
     @Environment(\.openWindow) private var openWindow
     /// A pull to refresh is checking for mail: the spinner above the list.
     @State private var pulling = false
+    /// Settings ▸ Viewing: a conversation is one row of the list, as with Mail's Organize by Conversation.
+    @AppStorage("showConversations") private var showConversations = true
 
     var body: some View {
         let msgs = store.visibleMessages
@@ -15,30 +17,34 @@ struct MessageListView: View {
         let lookup = Lookup(msgs)
         let isEmpty = msgs.isEmpty
         VStack(spacing: 0) {
-            List(selection: Bindable(store).selection) {
+            // Rows, not messages: a conversation's row stays selected when a reply arrives and becomes its newest.
+            List(selection: Bindable(store).listSelection) {
                 ForEach(msgs.map(\.id), id: \.self) { id in
                     let m = lookup.byID[id]!
-                    MessageRow(message: m)
+                    // Actions on a row act on every message of its conversation.
+                    let all = store.withConversations([m.id])
+                    MessageRow(message: m, conversation: store.conversationRow(m.id))
                         .tag(m.id)
                         // Dragging a selected row drags the whole selection, as in Mail.
-                        .draggable(MessageDrag(ids: Array(store.selection.contains(m.id) ? store.selection : [m.id]))) {
-                            let n = store.selection.contains(m.id) ? store.selection.count : 1
+                        .draggable(MessageDrag(ids: Array(store.withConversations(store.listSelection.contains(m.id) ? store.listSelection : [m.id])))) {
+                            let n = store.withConversations(store.listSelection.contains(m.id) ? store.listSelection : [m.id]).count
                             Label(n == 1 ? m.subject : "\(n) Messages", systemImage: "envelope")
                                 .padding(.horizontal, 8).padding(.vertical, 4)
                                 .background(.regularMaterial, in: Capsule())
                         }
                         .swipeActions(edge: .leading) {
-                            Button { store.toggleRead([m.id]) } label: {
-                                Label(m.isRead ? "Unread" : "Read",
-                                      systemImage: m.isRead ? "envelope.badge" : "envelope.open")
+                            let read = store.conversationRow(m.id)?.isRead ?? m.isRead
+                            Button { store.toggleRead(all) } label: {
+                                Label(read ? "Unread" : "Read",
+                                      systemImage: read ? "envelope.badge" : "envelope.open")
                             }
                             .tint(.blue)
                         }
                         .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) { store.delete([m.id]) } label: {
+                            Button(role: .destructive) { store.delete(all) } label: {
                                 Label("Trash", systemImage: "trash")
                             }
-                            Button { store.setFlag(m.flag == nil ? .orange : nil, for: [m.id]) } label: {
+                            Button { store.setFlag((store.conversationRow(m.id)?.flag ?? m.flag) == nil ? .orange : nil, for: all) } label: {
                                 Label("Flag", systemImage: "flag")
                             }
                             .tint(.orange)
@@ -64,12 +70,14 @@ struct MessageListView: View {
             }
             .contextMenu(forSelectionType: Message.ID.self) { ids in
                 // Read state from the rows' lookup: `store.message` goes over every message, on every redraw.
-                MessageContextMenu(ids: ids, unread: ids.contains { lookup.byID[$0]?.isRead == false })
+                MessageContextMenu(rows: ids, ids: store.withConversations(ids),
+                                   unread: ids.contains { (store.conversationRow($0)?.isRead ?? lookup.byID[$0]?.isRead) == false })
             } primaryAction: { ids in
                 // Double-click opens the message; in Mail that's a separate window. Here: reply-less read.
                 store.selection = ids
             }
             .onDeleteCommand { store.deleteSelection() }
+            .onChange(of: showConversations, initial: true) { store.groupsConversations = showConversations }
             .onChange(of: store.selection) {
                 // Mail marks a message read as soon as it is displayed. One main-loop turn later: changing the
                 // rows while the table is still reporting the click is a reentrant table update (AppKit warns).
@@ -106,6 +114,9 @@ struct MessageRow: View {
     @Environment(MailStore.self) private var store
     @AppStorage("showContactPhoto") private var showPhoto = false
     let message: Message
+    /// The conversation this row stands for, when it has more than one message in the list.
+    var conversation: ConversationRow? = nil
+    private var isRead: Bool { conversation?.isRead ?? message.isRead }
 
     var body: some View {
         HStack(alignment: .top, spacing: 6) {
@@ -114,9 +125,9 @@ struct MessageRow: View {
             Group {
                 if message.isVIP {
                     Image(systemName: "star.fill").font(.system(size: 9))
-                        .foregroundStyle(message.isRead ? Color.secondary : Color.accentColor)
+                        .foregroundStyle(isRead ? Color.secondary : Color.accentColor)
                 } else {
-                    Circle().fill(message.isRead ? Color.clear : Color.accentColor)
+                    Circle().fill(isRead ? Color.clear : Color.accentColor)
                 }
             }
             .frame(width: 8, height: 8)
@@ -131,13 +142,22 @@ struct MessageRow: View {
                     Text(Self.listDate(message.date)).font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(message.subject).font(.system(size: 12)).lineLimit(1)
+                    Text(conversation?.subject ?? message.subject).font(.system(size: 12)).lineLimit(1)
                     Spacer(minLength: 4)
-                    if message.hasAttachments {
+                    if conversation?.hasAttachments ?? message.hasAttachments {
                         Image(systemName: "paperclip").font(.system(size: 10)).foregroundStyle(.secondary)
                     }
-                    if let f = message.flag {
+                    if let f = conversation?.flag ?? message.flag {
                         Image(systemName: "flag.fill").font(.system(size: 10)).foregroundStyle(f.color)
+                    }
+                    // Mail's badge: how many messages the row stands for.
+                    if let n = conversation?.count {
+                        HStack(spacing: 2) {
+                            Text("\(n)")
+                            Image(systemName: "chevron.forward.circle")
+                        }
+                        .font(.system(size: 12)).foregroundStyle(Color.accentColor)
+                        .help("\(n) messages in this conversation")
                     }
                 }
                 Text(message.preview).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
@@ -149,7 +169,7 @@ struct MessageRow: View {
 
     private var senderLabel: String {
         message.mailbox == .sent || message.mailbox == .drafts
-            ? "To: " + (message.to.first?.name ?? "") : message.from.name
+            ? "To: " + (message.to.first?.name ?? "") : conversation?.senders ?? message.from.name
     }
 
     /// Today → time, yesterday → "Yesterday", last 7 days → weekday, else short date.
@@ -167,12 +187,14 @@ struct MessageRow: View {
 struct MessageContextMenu: View {
     @Environment(MailStore.self) private var store
     @Environment(\.openWindow) private var openWindow
+    /// The rows clicked, and every message they stand for (a conversation row stands for all of its messages).
+    let rows: Set<Message.ID>
     let ids: Set<Message.ID>
     /// Whether any of them is unread.
     let unread: Bool
 
     var body: some View {
-        if ids.count == 1, let id = ids.first {
+        if rows.count == 1, let id = rows.first {
             Button("Reply") { Task { openWindow(id: "compose", value: ComposeWindow(await store.loadedDraft(.reply, to: id))) } }
             Button("Reply All") { Task { openWindow(id: "compose", value: ComposeWindow(await store.loadedDraft(.replyAll, to: id))) } }
             Button("Forward") { Task { openWindow(id: "compose", value: ComposeWindow(await store.loadedDraft(.forward, to: id))) } }
