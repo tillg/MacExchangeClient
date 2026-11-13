@@ -800,3 +800,11 @@ edited: 2026-11-13
 - **Status:** decided
 - **Context:** `loadDay` added the invite to `unavailableDays` on any error, also when its task was only cancelled (the user moved to another message), so "Calendar not available" could show when coming back.
 - **Decision:** A cancelled load returns without marking anything; the next showing loads the day again. Errors that aren't cancellations still mark it, as before.
+
+## 06:35 — Mail of an account no longer set up stays on disk but isn't loaded {#d-bug-079}
+
+- **Status:** decided
+- **Context:** BUG-079. Launch loaded every stored message, also those of an account no longer in the account list; they showed in All Inboxes without their account in the sidebar.
+- **Decision:** `restore(_:boxes:)` and `finishLoading` add only messages of the accounts set up. Their rows stay in the database (nothing deletes them); the search index may still list them, but a hit that isn't in memory isn't shown.
+- **Why:** there is no UI to remove an account; an account dropped by editing the saved accounts may come back, and deleting its mail would make it download everything again. Not loading is the safe half of the fix.
+- **Alternatives:** delete the rows (and index entries) of unknown accounts at launch (rejected for now: irreversible, a product call once removing an account is a feature).

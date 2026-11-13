@@ -1001,20 +1001,26 @@ public final class MailStore {
 
     /// Launch, step 2: the mail of some mailboxes (the Inbox first), shown while the rest loads.
     public func restore(_ msgs: [Message], boxes: [MailboxKey]) {
-        let known = Set(messages.map(\.id))
-        messages += withoutRemovedFolders(msgs).filter { !known.contains($0.id) }
+        messages += notInMemory(withoutRemovedFolders(msgs))
         for b in boxes { loadedBoxes?.insert(key(b.account, b.mailbox)) }
     }
 
     /// Launch, step 3: everything else. A message changed meanwhile keeps its version in memory.
     /// Then waiting changes go to the server and the history sync may start.
     public func finishLoading(_ rest: [Message]) {
-        let known = Set(messages.map(\.id))
-        messages += withoutRemovedFolders(rest).filter { !known.contains($0.id) }
+        messages += notInMemory(withoutRemovedFolders(rest))
         removedFolders = [:]
         loadedBoxes = nil
         scheduleFlush()
         if !backends.isEmpty { startHistory() }
+    }
+
+    /// Stored messages to add at launch: those of the accounts set up (the mail of an account no longer in the list
+    /// stays on disk but isn't shown), and not in memory yet.
+    private func notInMemory(_ stored: [Message]) -> [Message] {
+        let mine = Set(accounts.map(\.id))
+        let known = Set(messages.map(\.id))
+        return stored.filter { mine.contains($0.accountID) && !known.contains($0.id) }
     }
 
     /// True while launch is still loading stored mail.

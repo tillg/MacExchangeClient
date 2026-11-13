@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Mail stored for an account you no longer use stays out of All Inboxes and the lists.",
             "Moving on from an invitation before its calendar day has loaded no longer makes it say \"Calendar not available\" when you come back.",
             "Quick Look no longer jumps back to an earlier message's attachment when its download finishes after you looked at another one.",
             "Quick Look on an attachment that can't be loaded no longer shows a different attachment instead.",
