@@ -231,7 +231,7 @@ public final class MailDatabase: @unchecked Sendable {
     /// The user's words as an FTS5 query: each one quoted (so no input is FTS syntax) with a prefix star,
     /// all of them required. Words without a letter or digit match nothing and are left out.
     static func matchExpression(_ text: String) -> String? {
-        let terms = text.split(whereSeparator: \.isWhitespace).filter { $0.contains { $0.isLetter || $0.isNumber } }
+        let terms = text.replacingOccurrences(of: "\u{0}", with: " ").split(whereSeparator: \.isWhitespace).filter { $0.contains { $0.isLetter || $0.isNumber } }
         guard !terms.isEmpty else { return nil }
         return terms.map { "\"" + $0.replacingOccurrences(of: "\"", with: "\"\"") + "\"*" }.joined(separator: " ")
     }
@@ -572,8 +572,9 @@ struct Statement {
 
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
+    /// With the byte count, so a NUL character in the text is stored, not the end of it.
     func bind(_ i: Int32, _ v: String?) {
-        if let v { sqlite3_bind_text(pointer, i, v, -1, Self.transient) } else { sqlite3_bind_null(pointer, i) }
+        if let v { sqlite3_bind_text(pointer, i, v, Int32(v.utf8.count), Self.transient) } else { sqlite3_bind_null(pointer, i) }
     }
     func bind(_ i: Int32, _ v: Int?) {
         if let v { sqlite3_bind_int64(pointer, i, Int64(v)) } else { sqlite3_bind_null(pointer, i) }
@@ -589,7 +590,11 @@ struct Statement {
     func bind(_ i: Int, _ v: Data?) { bind(Int32(i), v) }
 
     func isNull(_ c: Int32) -> Bool { sqlite3_column_type(pointer, c) == SQLITE_NULL }
-    func text(_ c: Int32) -> String { sqlite3_column_text(pointer, c).map { String(cString: $0) } ?? "" }
+    /// All the column's bytes, past a NUL character too (rows written before kept the text up to it, and read as before).
+    func text(_ c: Int32) -> String {
+        guard let p = sqlite3_column_text(pointer, c) else { return "" }
+        return String(decoding: UnsafeBufferPointer(start: p, count: Int(sqlite3_column_bytes(pointer, c))), as: UTF8.self)
+    }
     func optionalText(_ c: Int32) -> String? { isNull(c) ? nil : text(c) }
     func int(_ c: Int32) -> Int { Int(sqlite3_column_int64(pointer, c)) }
     func double(_ c: Int32) -> Double { sqlite3_column_double(pointer, c) }

@@ -58,6 +58,40 @@ struct MailDatabaseTests {
         #expect(Set(back) == [full, plain])
     }
 
+    /// A NUL character in a subject or body is stored, not the end of the text, and a search with one never throws.
+    @Test func nulCharacterInSubjectAndBodySurvives() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        var m = remote("N")
+        m.subject = "before\u{0}after"; m.body = "line one\u{0}line two"; m.bodyLoaded = true
+        let d = try MailDatabase(url: url)
+        try d.write(StoreChanges(upserts: [m]))
+        let back = try reopen(url).messages()
+        #expect(back.first?.subject.debugDescription == m.subject.debugDescription)
+        #expect(back.first?.body.debugDescription == m.body.debugDescription)
+        #expect(throws: Never.self) { _ = try d.search("hel\u{0}\"lo", accounts: nil) }
+        #expect(try d.search("after", accounts: nil) == [m.id])
+    }
+
+    /// Rows written before (the text cut at a NUL, as the old binding stored it) read as they always did.
+    @Test func rowsWrittenBeforeReadAsBefore() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let m = remote("O")
+        try MailDatabase(url: url).write(StoreChanges(upserts: [m]))
+        var raw: OpaquePointer?
+        #expect(sqlite3_open(url.path, &raw) == SQLITE_OK)
+        var st: OpaquePointer?
+        #expect(sqlite3_prepare_v2(raw, "UPDATE messages SET subject = ?", -1, &st, nil) == SQLITE_OK)
+        sqlite3_bind_text(st, 1, "old\u{0}tail", -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        #expect(sqlite3_step(st) == SQLITE_DONE)
+        sqlite3_finalize(st)
+        sqlite3_close(raw)
+        var old = m
+        old.subject = "old"
+        #expect(try reopen(url).messages() == [old])
+    }
+
     @Test func foldersSyncPositionsAndWaitingChangesSurvive() throws {
         let url = tempURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
