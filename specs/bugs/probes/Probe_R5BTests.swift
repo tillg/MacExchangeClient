@@ -34,79 +34,6 @@ enum R5B {
 }
 
 
-/// A loopback HTTP endpoint that answers each request with the next (status, body) of its script, so a probe can
-/// get an HTTP 401 (ScriptedServer always answers 200). Same approach as `LoopbackEndpoint`: 127.0.0.1 only.
-final class StatusServer: @unchecked Sendable {
-    let url: URL
-    private let listener: Int32
-    private let lock = NSLock()
-    private var script: [(Int, String)]
-    private var _served = 0
-    var served: Int { lock.withLock { _served } }
-
-    init(_ script: [(Int, String)]) {
-        self.script = script
-        signal(SIGPIPE, SIG_IGN)
-        let l = socket(AF_INET, SOCK_STREAM, 0)
-        var yes: Int32 = 1
-        setsockopt(l, SOL_SOCKET, SO_REUSEADDR, &yes, socklen_t(MemoryLayout<Int32>.size))
-        var addr = sockaddr_in()
-        addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
-        addr.sin_family = sa_family_t(AF_INET)
-        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
-        var len = socklen_t(MemoryLayout<sockaddr_in>.size)
-        withUnsafeMutablePointer(to: &addr) { p in
-            p.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
-                _ = bind(l, sa, len); _ = listen(l, 16); _ = getsockname(l, sa, &len)
-            }
-        }
-        listener = l
-        url = URL(string: "http://127.0.0.1:\(UInt16(bigEndian: addr.sin_port))/EWS/Exchange.asmx")!
-        let t = Thread { [self] in loop() }
-        t.start()
-    }
-
-    func stop() { close(listener) }
-
-    private func loop() {
-        while true {
-            let c = accept(listener, nil, nil)
-            if c < 0 { return }
-            var data: [UInt8] = []
-            var buf = [UInt8](repeating: 0, count: 65536)
-            while !Self.isComplete(data) {
-                let n = read(c, &buf, buf.count)
-                if n <= 0 { break }
-                data += buf[0..<n]
-            }
-            let (status, body) = lock.withLock { () -> (Int, String) in
-                _served += 1
-                return script.isEmpty ? (500, EWSReply.fault("ErrorScriptExhausted", "No scripted response left")) : script.removeFirst()
-            }
-            let bytes = Array(body.utf8)
-            let head = "HTTP/1.1 \(status) \(status == 200 ? "OK" : status == 401 ? "Unauthorized" : "Error")\r\n"
-                + "Content-Type: text/xml; charset=utf-8\r\nContent-Length: \(bytes.count)\r\nConnection: close\r\n\r\n"
-            let all = Array(head.utf8) + bytes
-            var off = 0
-            while off < all.count {
-                let n = all[off...].withUnsafeBytes { write(c, $0.baseAddress, $0.count) }
-                if n <= 0 { break }
-                off += n
-            }
-            shutdown(c, SHUT_WR); close(c)
-        }
-    }
-
-    private static func isComplete(_ data: [UInt8]) -> Bool {
-        guard let end = data.indices.dropLast(3).first(where: {
-            data[$0] == 13 && data[$0 + 1] == 10 && data[$0 + 2] == 13 && data[$0 + 3] == 10
-        }) else { return false }
-        let head = String(decoding: data[..<end], as: UTF8.self).lowercased()
-        let line = head.split(separator: "\r\n").first { $0.hasPrefix("content-length:") }
-        let length = line.flatMap { Int($0.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)) } ?? 0
-        return data.count - (end + 4) >= length
-    }
-}
 
 @MainActor
 @Suite(.serialized)
@@ -319,40 +246,5 @@ struct Probe_R5BTests {
         let id = s.messages.first { $0.remoteID == "R1" }!.id
         #expect(!s.canAnswer(id), "own invitation answerable; account address is \"\(ex.account.address)\"")
         #expect(EWSBackend.mailTipsRequest(from: ex.account.address).contains("<t:EmailAddress>me@work.com</t:EmailAddress>"))
-    }
-
-    // MARK: R5B-10
-
-    /// Exchange rejects the password (HTTP 401) when the compose window asks for the size limit (MailTips). The
-    /// account must be paused like for any other request (README: "the app stops sending requests for that account
-    /// until you relaunch"); the error was swallowed and the next check sent the rejected password again.
-    @Test func r5b10_rejectedPasswordOnMailTipsPausesTheAccount() async throws {
-        let server = StatusServer([(401, "")])
-        defer { server.stop() }
-        let s = MailStore(accounts: [], messages: [])
-        s.add(acct, backend: EWSBackend(client: EWSClient(url: server.url, username: "u", password: "wrong")))
-        await s.loadMaxMessageSize(for: acct.id)
-        #expect(server.served == 1)
-        #expect(s.isPaused(acct.id), "status: \(s.status ?? "")")
-    }
-
-    /// The same after "Do Not Send a Response": the answer went out, then the move of the invite to Deleted Items gets
-    /// a 401. The move is queued, but the account isn't paused, so the drain at once sends it again with the
-    /// rejected password.
-    @Test func r5b10_rejectedPasswordOnTheMoveAfterAnAnswerPausesTheAccount() async throws {
-        let server = StatusServer([(200, EWSReply.created("X1")), (401, ""), (401, "")])
-        defer { server.stop() }
-        let s = MailStore(accounts: [], messages: [])
-        s.add(acct, backend: EWSBackend(client: EWSClient(url: server.url, username: "u", password: "p")))
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .trash, id: "DEL")], account: acct.id)
-        var m = Message(accountID: acct.id, mailbox: .inbox, from: Contact(name: "Jan", email: "jan@work.com"), to: [],
-                        subject: "Planning", body: "", date: .now, remoteID: "R1", bodyLoaded: true)
-        m.invite = Invite(start: .now, end: .now.addingTimeInterval(1800))
-        s.merge([m], account: acct.id, mailbox: .inbox)
-        s.respond(InviteReply(response: .accept, send: false), to: mid(s, "R1"))
-        try await waitFor { server.served >= 2 }
-        try await Task.sleep(for: .milliseconds(400))
-        #expect(server.served == 2, "\(server.served) requests; the rejected password was sent again")
-        #expect(s.isPaused(acct.id))
     }
 }

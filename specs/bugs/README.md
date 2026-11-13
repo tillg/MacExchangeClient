@@ -54,3 +54,17 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [201](BUG-201-when-line-runs-backwards-on-clock-change.md) | P4 | invites | On the night the clocks go back, an invite's when line reads "at 2:30 – 2:15", as if it ended before it starts |
 | [202](BUG-202-recurring-invite-shown-as-one-off.md) | P3 | invites / EWS | A recurring meeting's invite is shown as a one-off meeting: nothing says it repeats |
 | [203](BUG-203-reply-stacks-numbered-or-indented-prefix.md) | P4 | compose | Reply to "Re[2]: …" or to a subject with a leading blank (" Re: …") stacks a second "Re:" |
+| [204](BUG-204-html-source-line-breaks-kept.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail keeps the HTML source's line breaks: paragraphs break mid-sentence and every <br> gives a blank line in quotes |
+| [205](BUG-205-block-elements-run-together.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail runs blocks together: "Original textMy answer" after </blockquote>, <hr>, or an unclosed <p> |
+| [206](BUG-206-gt-in-attribute-leaks-markup.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail shows tag remains when an attribute value contains ">" (alt="->", title="a > b") |
+| [207](BUG-207-c1-numeric-references-become-controls.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail loses ’, € and – written as &#146; &#128; &#150; (they become invisible control characters) |
+| [208](BUG-208-non-utf8-byte-fails-whole-response.md) | P4 | ews / transport | A message whose text holds one non-UTF-8 byte or a raw control character never opens ("Unreadable EWS response" on every try) |
+| [209](BUG-209-content-type-parameters-not-stripped.md) | P4 | ews / attachments | An attachment content type with parameters ("application/octet-stream; name=logo.png") hides an inline logo and drops an unnamed file's extension |
+| [210](BUG-210-cid-placeholders-in-preview-and-quote.md) | P3 | ews body / preview / compose | ⚠️ "[cid:image001.png@01D…]" from Exchange's text version shows in the list preview and is quoted in replies |
+| [211](BUG-211-colon-in-attachment-name-shows-as-slash.md) | P4 | attachments | ⚠️ An attachment with ":" in its name (attached message "Re: Budget") is saved as "Re/ Budget.eml" in the Finder |
+| [212](BUG-212-attachment-named-original-cant-be-saved.md) | P4 | attachments | An attachment named "Original" can't be saved once an app has changed the opened copy |
+| [213](BUG-213-invisible-characters-kept-in-address.md) | P4 | compose / recipients | An address pasted with a BOM or word joiner around it keeps the invisible character and goes to an address that doesn't exist |
+| [214](BUG-214-erase-does-not-suppress-read-receipts.md) | P3 | ews | Erasing a message from Trash doesn't suppress read receipts (DeleteItem without SuppressReadReceipts) |
+| [215](BUG-215-empty-address-recipient-fails-whole-send.md) | P3 | ews | A recipient typed as "Name <>" makes the whole send fail (empty EmailAddress is schema-invalid) |
+| [216](BUG-216-deleted-appointment-or-task-cannot-be-erased.md) | P2 | ews | A deleted appointment or task in Trash can't be erased: DeleteItem lacks SendMeetingCancellations / AffectedTaskOccurrences |
+| [217](BUG-217-flag-or-read-on-deleted-appointment-refused.md) | P3 | ews | Flagging or marking read a deleted appointment in Trash is refused and undone (UpdateItem lacks SendMeetingInvitationsOrCancellations) |
