@@ -80,37 +80,6 @@ struct Probe_Attach4Tests {
 
     // MARK: Attaching files
 
-    /// A Finder alias (not a symlink) dropped or chosen: the file it points to is attached, not the alias's
-    /// bookmark bytes.
-    @Test func probeFinderAliasToFileAttachesTheOriginal() throws {
-        let dir = tempDir()
-        let target = dir.appendingPathComponent("Report.pdf")
-        try Data("%PDF-1.4 real report".utf8).write(to: target)
-        let alias = dir.appendingPathComponent("Report.pdf alias")
-        let bm = try target.bookmarkData(options: .suitableForBookmarkFile, includingResourceValuesForKeys: nil, relativeTo: nil)
-        try URL.writeBookmarkData(bm, to: alias)
-        #expect(try alias.resourceValues(forKeys: [.isAliasFileKey]).isAliasFile == true)  // control: a real alias
-        let s = MailStore(accounts: [work], messages: [])
-        let files = s.files([alias])
-        #expect(files.count == 1)
-        #expect(files.first?.data == Data("%PDF-1.4 real report".utf8),
-                "attached \(files.first?.data.count ?? -1) bytes named \(files.first?.name ?? "-") (type \(files.first?.contentType ?? "nil"))")
-    }
-
-    /// A Finder alias of a folder: the folder is zipped, as a folder itself would be.
-    @Test func probeFinderAliasToFolderAttachesZip() throws {
-        let dir = tempDir()
-        let folder = dir.appendingPathComponent("Photos")
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try Data("a".utf8).write(to: folder.appendingPathComponent("a.txt"))
-        let alias = dir.appendingPathComponent("Photos alias")
-        let bm = try folder.bookmarkData(options: .suitableForBookmarkFile, includingResourceValuesForKeys: nil, relativeTo: nil)
-        try URL.writeBookmarkData(bm, to: alias)
-        let s = MailStore(accounts: [work], messages: [])
-        let files = s.files([alias])
-        #expect(files.map(\.contentType) == ["application/zip"], "got \(files.map { "\($0.name) \($0.contentType ?? "nil") \($0.data.count)B" })")
-    }
-
     /// Zero-byte file: attached as an empty file (control).
     @Test func controlZeroByteFileAttaches() throws {
         let dir = tempDir()

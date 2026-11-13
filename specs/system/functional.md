@@ -121,7 +121,9 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
   `loadingOriginal` stays set (Send and Save stay blocked), the status names the files, and the window shows "The
   original attachments couldn't be added." with Try Again and Continue Without Them.
 - Attaching: Attach button, File ▸ Attach Files… (⇧⌘A), dropping or pasting files. A folder is sent as "Name.zip"; a symbolic link
-  to a folder likewise, under the link's name.
+  to a folder likewise, under the link's name. A Finder alias (bookmark file, not a symbolic link) is resolved first:
+  its original file, or its folder as a zip, goes under the original's name; an alias whose original is gone is
+  reported as not attachable.
   Files sit in the text at a U+FFFC mark ([domain-model.md](domain-model.md#draft)); JPEG, PNG and GIF placed in the
   text are sent inline in an HTML body ([rendering.md](rendering.md#html-of-sent-mail)).
 - Size: estimated size above the account's MailTips limit shows red "(maximum …)"; Send then asks first (Try

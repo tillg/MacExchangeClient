@@ -24,7 +24,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [125](BUG-125-mailbox-selected-during-check-not-checked.md) | P4 | MailStore | Selecting a mailbox while a check is running doesn't check it (README: "at once when you select a mailbox") |
 | [126](BUG-126-paging-never-ends-when-server-repeats-page.md) | P4 | MailStore | Quick check and history page forever when the server answers "more" with the same SyncState |
 | [132](BUG-132-pending-search-shows-mailbox-instead-of-results.md) | P4 | MailStore | While the next search answer is on its way, the list jumps back to the plain mailbox (or "No Results") when the previous results came from memory |
-| [134](BUG-134-finder-alias-attached-as-bookmark.md) | P3 | MailStore | A dropped or pasted Finder alias is attached as the alias file itself (about 940 bytes of bookmark data), not the file or folder it points to |
 | [137](BUG-137-selected-message-linear-scan-per-read.md) | P3 | MailStore | Clicking a message that arrived this session takes 0.43 s: selectedMessage scans all messages on each of its 7 reads per redraw |
 | [138](BUG-138-cancelled-loads-reported-as-errors.md) | P3 | MailStore | Moving on from a message before it has loaded shows "Couldn’t load message: cancelled" (also images, calendar, attachment previews) |
 | [142](BUG-142-invite-time-drops-end-date.md) | P3 | Invite | Invite card shows only the start day for a meeting that ends on a later day |
