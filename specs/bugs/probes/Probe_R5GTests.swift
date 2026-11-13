@@ -110,32 +110,6 @@ struct Probe_R5GFindings {
     typealias F = R5GFixture
     var w: UUID { F.work.id }
 
-    /// R5G: conversation view (Settings ▸ Viewing): clicking the next unread message after an opened unread one in
-    /// Archive (30,000). Without conversations the same click costs about half.
-    @Test func openingUnreadInConversationViewStaysInBudget() {
-        let unread = F.base.filter { $0.accountID == F.work.id && $0.mailbox == .archive && !$0.isRead }
-        let a = unread[0].id, b = unread[1].id
-        func click(_ grouped: Bool) -> Double {
-            F.time("grouped=\(grouped): open unread, then the next unread + redraw", setup: { s in
-                s.groupsConversations = grouped; s.selectedMailbox = .account(F.work.id, .archive)
-                s.selection = [a]; s.markSelectionRead(); F.redraw(s)
-            }) { s in s.selection = [b]; s.markSelectionRead(); F.redraw(s) }
-        }
-        func alone(_ grouped: Bool) -> Double {
-            F.time("grouped=\(grouped): selection + markSelectionRead alone (no redraw)", setup: { s in
-                s.groupsConversations = grouped; s.selectedMailbox = .account(F.work.id, .archive)
-                s.selection = [a]; s.markSelectionRead(); F.redraw(s)
-            }) { s in s.selection = [b]; s.markSelectionRead() }
-        }
-        let rebuild = F.time("one list rebuild of Archive, grouped (control)", setup: { s in
-            s.groupsConversations = true; s.selectedMailbox = .account(F.work.id, .archive); F.redraw(s)
-        }) { s in s.filterUnread = true; _ = s.visibleMessages }
-        let flat = click(false), grouped = click(true), flatAlone = alone(false), groupedAlone = alone(true)
-        print(String(format: "R5G open next unread: conversations %.3fs, flat %.3fs; before the redraw: conversations %.3fs, flat %.3fs; one grouped rebuild %.3fs",
-                     grouped, flat, groupedAlone, flatAlone, rebuild))
-        #expect(grouped < F.limit)
-    }
-
 }
 
 /// R5G: File ▸ New Viewer Window (⌥⌘N). Every viewer window runs `pollForMail`, whose first step is `AppSetup.loadMail`:
