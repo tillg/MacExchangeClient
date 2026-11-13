@@ -53,4 +53,29 @@ struct MailStoreE2ETests {
         #expect(foreign.isEmpty, "mail of a removed account loaded: \(foreign)")
         #expect(s.visibleMessages.map(\.subject) == ["work inbox"], "All Inboxes shows \(s.visibleMessages.map(\.subject))")
     }
+
+    /// A check that runs before launch has restored the stored Inbox (a mailbox clicked while "Loading Mail…")
+    /// doesn't duplicate its messages, and the sync position it fetched isn't put back to the stored one.
+    @Test func refreshBeforeLaunchRestoreDoesNotDuplicateTheInbox() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let db = try MailDatabase(url: url)
+        var stored = server("A"); stored.accountID = a.id; stored.body = "stored text"; stored.bodyLoaded = true
+        try db.write(StoreChanges(upserts: [stored], sync: [SyncState(account: a.id, mailbox: .sent, token: "old", complete: true)]))
+        let s = MailStore(accounts: [a], messages: [])
+        // Early check: Inbox not known yet → newest merged; Sent moved on to "new".
+        s.merge([server("A"), server("B")], account: a.id, mailbox: .inbox)
+        s.apply(page([], token: "new"), account: a.id, mailbox: .sent)
+        let first = [MailboxKey(account: a.id, mailbox: .inbox)]
+        s.restore(try db.meta())
+        s.restore(try db.messages(in: first), boxes: first)
+        s.finishLoading(try db.messages(notIn: first))
+        #expect(s.messages.filter { $0.remoteID == "A" }.count == 1, "Inbox shows A \(s.messages.filter { $0.remoteID == "A" }.count) times")
+        #expect(s.syncToken(a.id, .sent) == "new")
+        // Saved and launched again: still one A, and the newer position.
+        try db.write(s.takeChanges())
+        let s2 = try launch([a], from: url)
+        #expect(s2.messages.filter { $0.remoteID == "A" }.count == 1)
+        #expect(s2.syncToken(a.id, .sent) == "new")
+    }
 }

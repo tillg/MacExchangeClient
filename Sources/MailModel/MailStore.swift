@@ -974,8 +974,10 @@ public final class MailStore {
     /// Launch, step 1: sync positions, folders and waiting changes. Messages follow with the next calls.
     public func restore(_ meta: StoredMeta) {
         let mine = Set(accounts.map(\.id))
+        // A check that ran before this (a mailbox selected while launch loads) has newer positions: they stay.
+        let fetched = Set(syncTokens.keys)
         for s in meta.sync where mine.contains(s.account) {
-            if let t = s.token { syncTokens[key(s.account, s.mailbox)] = t }
+            if let t = s.token, !fetched.contains(key(s.account, s.mailbox)) { syncTokens[key(s.account, s.mailbox)] = t }
             if s.complete { complete.insert(key(s.account, s.mailbox)) }
             serverAccounts.insert(s.account)
         }
@@ -997,8 +999,9 @@ public final class MailStore {
             }
         }
         loadedBoxes = []
-        // What was just read from disk doesn't need writing back; a send taken out of the outbox does.
-        syncChanged = false; foldersChanged = false; outboxChanged = interrupted
+        // What was just read from disk doesn't need writing back; a send taken out of the outbox does, and so do
+        // positions fetched before it.
+        syncChanged = !fetched.isEmpty; foldersChanged = false; outboxChanged = interrupted
     }
 
     /// Launch, step 2: the mail of some mailboxes (the Inbox first), shown while the rest loads.
@@ -1018,11 +1021,25 @@ public final class MailStore {
     }
 
     /// Stored messages to add at launch: those of the accounts set up (the mail of an account no longer in the list
-    /// stays on disk but isn't shown), and not in memory yet.
+    /// stays on disk but isn't shown), and not in memory yet. A server message a check brought before launch had
+    /// read it is in memory under another local ID: that newer version stays, and the stored row goes.
     private func notInMemory(_ stored: [Message]) -> [Message] {
+        struct RemoteKey: Hashable { let account: UUID; let id: String }
         let mine = Set(accounts.map(\.id))
         let known = Set(messages.map(\.id))
-        return stored.filter { mine.contains($0.accountID) && !known.contains($0.id) }
+        var remote = Set<RemoteKey>()
+        for m in messages { if let r = m.remoteID { remote.insert(RemoteKey(account: m.accountID, id: r)) } }
+        var stale = Set<Message.ID>()
+        let new = stored.filter { m in
+            guard mine.contains(m.accountID), !known.contains(m.id) else { return false }
+            if !remote.isEmpty, let r = m.remoteID, remote.contains(RemoteKey(account: m.accountID, id: r)) {
+                stale.insert(m.id)
+                return false
+            }
+            return true
+        }
+        if !stale.isEmpty { forget(stale) }
+        return new
     }
 
     /// True while launch is still loading stored mail.

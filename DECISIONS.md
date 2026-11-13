@@ -822,3 +822,11 @@ edited: 2026-11-13
 - **Status:** decided
 - **Context:** BUG-088. `removeLocalAccounts()` reset the selection and jumped to All Inboxes even when there was no sample account to remove.
 - **Decision:** With nothing to remove it returns at once; when sample accounts go, the reset stays as before (their messages and mailboxes are gone).
+
+## 06:50 — A check before launch has read the Inbox: its copy wins, the stored row goes {#d-bug-092}
+
+- **Status:** decided
+- **Context:** BUG-092. A check that ran before launch had restored the database (a mailbox clicked during "Loading Mail…") merged the newest Inbox mail under new local IDs; the restore then added the stored copies again (it matched by local ID only), and `restore(meta)` put back the older sync positions.
+- **Decision:** Launch skips a stored message whose server ID is already in memory for that account; the copy in memory (newer) stays, and the stored row is deleted with the next save, so the next launch has one row too. `restore(meta)` keeps sync positions fetched before it and marks them to be saved.
+- **Why:** no storage change: rows are written and deleted as before. The stored body of such a message is fetched again when it is shown.
+- **Alternatives:** don't check before launch has loaded (rejected: the probe's sequence calls the store directly; and the Inbox would wait for the database); give the memory copy the stored local ID (rejected: the selection may already hold the new ID).
