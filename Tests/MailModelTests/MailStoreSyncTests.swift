@@ -461,4 +461,27 @@ struct MailStoreSyncTests {
         #expect(p.change == .setRead(["R1"], true))
         #expect(p.inFlight == nil)
     }
+
+    // MARK: One unreachable account doesn't hold up the others (BUG-096)
+
+    /// Account A's server can't be reached (only over VPN, or down): its changes wait, in order, while account B's
+    /// changes and sends go out.
+    @Test func unreachableAccountDoesNotBlockTheOtherAccountsChanges() async throws {
+        let missing = FileManager.default.temporaryDirectory.appendingPathComponent("ews-sync-missing-\(UUID().uuidString).xml")
+        let s = MailStore(accounts: [], messages: [])
+        s.add(work, backend: backend(missing))  // file:// fixture that isn't there: a network error
+        s.add(home, backend: backend(try responseFile(success)))  // file:// fixture
+        s.apply(page(["A1", "A2"], token: "T1"), account: work.id, mailbox: .inbox)
+        s.apply(SyncResult(upserts: [remote("B1", account: home)], deletedRemoteIDs: [], token: "T1", more: false),
+                account: home.id, mailbox: .inbox)
+        let a1 = id(s, "A1"), a2 = id(s, "A2"), b1 = id(s, "B1")
+        s.toggleRead([a1])
+        s.toggleRead([b1])
+        s.setFlag(.red, for: [a2])
+        s.send(Draft(accountID: home.id, to: "x@y.com", subject: "From B", body: "b"))
+        await s.refresh(history: false)
+        #expect(s.outbox.filter { $0.account == home.id }.isEmpty, "B: \(s.outbox.filter { $0.account == home.id }.map(\.change))")
+        #expect(s.outbox.map(\.change) == [.setRead(["A1"], true), .setFlagged(["A2"], true)], "A's changes wait in order")
+        #expect(s.message(a1)?.isRead == true, "A's change isn't undone")
+    }
 }

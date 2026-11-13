@@ -369,3 +369,10 @@ edited: 2026-11-13
 - **Why:** README: a message that fails to send is never resent automatically; a send interrupted by quitting is the same uncertain case as a timeout.
 - **Not covered:** Invite answers (`respond`, `reply`) and other changes in flight are still replayed after a crash; repeating a read/flag/move is harmless, a repeated answer may notify the organizer twice. The status line is cleared by the next successful mail check (filed separately as BUG-100), so the draft in Drafts is the lasting trace.
 - **Alternatives:** Mark without the extra save (rejected: a crash between the mark and the 15-second save would still resend). Ask the user at launch with a dialog (rejected: the store has no UI; Drafts plus status matches the existing timeout rule).
+
+## 01:30 — A network error pauses only that account's changes {#d-bug-096}
+
+- **Status:** decided
+- **Context:** BUG-096. The outbox is one queue for all accounts, and `drain` stopped at the first network error, so a VPN-only or down server held up every other account's changes and sends.
+- **Decision:** On a `URLError` for a change that isn't a send or invite answer, `drain` notes the account as unreachable for the rest of this drain and goes on with the oldest change of any other account. All later changes of the unreachable account wait, so its order is kept; they go with the next refresh. The status text stays "Offline – changes will be sent to Exchange later".
+- **Why:** README: offline, changes wait until the next refresh; offline is per server. The quick check already treats accounts independently.

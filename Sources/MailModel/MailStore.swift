@@ -982,10 +982,14 @@ public final class MailStore {
         }
     }
 
-    /// Writes queued changes in order. When offline, changes stay queued for the next refresh;
-    /// a send is never retried, because a timed-out send may have gone out.
+    /// Writes queued changes in order. When an account's server can't be reached, its changes stay queued for the
+    /// next refresh while other accounts' changes go out; a send is never retried, because a timed-out send may have
+    /// gone out.
     private func drain() async {
-        while let p = outbox.first(where: canSend), let backend = backends[p.account] {
+        // Accounts whose server couldn't be reached this time: their changes wait, in order; the others go on.
+        var unreachable = Set<UUID>()
+        while let p = outbox.first(where: { canSend($0) && !unreachable.contains($0.account) }),
+              let backend = backends[p.account] {
             if case .send = p.change, let i = outbox.firstIndex(where: { $0.id == p.id }) {
                 // Marked and saved before the request goes out: a quit or crash meanwhile can't send it twice.
                 outbox[i].inFlight = true
@@ -1004,7 +1008,7 @@ public final class MailStore {
                 if case .respond = p.change { failed(p, e.localizedDescription); continue }
                 if case .reply = p.change { failed(p, e.localizedDescription); continue }
                 status = "Offline – changes will be sent to Exchange later"
-                return
+                unreachable.insert(p.account)
             } catch {
                 failed(p, error.localizedDescription)
             }
