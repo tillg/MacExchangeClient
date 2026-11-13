@@ -764,4 +764,14 @@ struct EWSParsingTests {
         #expect(!s.canAnswer(id), "own invitation answerable; account address is \"\(ex.account.address)\"")
         #expect(EWSBackend.mailTipsRequest(from: ex.account.address).contains("<t:EmailAddress>me@work.com</t:EmailAddress>"))
     }
+
+    /// BUG-252: the Keychain item is per user and server, so two accounts with the same username on different
+    /// servers keep their own passwords. The item from before (user only) is still read, as a fallback.
+    @Test func keychainItemIsPerUserAndServer() {
+        let a = ExchangeAccount(email: "a@x.com", username: "W\\me", server: "Mail.Work.com")
+        let b = ExchangeAccount(email: "b@y.com", username: "W\\me", server: "https://mail.club.org/EWS/Exchange.asmx")
+        #expect(a.keychainAccounts == ["W\\me@mail.work.com", "W\\me"])
+        #expect(b.keychainAccounts == ["W\\me@mail.club.org", "W\\me"])
+        #expect(ExchangeAccount(email: "", username: "u", server: "").keychainAccounts == ["u"])
+    }
 }

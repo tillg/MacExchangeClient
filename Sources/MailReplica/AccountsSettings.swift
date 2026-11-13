@@ -176,7 +176,7 @@ struct AccountsSettings: View {
             $0.email.caseInsensitiveCompare(email) == .orderedSame && $0.username == username && $0.ewsURL == typed.ewsURL
         } ?? typed
         guard let url = account.ewsURL else { message = "Invalid server"; return }
-        guard let pw = password.isEmpty ? Keychain.password(for: username) : password else {
+        guard let pw = password.isEmpty ? account.password : password else {
             message = "Enter the password"; return
         }
         message = "Connecting…"
@@ -186,7 +186,7 @@ struct AccountsSettings: View {
             message = error.localizedDescription
             return
         }
-        if !password.isEmpty, !Keychain.setPassword(password, for: username) {
+        if !password.isEmpty, !account.setPassword(password) {
             message = "Couldn't save the password in the Keychain"; return
         }
         if !saved.contains(account) { saved.append(account) }

@@ -38,9 +38,21 @@ public struct ExchangeAccount: Codable, Hashable, Sendable {
         return Account(id: id, name: address.isEmpty ? "Exchange" : address, address: address, isServer: true)
     }
 
+    /// The Keychain accounts its password may be stored under, first match wins: "user@host", so two accounts with
+    /// the same username on different servers keep their own (BUG-252); then the username alone, as stored before.
+    public var keychainAccounts: [String] {
+        guard let host = ewsURL?.host?.lowercased() else { return [username] }
+        return ["\(username)@\(host)", username]
+    }
+
+    public var password: String? { keychainAccounts.lazy.compactMap(Keychain.password(for:)).first }
+
+    /// Stores the password under the first of `keychainAccounts`.
+    public func setPassword(_ password: String) -> Bool { Keychain.setPassword(password, for: keychainAccounts[0]) }
+
     /// A backend for this account, or nil if the server is invalid or no password is stored.
     public func backend() -> EWSBackend? {
-        guard let url = ewsURL, let pw = Keychain.password(for: username) else { return nil }
+        guard let url = ewsURL, let pw = password else { return nil }
         return EWSBackend(client: EWSClient(url: url, username: username, password: pw))
     }
 

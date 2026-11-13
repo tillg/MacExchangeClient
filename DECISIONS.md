@@ -16,6 +16,7 @@ edited: 2026-11-13
   - [13:20 — Five parallel probe hunters in detached worktrees; bugs numbered from BUG-154](#run-2026-11-13-1235-6)
   - [13:58 — Commit while timing and WebKit tests fail under the hunters' load](#run-2026-11-13-1235-7)
   - [14:40 — BUG-194 deferred: its fix contradicts an existing test](#run-2026-11-13-1235-8)
+  - [14:38 — Keychain items keyed "user@host", old username-only items still read](#run-2026-11-13-1235-9)
 
 # 2026-11-12 23:16 — Unattended bug-fix run {#run-2026-11-12-2316}
 
@@ -985,3 +986,13 @@ edited: 2026-11-13
 - **Why:** the user's rule: never make tests pass by changing them without permission.
 - **Alternatives:** prefix hidden names with "_" (still breaks that test); only strip a single leading dot (inconsistent: "..x" stays hidden).
 - **Consequences:** the user decides whether "..:..:etc" is intended; then BUG-194 is a two-line fix.
+
+## 14:38 — Keychain items keyed "user@host", old username-only items still read {#run-2026-11-13-1235-9}
+
+- **Status:** open
+- **Context:** BUG-252: two accounts with the same `DOMAIN\user` on different servers shared one Keychain item (service `MailReplica-EWS`, account = username).
+- **Question:** how to key the item without losing the user's stored password?
+- **Decision:** new items are written as account `"<username>@<host>"` (host of the EWS URL, lower case); reading tries that first, then the old username-only item. Old items are never deleted.
+- **Why:** the user's existing account keeps working with no new sign-in; a new sign-in writes the per-server item.
+- **Alternatives:** `kSecClassInternetPassword` with `kSecAttrServer` (cleaner, but a different item class: the old item would need copying and a new "Always Allow").
+- **Consequences:** until an account signs in again, it can still read a stale shared old item; the README's live-test note (account = username) still works through the fallback. Rollback: revert the commit, the old items are untouched.
