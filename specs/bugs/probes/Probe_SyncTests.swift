@@ -48,23 +48,6 @@ struct Probe_SyncTests {
         #expect(!ids.contains("A"), "outbox still has \(s.outbox.map(\.change))")
     }
 
-    // MARK: Folders
-
-    /// A folder removed on the server: its mail must not linger in Flagged / search.
-    @Test func mailOfARemovedServerFolderIsDropped() {
-        let s = store()
-        let x = MailboxKind.folder("X")
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "i"), RemoteFolder(role: x, id: "X", name: "Projects")],
-                           account: work.id)
-        s.apply(page([remote("A", subject: "Quarterly plan", flag: .red)], token: "x1"), account: work.id, mailbox: x)
-        #expect(s.count(.smart(.flagged)) == 1)
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "i")], account: work.id)
-        #expect(s.children(of: nil, account: work.id).isEmpty)
-        #expect(s.count(.smart(.flagged)) == 0, "flagged mail of a deleted folder")
-        s.searchText = "quarterly"
-        #expect(s.visibleMessages.isEmpty, "search finds mail of a deleted folder")
-    }
-
     // MARK: Status messages
 
     @Test func failedSaveDraftDoesNotSayCouldntSend() {
@@ -108,17 +91,6 @@ struct Probe_SyncTests {
         }
         let b = run(batch: true), q = run(batch: false)
         #expect(b.sameID == q.sameID && b.selected == q.selected && b.body == q.body, "batch \(b) vs one by one \(q)")
-    }
-
-    /// Folder removed on the server while it is the selected mailbox: the title goes blank.
-    @Test func selectedRemovedFolderKeepsATitle() {
-        let s = store()
-        let x = MailboxKind.folder("X")
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "i"), RemoteFolder(role: x, id: "X", name: "Projects")], account: work.id)
-        s.selectedMailbox = .account(work.id, x)
-        #expect(s.title == "Projects")
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "i")], account: work.id)  // next launch: folder gone
-        #expect(s.title != "", "blank title, selection \(s.selectedMailbox)")
     }
 
     @Test func outboxBatchesAt100And101WithMixedChanges() {

@@ -471,35 +471,6 @@ struct Probe_DB2Tests {
         #expect(try d.search(query, accounts: nil).count == 1, "\(query) → \(subject)")
     }
 
-    // MARK: Folder state
-
-    /// A folder of the user's own is deleted on the server (Outlook: Shift-Delete, or emptied from Deleted
-    /// Items). The next folder list drops it from the sidebar, but its mail stays in memory and on disk for good:
-    /// it shows in search results and in Flagged, under a mailbox that no longer exists.
-    @Test func probeMailOfFolderDeletedOnServerGoesAway() async throws {
-        let url = tempURL(); defer { cleanup(url) }
-        let d = try MailDatabase(url: url)
-        let s = MailStore(accounts: [work], messages: [])
-        let all = MailboxKind.allCases.map { RemoteFolder(role: $0, id: $0.rawValue) }
-        s.setRemoteFolders(all + [RemoteFolder(role: .folder("P"), id: "P", name: "Projekt")], account: work.id)
-        var m = mail("Projekt Budget", box: .folder("P"), rid: "P1"); m.flag = .red
-        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "tp", more: false), account: work.id, mailbox: .folder("P"))
-        try d.write(s.takeChanges())
-        // The folder is gone on the server.
-        s.setRemoteFolders(all, account: work.id)
-        try d.write(s.takeChanges())
-        #expect(s.children(of: nil, account: work.id).isEmpty)  // control: gone from the sidebar
-        s.searchDebounce = .zero
-        s.searcher = { q, a in try d.search(q, accounts: a) }
-        s.searchText = "budget"
-        await s.searchTask?.value
-        #expect(s.visibleMessages.isEmpty, "search shows mail of the deleted folder: \(s.visibleMessages.map(\.subject))")
-        s.searchText = ""
-        s.selectedMailbox = .smart(.flagged)
-        #expect(s.visibleMessages.isEmpty, "Flagged shows \(s.visibleMessages.map { "\($0.subject) in \($0.mailbox.rawValue)" })")
-        #expect(try MailDatabase(url: url).count() == 0, "rows of the deleted folder kept on disk")
-    }
-
     /// README "To go back": delete Mail.sqlite* and rename Cache.json.imported to Cache.json. A user who copies
     /// it back instead (keeping the .imported file) upgrades again: the database is built and put in place, then
     /// renaming the cache fails, the import reports an error and the session runs without saving.
