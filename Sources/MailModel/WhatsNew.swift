@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Search finds Chinese and Japanese words in the middle of a sentence again.",
             "Search finds Greek words whether or not you type their accents, as it already did for French or German.",
             "Moving your mail into the new storage no longer fails when a copy of the old mail file from an earlier move is still there.",
             "Names and file names with unusual hidden characters no longer split into several recipients or attachments after you restart the app.",

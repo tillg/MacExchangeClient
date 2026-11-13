@@ -658,3 +658,12 @@ edited: 2026-11-13
 - **Why:** no migration, works on existing databases at once; at most a dozen prefix terms per Greek word.
 - **Not covered:** dialytika (ϊ, ϋ) in the indexed text aren't matched by a word typed without them.
 - **Alternatives:** A tokenizer that folds Greek (rejected: index rebuild, custom C tokenizer).
+
+## 03:19 — Chinese and Japanese words are searched by substring, not with a new tokenizer {#d-bug-081}
+
+- **Status:** decided
+- **Context:** BUG-081. `unicode61` sees a Chinese or Japanese sentence as one token, so a word inside it wasn't found. A segmenting or trigram tokenizer means rebuilding the 180k-row index and changes matching for every script.
+- **Decision:** A query word containing Han, hiragana or katakana is matched with `LIKE '%word%'` over the indexed columns of `messages`; the other words still use the index. No change to the index or on-disk data.
+- **Why:** no rebuild, no migration. Measured on 180,000 synthetic rows (3 KB bodies): 0.4 s for a word with no hit (full scan, on the search queue, off the main thread), close to the old memory search; with hits the newest-first scan stops at the limit.
+- **Not covered:** a CJK word that only appears in the HTML (not in the text body) isn't found, as for every search; LIKE is not accent-folded (irrelevant for these scripts).
+- **Alternatives:** `trigram` tokenizer (rejected: index rebuild, three times the index size, no prefix semantics for other languages). Answer CJK queries from memory (rejected: a MailStore change in an area another agent is editing).

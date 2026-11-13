@@ -206,7 +206,12 @@ public final class MailDatabase: @unchecked Sendable {
     /// any field. Trash and Junk are left out here, before the limit, so their hits can't crowd out the rest;
     /// the caller checks scope and mailbox again against memory (the database may lag it).
     public func search(_ query: String, accounts: Set<UUID>?, limit: Int = searchLimit) throws -> [Message.ID] {
-        guard let match = Self.matchExpression(query), accounts?.isEmpty != true else { return [] }
+        // Chinese and Japanese words: the tokenizer can't split those scripts into words, so they are looked for
+        // anywhere in the indexed text (a scan, newest first), the other words in the index.
+        let words = query.replacingOccurrences(of: "\u{0}", with: " ").split(whereSeparator: \.isWhitespace)
+        let cjk = words.filter { $0.unicodeScalars.contains(where: Self.isCJK) }.map(String.init)
+        let match = Self.matchExpression(words.filter { w in !w.unicodeScalars.contains(where: Self.isCJK) }.joined(separator: " "))
+        guard match != nil || !cjk.isEmpty, accounts?.isEmpty != true else { return [] }
         return try readQueue.sync {
             if reader == nil {
                 guard sqlite3_open_v2(url.path, &reader, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, nil) == SQLITE_OK else {
@@ -216,15 +221,30 @@ public final class MailDatabase: @unchecked Sendable {
                 }
             }
             let scope = accounts.map { a in " AND m.account IN (" + a.map { _ in "?" }.joined(separator: ",") + ")" } ?? ""
+            let anywhere = String(repeating: " AND (" + Self.indexed.map { "m.\($0) LIKE ? ESCAPE '\\'" }.joined(separator: " OR ") + ")",
+                                  count: cjk.count)
+            let patterns = cjk.flatMap { w in
+                let p = "%" + w.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "%", with: "\\%")
+                    .replacingOccurrences(of: "_", with: "\\_") + "%"
+                return Array(repeating: p, count: Self.indexed.count)
+            }
+            let source = match == nil ? "messages m WHERE 1" : "messages_fts f JOIN messages m ON m.rowid = f.rowid WHERE messages_fts MATCH ?"
             var ids: [Message.ID] = []
             try self.query("""
-                SELECT m.id FROM messages_fts f JOIN messages m ON m.rowid = f.rowid
-                WHERE messages_fts MATCH ? AND m.mailbox NOT IN ('\(MailboxKind.trash.rawValue)', '\(MailboxKind.junk.rawValue)')\(scope)
+                SELECT m.id FROM \(source) AND m.mailbox NOT IN ('\(MailboxKind.trash.rawValue)', '\(MailboxKind.junk.rawValue)')\(scope)\(anywhere)
                 ORDER BY m.date DESC LIMIT \(max(limit, 0))
-                """, [match] + (accounts ?? []).map(\.uuidString), on: reader) { r in
+                """, (match.map { [$0] } ?? []) + (accounts ?? []).map(\.uuidString) + patterns, on: reader) { r in
                 if let id = UUID(uuidString: r.text(0)) { ids.append(id) }
             }
             return ids
+        }
+    }
+
+    /// Han ideographs, hiragana and katakana: scripts written without spaces between words.
+    static func isCJK(_ c: Unicode.Scalar) -> Bool {
+        switch c.value {
+        case 0x3040...0x30FF, 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF, 0x20000...0x3134F: true
+        default: false
         }
     }
 

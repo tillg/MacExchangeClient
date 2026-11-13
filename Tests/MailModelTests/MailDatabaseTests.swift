@@ -433,6 +433,19 @@ struct MailDatabaseTests {
         #expect(try db.search(query, accounts: nil) == [m.id], "\(query) → \(subject)")
     }
 
+    /// Chinese and Japanese are written without spaces: a word inside a sentence is found, also next to other words.
+    @Test func searchFindsChineseAndJapaneseWordsInsideSentences() throws {
+        let zh = mail("明天的会议取消了"), ja = mail("会議の議事録を送ります", body: "Budget attached"), pct = mail("50%折扣")
+        let (db, url) = try searchable([zh, ja, pct, mail("Other"), mail("50x折扣")])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        #expect(try db.search("明天", accounts: nil) == [zh.id])
+        #expect(try db.search("会议", accounts: nil) == [zh.id])
+        #expect(try db.search("議事録", accounts: nil) == [ja.id])
+        #expect(try db.search("議事録 budget", accounts: nil) == [ja.id])
+        #expect(try db.search("議事録 other", accounts: nil) == [])
+        #expect(try db.search("%折扣", accounts: nil) == [pct.id])
+    }
+
     @Test func searchMatchesWordPrefixesNotFragments() throws {
         let m = mail("Rechnung März")
         let (db, url) = try searchable([m])
