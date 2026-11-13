@@ -2173,7 +2173,8 @@ public final class MailStore {
         let me = account(m.accountID)?.address
         // A prefix of the same kind already there (any case, with or without a space; AW:/WG: from German
         // Outlook) is replaced by the standard one rather than stacked.
-        let (prefix, existing) = kind == .forward ? ("Fwd: ", /^(?i:fwd|fw|wg): ?/) : ("Re: ", /^(?i:re|aw): ?/)
+        // Also numbered ("Re[2]:") and after leading blanks (BUG-203).
+        let (prefix, existing) = kind == .forward ? ("Fwd: ", /^\s*(?i:fwd|fw|wg)(\[\d+\])?: ?/) : ("Re: ", /^\s*(?i:re|aw)(\[\d+\])?: ?/)
         let subject = prefix + m.subject.replacing(existing, with: "", maxReplacements: 1)
         let df = DateFormatter(); df.dateStyle = .medium; df.timeStyle = .short
         // Any line ending: Exchange bodies use CRLF, which is one Character in Swift, not "\n".
@@ -2210,6 +2211,8 @@ public final class MailStore {
             let replyTo = (m.replyTo ?? []).filter { !$0.email.isEmpty }  // names only count as none
             to = addresses((replyTo.isEmpty ? [m.from] : replyTo) + m.to)
             cc = addresses(m.cc)
+            // A note only to myself goes to me, as Reply does (BUG-187).
+            if to.isEmpty && cc.isEmpty { to = m.from.email }
         case .forward: break
         }
         var d = Draft(accountID: m.accountID, to: to, cc: cc, subject: subject, body: header + quoted)

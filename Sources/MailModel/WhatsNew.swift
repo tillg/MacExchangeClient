@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Replies to \"Re[2]: …\" no longer stack a second \"Re:\", Reply All to a note to yourself goes to you, and invisible characters pasted with an address are dropped.",
             "A few menus, icons and labels now match Apple Mail more closely (Include Attachments order, View Options and Unread icons, the include-attachments question).",
             "The window title says \"1 message\" instead of \"1 messages\".",
             "Opening the next unread message in a large mailbox with conversations on is quicker.",
