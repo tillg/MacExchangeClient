@@ -148,6 +148,9 @@ flowchart LR
   `send` goes out it is marked `inFlight` and `saveBeforeSending` writes the changes to disk and is awaited
   (`AppSetup.saveAndWait`). At launch `restore(meta)` keeps a send still marked in flight in Drafts on this Mac
   instead of queueing it, with a status to check Sent.
+  - A send or invite answer that meets a timeout or "busy" goes to Drafts (never repeated), and the account's other
+    changes wait as for any other change (set aside for this drain, `busyUntil` from the back-off) (BUG-164). The
+    background check of complete folders stops for the account at throttling too (BUG-161).
   - A refused read, flag or move change undoes only while its value still holds; when a later queued change of the
     same kind overwrote it, that change's undo copy takes this one's old value, so two refusals end in the server's
     state (BUG-167).

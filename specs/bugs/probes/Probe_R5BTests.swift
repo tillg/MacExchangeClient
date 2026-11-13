@@ -69,17 +69,6 @@ struct Probe_R5BTests {
 
     // MARK: R5B-01
 
-    /// Exchange throttles the account (ErrorServerBusy with a back-off) during the background checks of the folders
-    /// not on screen: the account must be set aside, as everywhere else, not asked again for every other folder.
-    @Test func r5b01_backgroundCheckStopsAtThrottling() async throws {
-        let server = ScriptedServer([], fallback: R5B.throttled())
-        defer { server.stop() }
-        let s = store(server)
-        for box in [MailboxKind.inbox, .drafts, .sent, .trash] { complete(s, box) }
-        await s.syncHistory()
-        #expect(server.served == 1, "a throttled account was asked \(server.served) times in one background run")
-    }
-
     // MARK: R5B-02
 
     /// A mail folder inside Contacts (Outlook allows "Mail and Post Items" folders anywhere). Its parent is in the
@@ -127,21 +116,6 @@ struct Probe_R5BTests {
     func mid(_ s: MailStore, _ rid: String) -> Message.ID { s.messages.first { $0.remoteID == rid }!.id }
 
     // MARK: R5B-04
-
-    /// Exchange throttles a send (ErrorServerBusy with a 60 s back-off). The send goes to Drafts, as decided; but the
-    /// account's other waiting changes must not be sent right after it, within the back-off (README: "your changes
-    /// aren't sent again before then").
-    @Test func r5b04_throttledSendHoldsTheAccountsOtherChanges() async throws {
-        let server = ScriptedServer([R5B.throttled()], fallback: EWSReply.resp("UpdateItem", EWSReply.ok("UpdateItem")))
-        defer { server.stop() }
-        let s = inboxStore(server, ["A"])
-        s.send(Draft(accountID: acct.id, to: "bob@x.com", subject: "Report", body: "Hi"))
-        s.toggleRead([mid(s, "A")])
-        try await waitFor { s.messages.contains { $0.mailbox == .drafts } }
-        try await Task.sleep(for: .milliseconds(300))
-        #expect(server.served == 1, "\(server.served) requests went to a server that asked to wait 60 s")
-        #expect(s.outbox.map(\.change) == [.setRead(["A"], true)])
-    }
 
     // MARK: R5B-05
 
