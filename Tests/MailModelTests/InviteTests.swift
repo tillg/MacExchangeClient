@@ -114,3 +114,16 @@ struct InviteTests {
         #expect(threeDays.contains("Monday") && threeDays.contains("Wednesday") && !threeDays.contains("Thursday"), "\(threeDays)")
     }
 }
+
+/// BUG-192: an invite past midnight (22:00–02:00) reads the calendar until its end, not only until midnight.
+@MainActor @Test func overnightInviteReadsTheCalendarUntilItsEnd() {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "Europe/Berlin")!
+    let start = cal.date(from: DateComponents(year: 2026, month: 11, day: 20, hour: 22))!
+    let night = Invite(start: start, end: start.addingTimeInterval(4 * 3600))
+    let (from, to) = MailStore.calendarRange(of: night, calendar: cal)
+    #expect(from == cal.date(from: DateComponents(year: 2026, month: 11, day: 20)))
+    #expect(to == night.end)
+    let day = Invite(start: start.addingTimeInterval(-10 * 3600), end: start.addingTimeInterval(-9 * 3600))
+    #expect(MailStore.calendarRange(of: day, calendar: cal).1 == cal.date(from: DateComponents(year: 2026, month: 11, day: 21)))
+}

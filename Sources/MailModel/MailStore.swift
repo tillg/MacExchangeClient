@@ -1588,6 +1588,14 @@ public final class MailStore {
     /// Invites whose day couldn't be read (no server, paused, an error) and has none shown: no longer waited for.
     public private(set) var unavailableDays: Set<Message.ID> = []
 
+    /// The calendar read for an invite: its day, and on to its end when it runs past midnight, so conflicts after
+    /// midnight show too (BUG-192).
+    static func calendarRange(of invite: Invite, calendar: Calendar = .current) -> (Date, Date) {
+        let from = calendar.startOfDay(for: invite.start)
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: from) ?? from.addingTimeInterval(86400)
+        return (from, max(dayEnd, invite.end))
+    }
+
     /// Fetches the local calendar day around an invite, for its day column and conflict note.
     public func loadDay(for id: Message.ID) async {
         guard let m = message(id), let invite = m.invite else { return }
@@ -1595,8 +1603,7 @@ public final class MailStore {
             if dayEvents[id] == nil { unavailableDays.insert(id) }
             return
         }
-        let from = Calendar.current.startOfDay(for: invite.start)
-        let to = Calendar.current.date(byAdding: .day, value: 1, to: from) ?? from.addingTimeInterval(86400)
+        let (from, to) = Self.calendarRange(of: invite)
         do { setDayEvents(try await backend.events(from: from, to: to), for: id) } catch {
             // A cancelled load (the user moved on) says nothing about the calendar: the next showing loads it again.
             if Self.wasCancelled(error) { return }
