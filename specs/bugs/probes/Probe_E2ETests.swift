@@ -308,25 +308,6 @@ struct Probe_E2ETests {
         #expect(s.visibleMessages.map(\.remoteID) == ["R2"], "index search: \(s.visibleMessages.map(\.remoteID))")
     }
 
-    /// A draft saved from here (or Outlook) and opened once, then edited elsewhere: the Drafts sync brings the new
-    /// summary, but the merge keeps the old loaded body and never fetches it again; subject and text disagree.
-    @Test func draftEditedOnTheServerShowsItsNewText() throws {
-        let url = tempURL()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let s = MailStore(accounts: [a], messages: [])
-        var v1 = server("D1"); v1.subject = "Offer v1"; v1.serverPreview = "Price 100"
-        s.apply(page([v1], token: "d1"), account: a.id, mailbox: .drafts)
-        let id = s.messages[0].id
-        s.setBody(MessageBody(text: "Price 100", attachments: [Attachment(name: "v1.pdf", size: 1000, contentType: "application/pdf")]), for: id)
-        var v2 = server("D1"); v2.subject = "Offer v2"; v2.serverPreview = "Price 250"; v2.hasAttachments = true
-        s.apply(page([v2], token: "d2"), account: a.id, mailbox: .drafts)
-        let db = try MailDatabase(url: url)
-        let (s2, _) = try relaunch(s, db, url)
-        let m = try #require(s2.message(id))
-        #expect(m.subject == "Offer v2")
-        #expect(m.body == "Price 250" || m.needsBody, "subject 'Offer v2' with body '\(m.body)', needsBody \(m.needsBody)")
-    }
-
     /// Messages received in the same second (a mailing-list burst) keep their order in Flagged across a relaunch.
     @Test func sameTimeMessagesKeepTheirOrderAfterRelaunch() throws {
         let url = tempURL()

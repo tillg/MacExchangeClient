@@ -88,8 +88,9 @@ flowchart LR
 - **Progress:** `progress` shows "Synchronizing “name”" with the share of the server's `TotalCount` already here.
 - **Merge rules** (`merge`): a known `remoteID` keeps its local ID; a server flag keeps the local colour; a summary
   doesn't drop a loaded body, attachments, invite or HTML, nor the body's addresses (`keeping`: a names-only contact
-  naming the same person keeps the loaded one) or its paperclip state. A summary that names other people (a draft
-  edited elsewhere) replaces the contacts and drops the loaded body, which is fetched again when shown; a message with a pending outbox change keeps the property
+  naming the same person keeps the loaded one) or its paperclip state. A summary that names other people or has another
+  preview (a draft edited elsewhere; a nil stored preview counts as unchanged, a new subject alone doesn't) replaces
+  the contacts and drops the loaded body, which is fetched again when shown; a message with a pending outbox change keeps the property
   that change sets (read state for `setRead`, flag for `setFlagged`, mailbox for a move or an invite answer, all of
   them for an erase) and takes the server's read state, flag and mailbox for the others (`Guarded`). The same
   holds for a change already written after the answer was requested: every server read notes `requestStamp` before

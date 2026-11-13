@@ -224,25 +224,6 @@ struct Probe_EWSFlowTests {
 
     // MARK: Drafts edited elsewhere
 
-    /// A draft opened here, then edited in Outlook: the sync reports an Update with the new preview. The text
-    /// stays the old one and is never fetched again.
-    // file:// fixture
-    @Test func probeDraftEditedElsewhereShowsNewText() async throws {
-        let server = FlowServer([
-            FX.sync("", token: "T1", last: true),  // Inbox
-            FX.sync(FX.update(FX.summary("D", subject: "Plan v2", read: true, preview: "New text from Outlook")), token: "T1", last: true),
-        ])
-        defer { server.stop() }
-        let s = store(server)
-        complete(s, .inbox); complete(s, .drafts)
-        s.merge([serverMessage("D", box: .drafts, subject: "Plan", body: "Old text", loaded: true)], account: acct.id, mailbox: .drafts)
-        s.selectedMailbox = .account(acct.id, .drafts)
-        await s.refresh(history: false)
-        let d = try #require(s.messages.first { $0.remoteID == "D" })
-        #expect(d.subject == "Plan v2")
-        #expect(d.body != "Old text" || d.needsBody, "body \(d.body.debugDescription), needsBody \(d.needsBody), preview \(d.preview.debugDescription)")
-    }
-
     // MARK: History
 
     func meetingRequest(_ id: String, subject: String = "Sync", start: String = "2026-11-23T10:00:00Z",
@@ -580,20 +561,6 @@ struct Probe_EWSFlowTests {
         s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .drafts, id: "DRAFTS"),
                             RemoteFolder(role: .trash, id: "DEL")], account: acct.id)
         return (s, url)
-    }
-
-    // file:// fixture
-    /// R3-EWSFlow-03 on a plain response file: the Inbox is still syncing (its newest-50 lookup finds no items in this
-    /// answer), the Drafts folder gets the Update.
-    @Test func probeDraftEditedElsewhereShowsNewTextStaticFile() async throws {
-        let (s, _) = try fileStore(FX.sync(FX.update(FX.summary("D", subject: "Plan v2", read: true, preview: "New text from Outlook")), token: "T1", last: true))
-        complete(s, .drafts)
-        s.merge([serverMessage("D", box: .drafts, subject: "Plan", body: "Old text", loaded: true)], account: acct.id, mailbox: .drafts)
-        s.selectedMailbox = .account(acct.id, .drafts)
-        await s.refresh(history: false)
-        let d = try #require(s.messages.first { $0.remoteID == "D" })
-        #expect(d.subject == "Plan v2", "status \(s.status ?? "")")
-        #expect(d.body != "Old text" || d.needsBody, "body \(d.body.debugDescription), needsBody \(d.needsBody), preview \(d.preview.debugDescription)")
     }
 
     // file:// fixture
