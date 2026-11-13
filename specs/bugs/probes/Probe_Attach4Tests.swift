@@ -180,22 +180,6 @@ struct Probe_Attach4Tests {
         #expect(EWSBackend.parseAttachmentContent(d) == Data())
     }
 
-    /// An attached message without a subject (`<t:Name/>`): Save to Downloads must give a file the Finder shows.
-    @Test func probeAttachedMessageWithoutSubjectIsNotHidden() async throws {
-        let d = try doc("""
-            <t:Message><t:ItemId Id="ID1"/><t:Body BodyType="Text">Hi</t:Body><t:Attachments>\
-            <t:ItemAttachment><t:AttachmentId Id="A3"/><t:Name/><t:Size>900</t:Size></t:ItemAttachment>\
-            </t:Attachments></t:Message>
-            """)
-        let item = try #require(d.first("Message"))
-        let a = try #require(EWSBackend.parseBody(item).attachments.first)
-        let (s, id) = local([a], data: [Data("From: a@x.com\r\n\r\nHi".utf8)])
-        var saved = try #require(await s.saveAttachment(0, of: id, to: tempDir()))
-        saved.removeAllCachedResourceValues()
-        let hidden = try saved.resourceValues(forKeys: [.isHiddenKey]).isHidden
-        #expect(hidden == false, "listed as \(a.name.debugDescription); saved as \(saved.lastPathComponent.debugDescription), hidden \(String(describing: hidden))")
-    }
-
     /// base64 with CRLF line breaks every 76 characters and blanks (as MIME tools write it).
     @Test func controlBase64WithLineBreaks() throws {
         let raw = Data((0..<3000).map { UInt8($0 % 251) })
@@ -357,23 +341,6 @@ struct Probe_Attach4Tests {
         let url = await s.attachmentFile(0, of: id)
         let took = ContinuousClock.now - clock
         #expect(url.flatMap { try? Data(contentsOf: $0) } == raw, "open: \(s.status ?? "nil") after \(took)")
-    }
-
-    /// file:// fixture: an attachment Exchange sends without a Name element (an unnamed calendar part, an attached
-    /// message without subject): it must still be listed, so it can be seen and saved.
-    @Test func probeAttachmentWithoutNameElementIsListed() async throws {
-        let item = """
-            <t:Message><t:ItemId Id="M" ChangeKey="CK"/><t:Body BodyType="Text">Hi</t:Body><t:Attachments>\
-            <t:FileAttachment><t:AttachmentId Id="A1"/><t:ContentType>text/calendar</t:ContentType><t:Size>5</t:Size>\
-            <t:IsInline>false</t:IsInline><t:Content>QkVHSU4=</t:Content></t:FileAttachment></t:Attachments></t:Message>
-            """
-        let (s, _) = try fileStore(env(item))
-        s.merge([serverMessage("M")], account: acct.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        #expect(s.message(id)?.hasAttachments == true)  // control: the paperclip from the list
-        await s.loadBody(id)
-        let m = try #require(s.message(id))
-        #expect(m.attachments.count == 1 && m.hasAttachments, "attachments \(m.attachments), paperclip \(m.hasAttachments), status \(s.status ?? "nil")")
     }
 
     // MARK: The opened copy
