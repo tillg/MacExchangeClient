@@ -71,8 +71,9 @@ struct MailDatabaseTests {
         #expect(back["N"] == .some(nil))
     }
 
-    /// BUG-186: a database from before Reply-To gets the column, and its loaded server bodies are fetched once more.
-    @Test func bodiesLoadedBeforeReplyToAreFetchedAgain() throws {
+    /// BUG-186: a database from before Reply-To gets the column; its loaded bodies stay loaded (Reply fetches Reply-To
+    /// when needed, `loadedDraft`), so nothing is fetched again just to open a message.
+    @Test func bodiesLoadedBeforeReplyToStayLoaded() throws {
         let url = tempURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         var m = remote("L"); m.body = "Text"; m.bodyLoaded = true; m.htmlChecked = true; m.replyTo = []
@@ -82,7 +83,8 @@ struct MailDatabaseTests {
         #expect(sqlite3_exec(raw, "ALTER TABLE messages DROP COLUMN reply_to", nil, nil, nil) == SQLITE_OK)
         sqlite3_close(raw)
         let back = Dictionary(uniqueKeysWithValues: try reopen(url).messages().map { ($0.remoteID!, $0) })
-        #expect(back["L"]?.needsBody == true)
+        #expect(back["L"]?.needsBody == false)
+        #expect(back["L"]?.replyTo == nil)
         #expect(back["L"]?.body == "Text")
         #expect(back["U"]?.htmlChecked == nil)
     }

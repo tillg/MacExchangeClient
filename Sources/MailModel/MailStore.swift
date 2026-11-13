@@ -2139,6 +2139,12 @@ public final class MailStore {
     /// addresses, no text): the body is fetched first, so the draft has the addresses and the quote.
     public func loadedDraft(_ kind: ReplyKind, to id: Message.ID, includeAttachments: IncludeAttachments = .never) async -> Draft {
         if message(id)?.needsBody == true { await loadBody(id) }
+        // A body loaded before Reply-To was asked for: fetched once now, quietly; offline the reply uses what's stored.
+        if kind != .forward, let m = message(id), m.bodyLoaded, m.replyTo == nil, let rid = m.remoteID,
+           let backend = backends[m.accountID], !paused.contains(m.accountID),
+           let b = try? await backend.body(remoteID: rid), message(id)?.serverPreview == m.serverPreview {
+            setBody(b, for: id)
+        }
         return draft(kind, to: id, includeAttachments: includeAttachments)
     }
 

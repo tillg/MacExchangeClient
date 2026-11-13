@@ -537,6 +537,27 @@ struct EWSFlowTests {
         for _ in 0..<300 where seen.value == nil { try await Task.sleep(for: .milliseconds(10)) }
         #expect(seen.value == false, "the imported send went out while Cache.json (holding it) was still there")
     }
+
+    /// BUG-186 (review): bodies loaded before Reply-To was stored aren't fetched again on open; Reply fetches the
+    /// body once to learn Reply-To, and goes there.
+    @Test func replyToABodyLoadedBeforeReplyToFetchesItOnce() async throws {
+        let item = "<t:Message><t:ItemId Id=\"R1\"/><t:Body BodyType=\"Text\">Your ticket</t:Body>"
+            + "<t:From><t:Mailbox><t:Name>Shop</t:Name><t:EmailAddress>noreply@shop.example</t:EmailAddress></t:Mailbox></t:From>"
+            + "<t:ReplyTo><t:Mailbox><t:Name>Support</t:Name><t:EmailAddress>support@shop.example</t:EmailAddress></t:Mailbox></t:ReplyTo></t:Message>"
+        let server = ScriptedServer([EWSReply.resp("GetItem", EWSReply.ok("GetItem", "<m:Items>\(item)</m:Items>"))])
+        defer { server.stop() }
+        let s = store(server)
+        var m = Message(accountID: acct.id, from: Contact(name: "Shop", email: "noreply@shop.example"), to: [],
+                        subject: "Ticket", body: "Your ticket", date: .now, remoteID: "R1", bodyLoaded: true)
+        m.htmlChecked = true  // loaded by an older version: replyTo is nil
+        s.merge([m], account: acct.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        #expect(s.message(id)?.needsBody == false)
+        #expect(await s.loadedDraft(.reply, to: id).to == "support@shop.example")
+        #expect(server.served == 1)
+        _ = await s.loadedDraft(.replyAll, to: id)
+        #expect(server.served == 1)  // known now: not fetched again
+    }
 }
 
 /// What the server saw when the send arrived (BUG-177).

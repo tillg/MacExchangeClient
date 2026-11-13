@@ -150,16 +150,10 @@ public final class MailDatabase: @unchecked Sendable {
                 UPDATE sync SET token = NULL, complete = 0; COMMIT;
                 """)
         }
-        // From before Reply-To was stored: loaded server bodies are marked as fetched without HTML, so `needsBody`
-        // fetches them once more when opened, this time with Reply-To.
+        // From before Reply-To was stored: NULL; Reply fetches the body once when it needs Reply-To (`loadedDraft`).
         var hasReplyTo = false
         try query("SELECT 1 FROM pragma_table_info('messages') WHERE name = 'reply_to'") { _ in hasReplyTo = true }
-        if !hasReplyTo {
-            try exec("""
-                BEGIN IMMEDIATE; ALTER TABLE messages ADD COLUMN reply_to TEXT;
-                UPDATE messages SET html_checked = 0 WHERE remote IS NOT NULL AND bits & \(Self.loaded) != 0; COMMIT;
-                """)
-        }
+        if !hasReplyTo { try exec("ALTER TABLE messages ADD COLUMN reply_to TEXT") }
         // A new database gets the search index right away; an older one in `prepareSearch()`, after the Inbox has loaded.
         if isNew { try exec(Self.searchSchema + "PRAGMA user_version = \(Self.schemaVersion);") }
     }

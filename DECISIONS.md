@@ -1019,7 +1019,7 @@ edited: 2026-11-13
 - **Question:** rebuild the release bundle now, or leave it?
 - **Decision:** leave it; no relaunch, no `./run.sh release` by the run (it would also launch the app against the real account). Compile checks since then use `swift build --product MailReplica` only; CLAUDE.md now says so.
 - **Why:** launching the app connects to the user's real Exchange account; that's the user's call.
-- **Consequences:** the user runs `./run.sh release` when back. The first launch adds the `reply_to` column and marks loaded bodies to be fetched once more when opened (BUG-186), and stores new passwords per server (BUG-252; the old item is still read).
+- **Consequences:** the user runs `./run.sh release` when back. The first launch adds the `reply_to` column (stored bodies stay as they are; a reply fetches Reply-To once, BUG-186), and new passwords are stored per server (BUG-252; the old item is still read).
 
 ## 15:30 — Five P3 bugs deferred: they need a design choice or a look at real server data {#run-2026-11-13-1235-12}
 

@@ -51,7 +51,7 @@ One connection, `journal_mode=WAL`, `synchronous=NORMAL`.
   | `html` | HTML body |
   | `is_invite`, `html_checked` | 0/1/NULL |
   | `conversation` | Exchange `ConversationId` |
-  | `reply_to` | Reply-To contacts, same format as `to_list`; NULL = body loaded before Reply-To was asked for |
+  | `reply_to` | Reply-To contacts, same format as `to_list`; NULL = body loaded before Reply-To was asked for (Reply fetches it) |
 
   Indexes: `messages_mailbox(account, mailbox)`, `messages_date(date DESC)`.
 - **`sync`**: `(account, mailbox)` PK, `token` (EWS SyncState), `complete` 0/1.
@@ -112,8 +112,8 @@ There is no general migration framework. On open:
    every sync state is reset (`token = NULL, complete = 0`), so every folder syncs from scratch and existing messages
    learn their conversation. Merging keeps local IDs, bodies and flag colours. Mail a folder's complete re-sync
    doesn't list is removed ([architecture.md](architecture.md#reading-from-the-server)).
-3. **Reply-To:** if `messages` lacks `reply_to`, the column is added and loaded server bodies get `html_checked = 0`,
-   so `needsBody` fetches each once more when it is opened, now with Reply-To (BUG-186).
+3. **Reply-To:** if `messages` lacks `reply_to`, the column is added (NULL). Bodies stay loaded; Reply / Reply All on
+   such a message fetches its body once, quietly, to learn Reply-To (`MailStore.loadedDraft`, BUG-186).
 4. **Search index:** `PRAGMA user_version` is the search schema version (now 1). A new database gets the index and
    version 1 at once. An older one (version 0) gets it in `prepareSearch()`, called after all mail is in memory: one
    transaction creating table, triggers and date index, `rebuild`, then `user_version = 1`. On failure it rolls back
