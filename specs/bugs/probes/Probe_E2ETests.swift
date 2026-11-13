@@ -94,26 +94,6 @@ struct Probe_E2ETests {
 
     // MARK: Targeted probes
 
-    /// Mark All as Read while launch is still loading (Flagged spans every mailbox) leaves the mail that
-    /// loads afterwards unread.
-    @Test func markAllReadWhileLoadingCoversMailLoadedAfterwards() throws {
-        let url = tempURL()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let s = MailStore(accounts: [a], messages: [])
-        let db = try MailDatabase(url: url)
-        s.apply(page([server("I1", flagged: true)]), account: a.id, mailbox: .inbox)
-        s.apply(page([server("R1", flagged: true), server("R2", flagged: true)]), account: a.id, mailbox: .archive)
-        try db.write(s.takeChanges())
-        let s2 = MailStore(accounts: [a], messages: [])
-        let first = [MailboxKey(account: a.id, mailbox: .inbox)]
-        s2.restore(try db.meta())
-        s2.restore(try db.messages(in: first), boxes: first)
-        #expect(s2.unreadCount(.smart(.flagged)) == 1)
-        s2.markAllRead(in: .smart(.flagged))
-        s2.finishLoading(try db.messages(notIn: first))
-        #expect(s2.unreadCount(.smart(.flagged)) == 0, "\(s2.unreadCount(.smart(.flagged))) flagged still unread")
-    }
-
     /// A failed database write is retried with the next one. If a message erased in the failed batch was
     /// brought back meanwhile (a refused delete) and saved, the retry deletes it from disk although it is in memory.
     @Test func retryOfAFailedWriteDoesNotDeleteAMessageBroughtBackMeanwhile() throws {

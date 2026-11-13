@@ -56,7 +56,7 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 | Mark as Read/Unread (⇧⌘U) | All become read if any is unread, else all unread |
 | Toggle Flag (⇧⌘L) | Clears the flag if any selected message is flagged, else flags red |
 | Flag ▸ colour / Clear Flag | Sets that colour on all; seven colours, red to gray |
-| Mark All Messages as Read | Every message the mailbox contains |
+| Mark All Messages as Read | Every message the mailbox contains (during launch loading also the stored mail loaded afterwards) |
 
 - **Next message:** Delete (toolbar, menu bar, Delete key), Archive and Junk from the toolbar or menu bar, the Move
   menu, a drag of exactly the selection, and an invite answer on the selected invite go through `actOnSelection`: afterwards the first still-visible message after
