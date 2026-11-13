@@ -15,6 +15,7 @@ final class BodyPage {
         config.websiteDataStore = .nonPersistent()
         v = WKWebView(frame: NSRect(x: 0, y: 0, width: width, height: 1), configuration: config)
         v.appearance = NSAppearance(named: .aqua)
+        HTMLPage.pinViewportUnits(of: v, to: CGSize(width: width, height: 700))
         v.loadHTMLString(HTMLPage.document(mail, allowRemote: false), baseURL: nil)
         try? await Task.sleep(for: .milliseconds(200))
         while v.isLoading { try? await Task.sleep(for: .milliseconds(50)) }
@@ -27,6 +28,7 @@ final class BodyPage {
 
     func resize(width: CGFloat? = nil, height: CGFloat? = nil) async {
         v.setFrameSize(NSSize(width: width ?? v.frame.width, height: height ?? v.frame.height))
+        HTMLPage.pinViewportUnits(of: v, to: CGSize(width: v.frame.width, height: 700))
         v.layoutSubtreeIfNeeded()
         try? await Task.sleep(for: .milliseconds(300))
         _ = await eval("document.body.offsetHeight")  // lays the page out
@@ -79,6 +81,35 @@ struct HTMLBodySizingTests {
         let content = await p.contentHeight()
         let h = await p.settle()
         #expect(h >= content, "measured \(h), page \(content)")
+    }
+
+    /// MailChimp's `height="100%"` body table, and mail that makes the page as tall as the window: once the window
+    /// is widened, the view gets shorter again (a fresh load at the new width is the reference).
+    nonisolated static let percentTemplate = """
+        <body style="margin:0;padding:0"><center><table align="center" border="0" cellpadding="0" cellspacing="0" height="100%" width="100%" id="bodyTable"><tr><td align="center" valign="top" id="bodyCell">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px"><tr><td valign="top" style="padding:9px 18px;font-family:Helvetica;font-size:16px;line-height:150%">
+        \(String(repeating: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore. ", count: 30))
+        </td></tr></table></td></tr></table></center></body>
+        """
+
+    @Test(arguments: [percentTemplate, "<style>html, body { height: 100% !important; }</style><p>\(String(repeating: "Short mail. ", count: 60))</p>"])
+    func windowHighMailShrinksWhenTheWindowWidens(_ mail: String) async {
+        let p = await BodyPage(mail, width: 320)
+        let narrow = await p.settle()
+        await p.resize(width: 900)
+        let widened = await p.measure()
+        let reference = await BodyPage(mail, width: 900).measure()
+        #expect(abs(widened - reference) <= 2, "narrow \(narrow), after widening \(widened), fresh load at that width \(reference)")
+    }
+
+    /// A `height: 100vh` block is measured at the view's start height of 1 pt, then grows with the view: viewport
+    /// units must not follow the view's own height.
+    @Test func viewportHeightBlockDoesNotOutgrowTheView() async {
+        let p = await BodyPage(#"<div style="height:100vh;background:#eee">Hero</div><p>Read more</p><p id="last">Unsubscribe</p>"#)
+        let h = await p.settle()
+        let again = await p.measure()
+        let lastBottom = await p.eval("document.getElementById('last').getBoundingClientRect().bottom")
+        #expect(lastBottom <= h && again == h, "measured \(h), last line ends at \(lastBottom), measured again \(again)")
     }
 
     /// The view gets shorter again when the window is widened (a fresh load at the new width is the reference).

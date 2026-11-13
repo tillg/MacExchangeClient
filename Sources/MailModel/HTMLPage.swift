@@ -42,7 +42,8 @@ public enum HTMLPage {
             : "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
         // WebKit draws a blocked image as an outlined box with its alt text. Mail shows nothing but keeps the space.
         let blocked = allowRemote ? "" : #"img:not([src^="data:" i]) { visibility: hidden; }"#
-        // Like Mail's MUIWebDocument.css, with Mail's default message font. Its `max-width` for Apple Mail's pictures
+        // Like Mail's MUIWebDocument.css, with Mail's default message font. The root is never as tall as the view
+        // (`html { height: 100% }` in mail): the view is as tall as the page, so that would never shrink again. Its `max-width` for Apple Mail's pictures
         // is written `max-inline-size` (the same in horizontal text): no other image is limited to its container. No colours, as there: the sender's
         // `<body bgcolor text>` apply, and without them the light colour scheme gives a white page and black text.
         return """
@@ -51,6 +52,7 @@ public enum HTMLPage {
             <meta name="color-scheme" content="light">
             <style>
             html { font: 14px Helvetica; }
+            html:root { height: auto !important; min-height: 0 !important; }
             body { margin: 18px 20px 22px; padding: 0; word-wrap: break-word; word-break: break-word; }
             table { word-break: normal; }
             blockquote[type=cite] { padding-left: 8px; margin: 0; border-left: 2px solid \(quoteColours[0]); color: \(quoteColours[0]); }
@@ -64,6 +66,19 @@ public enum HTMLPage {
             </style>
             <div id="\(bodyID)">\(html)</div>
             """
+    }
+
+    /// Makes `vh`, `vw` and the other viewport units of the page in `webView` (a `WKWebView`) resolve against `size`
+    /// instead of the view. The body view is as tall as its content, so a `100vh` block would otherwise grow with
+    /// each measurement. WebKit has no public API for this; the private `_setViewportSizeForCSSViewportUnits:` is
+    /// used when the web view has it. Returns whether it did.
+    @MainActor @discardableResult
+    public static func pinViewportUnits(of webView: NSObject, to size: CGSize) -> Bool {
+        let selector = NSSelectorFromString("_setViewportSizeForCSSViewportUnits:")
+        guard size.width > 0, size.height > 0, webView.responds(to: selector) else { return false }
+        typealias Setter = @convention(c) (NSObject, Selector, CGSize) -> Void
+        unsafeBitCast(webView.method(for: selector), to: Setter.self)(webView, selector, size)
+        return true
     }
 
     /// The mail's `<link>` elements, renamed to an element that does nothing. WebKit opens connections for resource

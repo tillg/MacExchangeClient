@@ -85,6 +85,7 @@ private struct MailWebView: NSViewRepresentable {
 final class BodyWebView: WKWebView {
     var onWidthChange: (() -> Void)?
     private var lastWidth: CGFloat = 0
+    private var lastViewport = CGSize.zero
 
     override func scrollWheel(with event: NSEvent) {
         if abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX) {
@@ -96,6 +97,9 @@ final class BodyWebView: WKWebView {
 
     override func layout() {
         super.layout()
+        // Viewport units (`100vh`) follow the window, not this view, which is as tall as the page.
+        let viewport = CGSize(width: bounds.width, height: window?.contentLayoutRect.height ?? 800)
+        if viewport != lastViewport, HTMLPage.pinViewportUnits(of: self, to: viewport) { lastViewport = viewport }
         if bounds.width != lastWidth {
             lastWidth = bounds.width
             onWidthChange?()
