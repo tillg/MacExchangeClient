@@ -116,7 +116,9 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
   organizer, required and optional `Attendee/Mailbox`; `isCancellation` when the element is `MeetingCancellation`.
 - **Events:** `LegacyFreeBusyStatus` Free/Tentative/Busy → same; OOF and WorkingElsewhere → away; else unknown.
 - **Folders:**
-  - Standard folders: each successful `GetFolderResponseMessage`, paired with the requested IDs in order.
+  - Standard folders: each successful `GetFolderResponseMessage`, paired with the requested IDs in order. If the
+    Inbox's (first) answer is an error, `folders()` throws it as `EWSError`: the check shows it, and since no list is
+    kept, the next check asks again.
   - Archive: the top-level `FindFolder` result named "archive" or "archiv" (any case). A nested one (in a project folder, or a deleted one in Deleted Items) is an ordinary folder; with no top-level one the account has no Archive.
   - User folders (`folderTree`): `Folder` elements only (calendar, contacts, tasks and search folders are other
     tags). Kept if it and every ancestor has class `IPF.Note` or none, isn't hidden (`0x10F4`) and isn't the

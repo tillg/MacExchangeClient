@@ -220,23 +220,6 @@ struct Probe_EWSFlowTests {
 
     // MARK: Folder list
 
-    /// GetFolder answers each standard folder with an error (mailbox store unavailable, e.g. during a mailbox move).
-    /// The check ends without any status and the empty folder list is kept for the session: the Inbox is never
-    /// checked again until relaunch.
-    // file:// fixture
-    @Test func probeFolderListWithoutInboxIsReportedOrRetried() async throws {
-        let e = FX.err("GetFolder", "ErrorMailboxStoreUnavailable", "The mailbox database is temporarily unavailable.")
-        let server = FlowServer([FX.resp("GetFolder", String(repeating: e, count: 6)), FX.findFolder()],
-                                    fallback: FX.sync("", token: "T1", last: true))
-        defer { server.stop() }
-        let s = store(server, folders: false)
-        await s.refresh(history: false)
-        let afterFirst = server.served, status = s.status
-        await s.refresh(history: false)
-        #expect(status != nil || server.served > afterFirst,
-                "status \(String(describing: status)); requests: first check \(afterFirst), second check \(server.served - afterFirst)")
-    }
-
     // MARK: Paging
 
     // MARK: Drafts edited elsewhere

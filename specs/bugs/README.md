@@ -64,7 +64,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [124](BUG-124-every-exchange-account-named-exchange.md) | P4 | EWS | Every Exchange account is called "Exchange": two accounts can't be told apart |
 | [125](BUG-125-mailbox-selected-during-check-not-checked.md) | P4 | MailStore | Selecting a mailbox while a check is running doesn't check it (README: "at once when you select a mailbox") |
 | [126](BUG-126-paging-never-ends-when-server-repeats-page.md) | P4 | MailStore | Quick check and history page forever when the server answers "more" with the same SyncState |
-| [127](BUG-127-folder-list-without-inbox-silently-kept.md) | P4 | EWS | If GetFolder answers the standard folders with errors, the check ends silently and the Inbox is not checked again until relaunch |
 | [128](BUG-128-fixed-footer-covers-last-lines.md) | P4 | HTMLPage | A position:fixed footer/header in a mail permanently covers the message's last (or first) lines |
 | [129](BUG-129-apple-mail-list-styles.md) | P4 | HTMLPage | Apple Mail dash lists show bullets, and nested numbered lists show 1. 1. 1. instead of 1. a. i. |
 | [130](BUG-130-contenteditable-mail-is-editable.md) | P4 | HTMLPage | A mail with contenteditable can be edited in the message view (the reader can type into received mail) |
