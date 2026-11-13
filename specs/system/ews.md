@@ -61,6 +61,11 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
 | `setFlagged` | The same with `item:Flag` / `FlagStatus` `Flagged` or `NotFlagged` |
 | `move` | `MoveItem` with `ReturnNewItemIds`; new IDs are paired with old ones by response order |
 | `delete` | `DeleteItem DeleteType="SoftDelete"` (into Recoverable Items) |
+
+- `setRead`, `setFlagged`, `move` and `delete` are judged per item (`checkBatch`, not strict): one response message
+  per item, in request order, is required, else the batch fails as a whole. Items with a code other than `NoError`
+  are thrown as `PartlyRefused` (refused IDs with "MessageText (code)", and the new IDs of the items that moved).
+  For `delete`, `ErrorItemNotFound` counts as erased.
 | `send` without files | `CreateItem SendAndSaveCopy`, saved to `sentitems` |
 | `saveDraft` without files | `CreateItem SaveOnly` into `drafts` |
 | with files | `CreateItem SaveOnly` into `drafts` → `CreateAttachment` (all files in one call) → for send, `SendItem` with the root item's last change key, saving to `sentitems`. A failed step deletes the half-made draft item |

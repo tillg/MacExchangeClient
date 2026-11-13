@@ -26,7 +26,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [050](BUG-050-reply-all-trailing-comma-for-addressless-recipient.md) | P4 | MailStore | Reply All leaves a trailing ", " (empty recipient) when the original lists a recipient without address |
 | [051](BUG-051-symlink-to-folder-cannot-be-attached.md) | P4 | MailStore | Attaching a symbolic link to a folder fails with "Couldn't attach" instead of zipping the folder |
 | [058](BUG-058-imported-cache-never-learns-conversations.md) | P3 | MailDatabase | Mail imported from Cache.json keeps the cache's sync positions, so it never learns its conversation |
-| [059](BUG-059-one-missing-item-fails-whole-batch.md) | P3 | EWS | One item gone on the server makes a whole batch (read, flag, move, delete) fail: the other items changed on Exchange but are undone here, moved ones lose their new IDs |
 | [060](BUG-060-response-without-result-taken-as-success.md) | P3 | EWS | A response without any EWS result (empty SOAP body, a well-formed proxy/error page) counts as success: Send reports nothing, a sync "completes" with an empty token |
 | [061](BUG-061-transient-server-errors-undo-changes.md) | P3 | MailStore | Throttling (ErrorServerBusy) or a 503 page undoes the user's change as "Exchange refused a change" instead of keeping it queued |
 | [062](BUG-062-archive-role-given-to-nested-or-deleted-folder.md) | P3 | EWS | Without a top-level Archive, any folder named "Archive" becomes the Archive mailbox, even one inside Deleted Items or deep in Inbox |

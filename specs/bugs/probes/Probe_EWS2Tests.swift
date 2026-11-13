@@ -74,19 +74,6 @@ struct Probe_EWS2Tests {
         }
     }
 
-    // MARK: Batches with one failing item
-
-    @Test func probeMoveKeepsNewIDsWhenOneItemFails() async throws {
-        let moved = { (id: String) in self.ok("MoveItem", "<m:Items><t:Message><t:ItemId Id=\"\(id)\" ChangeKey=\"CK\"/></t:Message></m:Items>") }
-        let xml = response("MoveItem", moved("N1") + err("MoveItem", "ErrorItemNotFound") + moved("N3"))
-        let b = try backend(xml)
-        var map: [String: String]?
-        do { map = try await b.move(["A", "B", "C"], to: RemoteFolder(role: .archive, id: "ARCH")) } catch {
-            Issue.record("move threw \(error); the new IDs of A and C (moved on the server) are lost")
-        }
-        #expect(map == ["A": "N1", "C": "N3"])
-    }
-
     // MARK: Folders
 
     /// No top-level Archive; a deleted folder called "Archive" sits in Deleted Items. It must not become the
@@ -256,18 +243,6 @@ struct Probe_EWS2StoreTests {
         for _ in 0..<250 where !s.outbox.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
     }
 
-    /// Mark three as read; the server marks A and C and reports B as gone. A and C must stay read here.
-    @Test func probeReadBatchWithOneMissingItemKeepsTheOthers() async throws {
-        let xml = helper.response("UpdateItem", helper.ok("UpdateItem", "<m:Items><t:Message><t:ItemId Id=\"A\" ChangeKey=\"K\"/></t:Message></m:Items>")
-            + helper.err("UpdateItem", "ErrorItemNotFound")
-            + helper.ok("UpdateItem", "<m:Items><t:Message><t:ItemId Id=\"C\" ChangeKey=\"K\"/></t:Message></m:Items>"))
-        let (s, _) = try store(xml, ["A", "B", "C"].map { serverMessage($0) })
-        s.toggleRead(Set(s.messages.map(\.id)))
-        try await waitForOutbox(s)
-        let read = Dictionary(uniqueKeysWithValues: s.messages.map { ($0.remoteID!, $0.isRead) })
-        #expect(read["A"] == true && read["C"] == true, "local read state: \(read), status: \(s.status ?? "")")
-    }
-
     /// Exchange throttling (ErrorServerBusy, with BackOffMilliseconds) is transient. The user's change must not be
     /// undone as if Exchange had refused it.
     @Test func probeServerBusyDoesNotUndoChange() async throws {
@@ -311,17 +286,6 @@ struct Probe_EWS2StoreTests {
         await s.syncHistory()
         let complete = s.isComplete(acct.id, .inbox), token = s.syncToken(acct.id, .inbox)
         #expect(complete == false, "complete \(complete), token \(String(describing: token))")
-    }
-
-    /// Erase three from Trash; the server reports one as already gone. The other two are erased on the server and
-    /// must not come back here.
-    @Test func probeDeleteBatchWithOneMissingItemKeepsTheOthersErased() async throws {
-        let xml = helper.response("DeleteItem", helper.ok("DeleteItem") + helper.err("DeleteItem", "ErrorItemNotFound") + helper.ok("DeleteItem"))
-        let (s, _) = try store(xml, [])
-        s.merge(["A", "B", "C"].map { serverMessage($0, box: .trash) }, account: acct.id, mailbox: .trash)
-        s.delete(Set(s.messages.map(\.id)))
-        try await waitForOutbox(s)
-        #expect(s.messages.compactMap(\.remoteID).sorted() == [], "status: \(s.status ?? "")")
     }
 
     /// The same sync page applied twice changes nothing the second time (idempotence, control).
