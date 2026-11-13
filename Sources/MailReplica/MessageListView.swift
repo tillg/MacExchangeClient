@@ -163,9 +163,9 @@ struct MessageContextMenu: View {
 
     var body: some View {
         if ids.count == 1, let id = ids.first {
-            Button("Reply") { openWindow(id: "compose", value: store.draft(.reply, to: id)) }
-            Button("Reply All") { openWindow(id: "compose", value: store.draft(.replyAll, to: id)) }
-            Button("Forward") { openWindow(id: "compose", value: store.draft(.forward, to: id)) }
+            Button("Reply") { openWindow(id: "compose", value: ComposeWindow(store.draft(.reply, to: id))) }
+            Button("Reply All") { openWindow(id: "compose", value: ComposeWindow(store.draft(.replyAll, to: id))) }
+            Button("Forward") { openWindow(id: "compose", value: ComposeWindow(store.draft(.forward, to: id))) }
             Divider()
         }
         let unread = ids.contains { store.message($0)?.isRead == false }

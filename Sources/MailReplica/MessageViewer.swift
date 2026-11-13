@@ -56,7 +56,7 @@ struct MessageViewer: View {
             }
             .help("Filter messages in this mailbox")
             ViewOptionsMenu()
-            Button { openWindow(id: "compose", value: Draft(accountID: defaultAccount)) } label: {
+            Button { openWindow(id: "compose", value: ComposeWindow(Draft(accountID: defaultAccount))) } label: {
                 Label("New Message", systemImage: "square.and.pencil")
             }
             .help("Compose new message")
@@ -102,7 +102,7 @@ struct MessageViewer: View {
 
     private func reply(_ kind: ReplyKind) {
         guard let m = store.selectedMessage else { return }
-        openWindow(id: "compose", value: store.draft(kind, to: m.id))
+        openWindow(id: "compose", value: ComposeWindow(store.draft(kind, to: m.id)))
     }
 
     private func goBack() {

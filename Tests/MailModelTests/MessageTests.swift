@@ -87,4 +87,71 @@ struct MessageTests {
         #expect(h.contains("<div>\(tab)\(tab)z </div>"))
         #expect(h.contains("<div>&nbsp;</div>"))
     }
+
+    /// Lines of only spaces and tabs leave no gap in the list preview; lines are trimmed.
+    @Test func previewDropsBlankLinesWithSpacesAndTabs() {
+        #expect(message("Hello\n   \n\tWorld").preview == "Hello World")
+        #expect(message("Hi\r\n  > quoted\r\nBye").preview == "Hi Bye")
+    }
+
+    /// Moving a placed picture changes only where its mark is: still a change, so closing the window asks.
+    @Test func movingAPlacedPictureIsAChange() {
+        var d = Draft(accountID: UUID(), to: "a@x.com", subject: "S", body: "\u{FFFC}Hello world")
+        d.attachments = [DraftAttachment(name: "p.png", contentType: "image/png", data: Data([1]))]
+        let start = d
+        d.body = "Hello world\u{FFFC}"
+        #expect(d.hasChanges(since: start))
+        // The original's files and their marks arriving by themselves are no change.
+        var f = Draft(accountID: UUID(), body: "Hi")
+        let opened = f
+        f.attachments = [DraftAttachment(name: "o.png", contentType: "image/png", data: Data([1]), fromOriginal: true)]
+        f.body = "Hi\u{FFFC}"
+        #expect(!f.hasChanges(since: opened))
+    }
+
+    /// NSTextView keeps a picture's U+FFFC and a following combining character (accent, shadda, ZWJ, ZWNJ) apart;
+    /// Swift joins them into one Character. The mark still counts as the file's place.
+    @Test func markFollowedByCombiningCharacterStillCountsAsAFile() {
+        let mark = String(Draft.fileMark)
+        func png(_ name: String, original: Bool = false) -> DraftAttachment {
+            DraftAttachment(name: name, contentType: "image/png", data: Data([7]), fromOriginal: original)
+        }
+        for combining in ["\u{0651}", "\u{0301}", "\u{200C}", "\u{200D}"] {
+            var d = Draft(accountID: UUID(), to: "a@x.com", body: "A\(mark)\(combining)B\(mark)C")
+            d.attachments = [png("one.png"), png("two.png")]
+            #expect(d.placedPictures == [0, 1])
+            #expect(!d.text.unicodeScalars.contains("\u{FFFC}"))
+            #expect(d.text.unicodeScalars.elementsEqual("A\(combining)BC".unicodeScalars))
+            let h = d.html { "id\($0)" }
+            #expect(h.contains("A<img src=\"cid:id0\""), "\(h)")
+            #expect(h.contains("B<img src=\"cid:id1\""), "\(h)")
+            #expect(!h.unicodeScalars.contains("\u{FFFC}"))
+        }
+        var d = Draft(accountID: UUID(), body: "x\(mark)\u{0301}y\(mark)z")
+        d.attachments = [png("orig.png", original: true), png("mine.png")]
+        d.excludeOriginalAttachments()
+        #expect(d.attachments.map(\.name) == ["mine.png"])
+        #expect(d.body.unicodeScalars.filter { $0 == "\u{FFFC}" }.count == 1)
+        #expect(d.placedPictures == [0])
+    }
+
+    /// The compose window shows the size on every keystroke: the estimate must not walk a long body.
+    @Test func estimatedSizeIsCheapForALongReply() {
+        let line = "> Thanks, that works for me. Let's keep Friday at 10 as planned, ok?\n"
+        var d = Draft(accountID: UUID(), body: String(repeating: line, count: 6_000))  // ~420 KB quoted thread
+        d.attachments = [DraftAttachment(name: "p.png", contentType: "image/png", data: Data(repeating: 7, count: 1_000_000))]
+        let clock = ContinuousClock()
+        var total = 0
+        let t = clock.measure { for _ in 0..<3 { total &+= d.estimatedSize } }
+        #expect(t < .milliseconds(16), "three size estimates (one keystroke's render) took \(t)")
+    }
+
+    /// Each New Message (or Reply to the same message) opens its own window: the window values differ even for
+    /// equal drafts, and carry the draft.
+    @Test func twoNewMessagesAreDistinctWindowValues() {
+        let d = Draft(accountID: UUID())
+        let a = ComposeWindow(d), b = ComposeWindow(d)
+        #expect(a != b)
+        #expect(a.draft == d && b.draft == d)
+    }
 }

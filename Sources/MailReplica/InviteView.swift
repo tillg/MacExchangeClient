@@ -99,7 +99,7 @@ struct InviteCard: View {
 
     /// Like Outlook: the answer opens as a message to the organizer, sent when you press Send.
     private func write(_ r: InviteResponse, proposing: Bool = false) {
-        openWindow(id: "compose", value: store.answerDraft(r, to: message.id, proposing: proposing))
+        openWindow(id: "compose", value: ComposeWindow(store.answerDraft(r, to: message.id, proposing: proposing)))
     }
 
     private func answered(_ r: InviteResponse) -> String {

@@ -12,7 +12,7 @@ struct MailCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Message") { openWindow(id: "compose", value: Draft(accountID: store.accounts[0].id)) }
+            Button("New Message") { openWindow(id: "compose", value: ComposeWindow(Draft(accountID: store.accounts[0].id))) }
                 .keyboardShortcut("n")
             Button("New Viewer Window") { openWindow(id: "viewer") }
                 .keyboardShortcut("n", modifiers: [.command, .option])
@@ -100,6 +100,6 @@ struct MailCommands: Commands {
 
     private func reply(_ kind: ReplyKind) {
         guard let m = store.selectedMessage else { return }
-        openWindow(id: "compose", value: store.draft(kind, to: m.id, includeAttachments: includeMode))
+        openWindow(id: "compose", value: ComposeWindow(store.draft(kind, to: m.id, includeAttachments: includeMode)))
     }
 }

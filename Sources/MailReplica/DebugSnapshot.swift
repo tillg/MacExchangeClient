@@ -44,7 +44,7 @@ struct DebugSnapshot: ViewModifier {
                 let draft = answer == "forward" ? store.draft(.forward, to: id)
                     : answer == "propose" ? store.answerDraft(.decline, to: id, proposing: true)
                     : store.answerDraft(InviteResponse(rawValue: answer) ?? .decline, to: id)
-                openWindow(id: "compose", value: draft)
+                openWindow(id: "compose", value: ComposeWindow(draft))
                 windowTitle = draft.subject
                 // MAIL_SNAPSHOT_DROP=a.jpg:b.txt drops those files onto the message text through a real pasteboard,
                 // at character MAIL_SNAPSHOT_DROP_AT (default 0).

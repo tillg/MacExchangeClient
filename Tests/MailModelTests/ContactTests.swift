@@ -64,4 +64,18 @@ struct ContactTests {
         #expect(Contact.parseList("<x@y.com>").first?.name == "x@y.com")
         #expect(Contact.parseList("").isEmpty)
     }
+
+    /// Avatar initials: the first letters of the first two words, split on any space, never more than two letters.
+    @Test func initialsSplitOnAnySpaceAndStayTwoLetters() {
+        #expect(Contact(name: "Jane\u{00A0}Doe", email: "j@x").initials == "JD")
+        #expect(Contact(name: "Jane\tDoe", email: "j@x").initials == "JD")
+        #expect(Contact(name: "👨‍👩‍👧 Family Group", email: "f@x").initials == "👨‍👩‍👧F")
+        #expect(Contact(name: "", email: "f@x").initials == "")
+        #expect(Contact(name: "محمد علي", email: "m@x").initials == "مع")
+        for name in ["ßtefan Müller", "ǆenan Kovač", "ﬀoo Bar"] {
+            let i = Contact(name: name, email: "x@x.com").initials
+            #expect(i.count <= 2, "\(name) -> \(i)")
+        }
+        #expect(Contact(name: "ßtefan Müller", email: "x@x.com").initials == "SM")
+    }
 }

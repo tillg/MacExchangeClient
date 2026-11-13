@@ -12,6 +12,13 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Avatars show both initials for names separated by a tab or a special space, and never more than two letters.",
+            "The preview under each message in the list no longer has gaps from lines that only hold spaces.",
+            "Moving a picture to another place in a message you're writing counts as a change, so closing the window asks whether to save it.",
+            "Pictures in a message you write stay in their place when an accent or a joining character follows them.",
+            "Hebrew and Arabic lines stay right to left in a message you send with pictures in the text.",
+            "New Message, or Reply to the same message a second time, opens a new window each time instead of bringing back the first one.",
+            "Typing in a long reply with a file attached is faster.",
             "Pictures that are part of an email show even while remote content is blocked, including more signature pictures, and a picture that can't be found no longer leaves an empty frame.",
             "Emails that bring their own font are shown in it without loading remote content.",
             "A bar pinned to the bottom of an email, such as \"View in browser\", no longer covers the email's last lines.",

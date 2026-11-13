@@ -125,6 +125,20 @@ struct HTMLPageRenderTests {
         #expect(r == "a:visible:true b:visible:true c:visible:true d:hidden:false", "\(r)")
     }
 
+    /// A Hebrew line of a mail sent as HTML (a picture is placed) stays right to left, as in plain text: aligned
+    /// right, its "!" at the left end. A Latin line next to it stays left to right.
+    @Test func rtlLineStaysRightToLeftInDraftHTML() async {
+        var d = Draft(accountID: UUID(), body: "שלום עולם!\nHello there!\n\(Draft.fileMark)")
+        d.attachments = [DraftAttachment(name: "p.png", contentType: "image/png", data: Data([1]))]
+        let r = await eval(d.html { _ in "x" }, """
+            Array.from(document.querySelectorAll('div')).slice(0, 2).map(div => { const t = div.firstChild; const r = document.createRange();
+              r.setStart(t, t.length - 1); r.setEnd(t, t.length); const bang = r.getBoundingClientRect();
+              r.setStart(t, 0); r.setEnd(t, 1); const first = r.getBoundingClientRect();
+              return [bang.left < first.left, Math.abs(Math.max(first.right, bang.right) - div.getBoundingClientRect().right) < 2].join(',') }).join('|')
+            """)
+        #expect(r == "true,true|false,false", "bang-left-of-first,right-aligned per line: \(r)")
+    }
+
     /// A mail that refreshes or links to `about:blank` must not replace itself with an empty page; the app's own
     /// loads (a second one when remote content is allowed) still show.
     @Test func mailCannotNavigateToAnEmptyPage() async {

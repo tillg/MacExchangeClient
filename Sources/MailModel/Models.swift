@@ -108,9 +108,11 @@ public struct Contact: Hashable, Codable, Sendable {
     public var email: String
     public init(name: String, email: String) { self.name = name; self.email = email }
 
+    /// The first letters of the first two words (split on any space, tab or no-break space), uppercased. A letter
+    /// whose uppercase is two (ß → SS, ﬀ → FF) gives its first, so the avatar never shows more than two.
     public var initials: String {
-        let parts = name.split(separator: " ").prefix(2)
-        return parts.compactMap(\.first).map(String.init).joined().uppercased()
+        let parts = name.split(whereSeparator: \.isWhitespace).prefix(2)
+        return parts.compactMap { $0.first.flatMap { String($0).uppercased().first } }.map(String.init).joined()
     }
 
     /// Parses "a@b.com, Name <c@d.com>; \"Doe, John\" <e@f.com>". Commas and semicolons separate recipients,
@@ -236,8 +238,9 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
     /// shows two lines, so only the start of the body is looked at, however long the mail.
     public var preview: String {
         if !bodyLoaded, let serverPreview { return serverPreview }
-        let text = body.prefix(10_000).split(whereSeparator: \.isNewline).filter { !$0.hasPrefix(">") }
-            .joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        let text = body.prefix(10_000).split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && !$0.hasPrefix(">") }
+            .joined(separator: " ")
         return String(text.prefix(500))
     }
 }
@@ -276,25 +279,47 @@ extension Draft {
     /// arrive (and go) by themselves, so they don't count.
     public func hasChanges(since start: Draft) -> Bool { userContent != start.userContent }
 
+    /// The body with the marks of the files placed here (moving a picture is a change), without the original's.
     private var userContent: [AnyHashable] {
-        [accountID, to, cc, subject, text, attachments.filter { !$0.fromOriginal }]
+        [accountID, to, cc, subject, bodyWithoutMarks(of: \.fromOriginal), attachments.filter { !$0.fromOriginal }]
+    }
+
+    /// `body` without the marks of the files for which `drop` is true (marks beyond the files stay).
+    private func bodyWithoutMarks(of drop: (DraftAttachment) -> Bool) -> String {
+        var k = 0
+        return String(String.UnicodeScalarView(body.unicodeScalars.filter { c in
+            guard c == Self.fileMarkScalar else { return true }
+            defer { k += 1 }
+            return !(attachments.indices.contains(k) && drop(attachments[k]))
+        }))
     }
 
     /// Exclude Attachments: takes out the original's files, keeps the ones added here.
     public mutating func excludeOriginalAttachments() {
-        var k = 0
-        body = String(body.filter { c in
-            guard c == Self.fileMark else { return true }
-            defer { k += 1 }
-            return !(attachments.indices.contains(k) && attachments[k].fromOriginal)
-        })
+        body = bodyWithoutMarks(of: \.fromOriginal)
         attachments.removeAll(where: \.fromOriginal)
     }
 
     /// About the size Exchange counts against the account's limit: the text, and files in base64
-    /// (4 bytes per 3, plus a line break every 76 characters).
+    /// (4 bytes per 3, plus a line break every 76 characters). The window shows it on every keystroke, so the
+    /// marks are found with `memchr` over the body's bytes instead of building `text`.
     public var estimatedSize: Int {
-        text.utf8.count + subject.utf8.count + attachments.reduce(0) { $0 + Self.encodedSize($1) }
+        body.utf8.count - 3 * markCount + subject.utf8.count + attachments.reduce(0) { $0 + Self.encodedSize($1) }
+    }
+
+    /// The file marks in `body` (U+FFFC is EF BF BC in UTF-8).
+    private var markCount: Int {
+        var body = body
+        return body.withUTF8 { bytes in
+            guard var p = bytes.baseAddress else { return 0 }
+            let end = p + bytes.count
+            var n = 0
+            while p < end, let hit = memchr(p, 0xEF, end - p).map({ UnsafePointer($0.assumingMemoryBound(to: UInt8.self)) }) {
+                if end - hit >= 3, hit[1] == 0xBF, hit[2] == 0xBC { n += 1 }
+                p = hit + 1
+            }
+            return n
+        }
     }
 
     static func encodedSize(_ a: DraftAttachment) -> Int {
@@ -304,15 +329,18 @@ extension Draft {
 
     /// A file placed in the text sits at this character of `body`: the k-th one is `attachments[k]`, as in
     /// an attributed string. Files beyond the marks were added without a place (they show at the end).
+    /// Marks are counted by Unicode scalar: a combining character typed after a file (an accent, ZWJ, ZWNJ) joins
+    /// the mark into one `Character`, but stays a separate character in the text view.
     public static let fileMark: Character = "\u{FFFC}"
+    static let fileMarkScalar: Unicode.Scalar = "\u{FFFC}"
 
     /// The text that is sent: the body without the marks of the files placed in it.
-    public var text: String { body.filter { $0 != Self.fileMark } }
+    public var text: String { String(String.UnicodeScalarView(body.unicodeScalars.filter { $0 != Self.fileMarkScalar })) }
 
     /// Pictures placed in the text, by their index in `attachments`: they are sent in their place. Only types every
     /// mail client draws in HTML; others (HEIC, TIFF…) go as ordinary files, so the recipient still gets them.
     public var placedPictures: [Int] {
-        let marks = body.filter { $0 == Self.fileMark }.count
+        let marks = body.unicodeScalars.filter { $0 == Self.fileMarkScalar }.count
         return attachments.indices.filter { $0 < marks && Self.inlineTypes.contains(attachments[$0].contentType?.lowercased() ?? "") }
     }
 
@@ -342,20 +370,32 @@ extension Draft {
         var k = 0
         // Any line ending: "\r\n" (as in quoted Exchange text) is one Character, not "\n".
         let lines = body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map { line -> String in
-            var out = "", run = Substring()
-            for c in line {
-                guard c == Self.fileMark else { run.append(c); continue }
-                out += text(run, atLineStart: out.isEmpty); run = ""
+            var out = "", run = String.UnicodeScalarView()
+            for c in line.unicodeScalars {
+                guard c == Self.fileMarkScalar else { run.append(c); continue }
+                out += text(Substring(String(run)), atLineStart: out.isEmpty); run = .init()
                 if let id = contentID(k) { out += "<img src=\"cid:\(id)\" alt=\"\(escape(Substring(attachments[k].name)))\">" }
                 k += 1
             }
-            out += text(run, atLineStart: out.isEmpty)
+            out += text(Substring(String(run)), atLineStart: out.isEmpty)
             return "<div>\(out.isEmpty ? "<br>" : out)</div>"
         }
-        return "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\"></head>"
+        // Each line takes its direction from its first strong letter, as in the text view and in plain-text mail,
+        // so a Hebrew or Arabic line stays right to left.
+        return "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\">"
+            + "<style>div { unicode-bidi: plaintext; }</style></head>"
             + "<body style=\"overflow-wrap: break-word; -webkit-nbsp-mode: space; line-break: after-white-space;\">"
             + lines.joined(separator: "\n") + "</body></html>"
     }
+}
+
+/// What a compose window is opened with. SwiftUI brings a window to the front instead of opening one when it already
+/// shows an equal value, and two new messages (or two replies to one message) are equal drafts: each request is
+/// its own value, so each opens its own window, as in Mail.
+public struct ComposeWindow: Hashable, Codable, Sendable {
+    public let id: UUID
+    public var draft: Draft
+    public init(_ draft: Draft) { id = UUID(); self.draft = draft }
 }
 
 /// Edit ▸ Include Attachments With Replies, as in Mail.

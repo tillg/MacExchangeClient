@@ -30,8 +30,8 @@ struct MailReplicaApp: App {
         .defaultSize(width: 1280, height: 800)
         .commands { MailCommands(store: store) }
 
-        WindowGroup("New Message", id: "compose", for: Draft.self) { $draft in
-            ComposeView(draft: draft ?? Draft(accountID: store.accounts[0].id))
+        WindowGroup("New Message", id: "compose", for: ComposeWindow.self) { $window in
+            ComposeView(draft: window?.draft ?? Draft(accountID: store.accounts[0].id))
                 .environment(store)
         }
         .defaultSize(width: 640, height: 520)

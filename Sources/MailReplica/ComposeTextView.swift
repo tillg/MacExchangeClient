@@ -146,11 +146,13 @@ final class DropTextView: NSTextView {
     func load(body: String, attachments: [DraftAttachment]) {
         let text = NSMutableAttributedString()
         var k = 0
-        for c in body {
-            if c == Draft.fileMark, attachments.indices.contains(k) {
+        // By scalar, as `Draft` counts marks: a combining character after a file joins its mark into one Character.
+        let mark = Draft.fileMark.unicodeScalars.first!
+        for c in body.unicodeScalars {
+            if c == mark, attachments.indices.contains(k) {
                 text.append(NSAttributedString(attachment: make(attachments[k])))
                 k += 1
-            } else if c != Draft.fileMark {
+            } else if c != mark {
                 text.append(NSAttributedString(string: String(c)))
             }
         }
