@@ -257,21 +257,6 @@ struct Probe_E2ETests {
         #expect(s.visibleMessages.map(\.remoteID) == ["R2"], "index search: \(s.visibleMessages.map(\.remoteID))")
     }
 
-    /// Messages received in the same second (a mailing-list burst) keep their order in Flagged across a relaunch.
-    @Test func sameTimeMessagesKeepTheirOrderAfterRelaunch() throws {
-        let url = tempURL()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let s = MailStore(accounts: [a], messages: [])
-        let db = try MailDatabase(url: url)
-        s.apply(page([server("ARCH", flagged: true, minutes: 5)]), account: a.id, mailbox: .archive)
-        s.apply(page([server("INB", flagged: true, minutes: 5)]), account: a.id, mailbox: .inbox)
-        s.selectedMailbox = .smart(.flagged)
-        let before = s.visibleMessages.map(\.remoteID)
-        let (s2, _) = try relaunch(s, db, url)
-        s2.selectedMailbox = .smart(.flagged)
-        #expect(s2.visibleMessages.map(\.remoteID) == before)
-    }
-
     // MARK: Model-based: random sessions with saves and relaunches
 
     @Test(arguments: 0..<4) func randomSessionsKeepInvariantsAcrossRelaunches(chunk: Int) throws {

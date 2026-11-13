@@ -17,7 +17,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [120](BUG-120-unchanged-messages-rewritten-on-save.md) | P4 | MailStore | Actions that change nothing still rewrite their rows: Mark All as Read on a read mailbox rewrites every message |
 | [121](BUG-121-queued-moves-store-full-message-copies.md) | P4 | MailStore | Queued changes keep a full copy of every message: archiving an opened Inbox makes a 35 MB outbox, rewritten after one more flag |
 | [122](BUG-122-mark-all-read-while-loading-misses-later-mail.md) | P4 | MailStore | Mark All as Read while launch is still loading leaves the mail loaded afterwards unread |
-| [123](BUG-123-same-time-messages-swap-after-relaunch.md) | P4 | MailStore | Messages with the same time swap places in Flagged (and other mixed lists) after a relaunch |
 | [125](BUG-125-mailbox-selected-during-check-not-checked.md) | P4 | MailStore | Selecting a mailbox while a check is running doesn't check it (README: "at once when you select a mailbox") |
 | [126](BUG-126-paging-never-ends-when-server-repeats-page.md) | P4 | MailStore | Quick check and history page forever when the server answers "more" with the same SyncState |
 | [132](BUG-132-pending-search-shows-mailbox-instead-of-results.md) | P4 | MailStore | While the next search answer is on its way, the list jumps back to the plain mailbox (or "No Results") when the previous results came from memory |

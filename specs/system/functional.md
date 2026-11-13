@@ -31,7 +31,8 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 
 ## Message list
 
-- `visibleMessages`: the selected mailbox's messages, newest first. With the unread filter (⌘L) only unread ones
+- `visibleMessages`: the selected mailbox's messages, newest first (same time: by message ID, so the order survives a
+  relaunch; also search results and conversations, `MailStore.newestFirst`). With the unread filter (⌘L) only unread ones
   (and the opened message, see below).
   While searching, the list shows search results instead and ignores the unread filter ([search.md](search.md)).
 - Row: unread dot, or for a VIP sender a star in the same column (accent while unread, grey when read), optional
