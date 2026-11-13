@@ -110,7 +110,7 @@ public struct EWSBackend: MailBackend {
     /// type (`application/octet-stream`, or none) count too: some mailers send pictures that way.
     static func inlineAttachmentIDs(_ item: XMLNode, wanted: Set<String>) -> [String] {
         (item.child("Attachments")?.children("FileAttachment") ?? []).compactMap { a in
-            let type = a.text("ContentType")?.lowercased() ?? ""
+            let type = mimeType(a.text("ContentType"))
             guard type.hasPrefix("image/") || isGeneric(type),
                   let cid = a.text("ContentId").map(contentID), wanted.contains(cid) else { return nil }
             return a.child("AttachmentId")?.attr("Id")
@@ -145,7 +145,7 @@ public struct EWSBackend: MailBackend {
         let added = all.filter { a in !old.contains { $0 === a } && (a.text("IsInline") != "true" || !isPicture(a)) }
         return (old + added).map { a in
             let isMessage = a.localName == "ItemAttachment"
-            let type = isMessage ? "message/rfc822" : a.text("ContentType")
+            let type = isMessage ? "message/rfc822" : a.text("ContentType").map(mimeType)
             var name = a.child("Name")?.stringValue ?? ""
             if name.trimmingCharacters(in: .whitespaces).isEmpty {
                 let ext = isMessage ? nil : type.flatMap { UTType(mimeType: $0)?.preferredFilenameExtension }
@@ -206,10 +206,17 @@ public struct EWSBackend: MailBackend {
         return images
     }
 
+    /// A content type without its parameters ("application/pdf; name=x.pdf" → "application/pdf"), in lower case
+    /// (BUG-209).
+    static func mimeType(_ s: String?) -> String {
+        (s ?? "").split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false).first
+            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() } ?? ""
+    }
+
     /// A file the body can show in place: an image type, or a generic one whose name isn't of another kind.
     static func isPicture(_ a: XMLNode) -> Bool {
         guard a.localName == "FileAttachment" else { return false }
-        let type = a.text("ContentType")?.lowercased() ?? ""
+        let type = mimeType(a.text("ContentType"))
         if type.hasPrefix("image/") { return true }
         guard isGeneric(type) else { return false }
         let ext = ((a.text("Name") ?? "") as NSString).pathExtension
@@ -408,7 +415,8 @@ public struct EWSBackend: MailBackend {
 
     /// A content ID per picture placed in the text, for the HTML body to point at.
     static func contentIDs(_ d: Draft) -> [Int: String] {
-        Dictionary(uniqueKeysWithValues: d.placedPictures.map { ($0, UUID().uuidString) })
+        // A msg-id (id-left "@" id-right, RFC 2045 §7), as other mailers write Content-IDs (BUG-196).
+        Dictionary(uniqueKeysWithValues: d.placedPictures.map { ($0, UUID().uuidString + "@mailreplica") })
     }
 
     /// Files in `contentIDs` are inline: shown in the HTML body where it references them, not in the list.
