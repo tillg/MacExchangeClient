@@ -151,7 +151,9 @@ flowchart LR
 - A move needs the folder list (read on demand) and renames the moved messages to the new IDs Exchange returns,
   in memory and in the queued changes, including the copies they keep for undoing (`renameRemote`). If the destination's sync already brought a moved item under
   its new ID, that copy is dropped first; the moved message keeps its local ID, body and selection. An answer sent with "Do Not Send a Response" and Remove from
-  Calendar also move the item to Trash on the server, ignoring failure.
+  Calendar also move the item to Trash on the server (`moveToTrash`, after the answer went out), reading the folder
+  list first if it isn't known yet. If the server can't be reached, is busy or sign-in fails, that move is queued as
+  an ordinary `.move(…, to: .trash)` with nothing to undo; any other failure means the server moved it already.
 - Exchange messages can't move to another account: `update` reverts such a change and sets a status.
 
 ## Saving to disk
