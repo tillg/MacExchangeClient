@@ -244,11 +244,20 @@ public struct Message: Identifiable, Hashable, Codable, Sendable {
             + #"|<link\b[^>]*\bhref\s*=\s*["']?\s*https?:|url\(\s*"# + quote + #"\s*https?:|@import\s*"# + quote + #"\s*https?:"#
             // SVG <image>/<feImage> href, CSS image-set() with a quoted address, and a web <base> (relative pictures
             // then load from the web) (BUG-189).
-            + #"|<(image|feImage)\b[^>]*\bhref\s*=\s*["']?\s*https?:|image-set\(\s*"# + quote + #"\s*https?:"#
-            + #"|<base\b[^>]*\bhref\s*=\s*["']?\s*https?:"#
+            // Bounded: an unclosed tag must not make the search quadratic.
+            + #"|<(image|feImage)\b[^>]{0,500}\bhref\s*=\s*["']?\s*https?:|image-set\(\s*"# + quote + #"\s*https?:"#
+            + #"|<base\b[^>]{0,500}\bhref\s*=\s*["']?\s*https?:"#
         func found(_ s: String) -> Bool { s.range(of: remote, options: [.regularExpression, .caseInsensitive]) != nil }
-        // The browser decodes character references first: "&#104;ttp://" is a web address too (BUG-190).
-        return found(html) || (html.contains("&#") && found(HTMLPage.decodingCharacterReferences(html)))
+        // The browser decodes character references first: "&#104;ttp://" is a web address too (BUG-190). Checked
+        // again only when a letter of "https:" is written as a number, and only numeric references are decoded
+        // (`&lt;img src=&quot;…` shown as text stays text).
+        let codedScheme = #"&#(0*(104|116|112|115|58)|x0*(68|74|70|73|3a));"#
+        guard !found(html) else { return true }
+        guard html.range(of: codedScheme, options: [.regularExpression, .caseInsensitive]) != nil else { return false }
+        return found(html.replacing(/&#([0-9]{1,7}|[xX][0-9a-fA-F]{1,6});/) { m in
+            let n = m.1.first == "x" || m.1.first == "X" ? UInt32(m.1.dropFirst(), radix: 16) : UInt32(m.1)
+            return n.flatMap(Unicode.Scalar.init).map { String(Character($0)) } ?? String(m.0)
+        })
     }
 
     /// First lines of the body, as shown under the subject in the list. The list reads it on every render and

@@ -45,6 +45,18 @@ struct MessageTests {
         #expect(html(#"<img src="&#x68;ttps://t.example/p.png">"#).hasRemoteContent)
         #expect(html(#"<img src="h&#116;tps://t.example/p.png">"#).hasRemoteContent)
         #expect(!html(#"<img src="cid:a&#64;b">"#).hasRemoteContent)
+        // Escaped HTML shown as text is not remote content, even in a mail with numeric references (review of BUG-190).
+        #expect(!html(#"<p>&#160;Code: &lt;img src=&quot;https://t.example/p.png&quot;&gt;</p>"#).hasRemoteContent)
+    }
+
+    /// The check runs on every redraw of a message: a long mail with ordinary references (&#160;) and an unclosed tag
+    /// stays fast (review of BUG-189/190).
+    @Test func remoteContentCheckStaysFastOnLongMail() {
+        var m = message("")
+        m.html = String(repeating: "<p>Text&#160;with&#8217;s references and words.</p>", count: 4_000) + String(repeating: "<image a ", count: 2_000)
+        let start = Date()
+        _ = m.hasRemoteContent
+        #expect(Date().timeIntervalSince(start) < 0.5)
     }
 
     /// Every way a mail can load something from the web makes the Load Remote Content banner appear.
