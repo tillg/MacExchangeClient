@@ -159,6 +159,20 @@ struct HTMLBodySizingTests {
         #expect(p.remeasured == count && p.v.frame.height == height && count < 10, "re-measured \(p.remeasured) times, view \(p.v.frame.height)")
     }
 
+    /// A `position: fixed` bar (web pages sent as mail) would sit over the message's last lines for good, as the
+    /// view is as tall as the page and never scrolls: it stays where the mail puts it in the text.
+    @Test func fixedFooterDoesNotCoverTheLastLine() async {
+        let mail = #"<p>\#(String(repeating: "Body text. ", count: 100))</p><p id="last">Kind regards, Ann</p><div id="bar" style="position:fixed;bottom:0;left:0;right:0;height:60px;background:#333;color:#fff">Open in browser</div>"#
+        let p = await BodyPage(mail)
+        _ = await p.settle()
+        let r = try? await p.v.evaluateJavaScript("""
+            (r => { const e = document.elementFromPoint(r.left + 5, r.top + r.height / 2); return e ? (e.id || e.tagName) : 'none' })(document.getElementById('last').getBoundingClientRect())
+            """)
+        #expect(r as? String == "last", "element on top of the last line: \(String(describing: r))")
+        let content = await p.contentHeight()
+        #expect(content <= p.v.frame.height, "view \(p.v.frame.height), page \(content)")
+    }
+
     /// The view gets shorter again when the window is widened (a fresh load at the new width is the reference).
     @Test func plainMailShrinksWhenTheWindowWidens() async {
         let mail = "<p>\(String(repeating: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ", count: 40))</p>"

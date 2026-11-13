@@ -23,8 +23,12 @@ public enum HTMLPage {
     /// `autofocus` scrolls the page at load. Content placed with `position: absolute` is outside every box: the
     /// body's `scrollHeight` counts it (plus the body's bottom margin). Neither depends on the view's own height,
     /// which `documentElement.scrollHeight` never drops below, so the view still shrinks when the window widens.
+    /// The view is as tall as the page and never scrolls, so a `position: fixed` bar would cover the lines under it
+    /// for good: such elements are put back in the text, where the mail has them.
     public static let measureScript = """
         (() => {
+            for (const e of document.querySelectorAll('#\(bodyID) *'))
+                if (getComputedStyle(e).position === 'fixed') e.style.setProperty('position', 'static', 'important');
             const b = document.body, root = document.documentElement.getBoundingClientRect().bottom;
             const placed = b.getBoundingClientRect().top + b.scrollHeight + parseFloat(getComputedStyle(b).marginBottom);
             return Math.ceil(Math.max(root, placed) + window.scrollY);
@@ -37,13 +41,17 @@ public enum HTMLPage {
         var html = inline.isEmpty ? html : replacingContentIDs(in: html) { id in
             inline[id].map { "data:\(safeType($0.contentType));base64,\($0.data.base64EncodedString())" }
         }
-        if !allowRemote { html = withoutLinks(html) }
+        if !allowRemote { html = withEmbeddedSourcesTrimmed(withoutLinks(html)) }
         let csp = allowRemote
             ? "default-src 'none'; style-src * 'unsafe-inline'; img-src * data:; font-src * data:"
-            : "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
+            : "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:"
         // WebKit draws a blocked image as an outlined box with its alt text. Mail shows nothing but keeps the space.
+        // Pictures embedded in the mail (`data:`) need no permission, also when they come from `srcset` or `<picture>`.
         let blocked = allowRemote ? "" : #"img:not([src^="data:" i]) { visibility: hidden; }"#
-        // Like Mail's MUIWebDocument.css, with Mail's default message font. The root is never as tall as the view
+            + #" img[srcset^="data:" i], picture:has(source[srcset^="data:" i]) img { visibility: visible; }"#
+        // Like Mail's MUIWebDocument.css (never editable; Apple Mail's dash lists; nested numbered lists 1. a. i., at
+        // zero specificity and not for an `<ol type>`, as the mail's own list styles and `type` win over Mail's user
+        // style sheet), with Mail's default message font. The root is never as tall as the view
         // (`html { height: 100% }` in mail): the view is as tall as the page, so that would never shrink again. Its `max-width` for Apple Mail's pictures
         // is written `max-inline-size` (the same in horizontal text): no other image is limited to its container. No colours, as there: the sender's
         // `<body bgcolor text>` apply, and without them the light colour scheme gives a white page and black text.
@@ -52,6 +60,7 @@ public enum HTMLPage {
             <meta http-equiv="Content-Security-Policy" content="\(csp)">
             <meta name="color-scheme" content="light">
             <style>
+            * { -webkit-user-modify: initial !important; }
             html { font: 14px Helvetica; }
             html:root { height: auto !important; min-height: 0 !important; }
             body { margin: 18px 20px 22px; padding: 0; word-wrap: break-word; word-break: break-word; }
@@ -61,7 +70,14 @@ public enum HTMLPage {
             blockquote[type=cite] blockquote[type=cite] blockquote[type=cite] { border-left-color: \(quoteColours[2]); color: \(quoteColours[2]); }
             img.Apple-web-attachment { vertical-align: top !important; max-inline-size: 100% !important; }
             video.Apple-web-attachment { max-inline-size: 100% !important; }
-            img[src^="cid:"] { display: none; }
+            ul.Apple-dash-list, ul.Apple-dash-list ul { list-style-type: none; }
+            ul.Apple-dash-list li:before { content: "\\2013"; position: absolute; margin: 0 -1.25em; }
+            :where(ol ol ol ol, ol ol ol ol ol ol ol):where(:not([type])) { list-style-type: decimal; }
+            :where(ol ol, ol ol ol ol ol, ol ol ol ol ol ol ol ol):where(:not([type])) { list-style-type: lower-alpha; }
+            :where(ol ol ol, ol ol ol ol ol ol, ol ol ol ol ol ol ol ol ol):where(:not([type])) { list-style-type: lower-roman; }
+            :where(ol ol ol ol ol ol ol ol ol ol):where(:not([type])) { list-style-type: none; }
+            :where(ol ol ol ol ol ol ol ol ol ol):where(:not([type])) > li:before { content: "\\2013"; position: absolute; margin-inline-start: -1.25em; }
+            img[src^="cid:" i] { display: none; }
             \(blocked)
             #\(bodyID) { display: flow-root; }
             </style>
@@ -112,6 +128,12 @@ public enum HTMLPage {
         html.replacing(/<(link)(?=[\s\/>])/.ignoresCase().matchingSemantics(.unicodeScalar), with: { _ in "<x-blocked-link" })
     }
 
+    /// Leading spaces of `src` and `srcset` values removed (the browser ignores them), so the blocked-image rule sees
+    /// an embedded picture's `data:` at the start.
+    static func withEmbeddedSourcesTrimmed(_ html: String) -> String {
+        html.replacing(/([\s"'\/])(src(?:set)?\s*=\s*["'])\s+/.ignoresCase(), with: { $0.1 + $0.2 })
+    }
+
     /// The sender's content type, reduced to a lowercased `type/subtype` of token characters (parameters dropped),
     /// else `application/octet-stream`: it goes into an attribute, so it must never carry quotes or markup.
     static func safeType(_ contentType: String) -> String {
@@ -128,22 +150,39 @@ public enum HTMLPage {
         return ids
     }
 
-    /// A reference runs to the closing quote, bracket or space, so `cid:a@x` never matches inside `cid:a@x2`.
-    private static let cidReference = try! NSRegularExpression(pattern: #"cid:([^"'\s)>]+)"#, options: .caseInsensitive)
+    /// A reference starts where a scheme can (not inside a word such as `acid:rain`) and runs to the closing quote,
+    /// bracket, space, or the `/>` of a self-closing tag, so `cid:a@x` never matches inside `cid:a@x2`.
+    private static let cidReference = try! NSRegularExpression(pattern: #"(?<![\w+.-])cid:((?:(?!/>)[^"'\s)<>])+)"#,
+                                                               options: .caseInsensitive)
 
-    /// Calls `replacement` with each referenced content ID (unescaped, without `<>`); nil keeps the reference.
+    /// Calls `replacement` with each referenced content ID (character references decoded, percent-decoded, without
+    /// `<>`); nil keeps the reference.
     private static func replacingContentIDs(in html: String, _ replacement: (String) -> String?) -> String {
         let ns = html as NSString
         var out = html
         for m in cidReference.matches(in: html, range: NSRange(location: 0, length: ns.length)).reversed() {
-            var id = ns.substring(with: m.range(at: 1)).replacingOccurrences(of: "&lt;", with: "<")
-                .replacingOccurrences(of: "&gt;", with: ">")
+            var id = decodingCharacterReferences(ns.substring(with: m.range(at: 1)))
             id = id.removingPercentEncoding ?? id
             id = id.trimmingCharacters(in: CharacterSet(charactersIn: "<>"))
-            guard let new = replacement(id), let r = Range(m.range, in: out) else { continue }
+            guard var new = replacement(id), let r = Range(m.range, in: out) else { continue }
+            // An unquoted value would take the `/` of `/>` into the data URI.
+            if out[r.upperBound...].hasPrefix("/>") { new += " " }
             out.replaceSubrange(r, with: new)
         }
         return out
+    }
+
+    /// `&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;` and numeric references decoded, as the browser reads an attribute.
+    static func decodingCharacterReferences(_ text: String) -> String {
+        guard text.contains("&") else { return text }
+        let named = ["amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'"]
+        return text.replacing(/&(#[0-9]+|#[xX][0-9a-fA-F]+|[a-zA-Z]+);/) { m in
+            let name = String(m.1)
+            if let c = named[name.lowercased()] { return c }
+            let number = name.hasPrefix("#x") || name.hasPrefix("#X") ? UInt32(name.dropFirst(2), radix: 16)
+                : name.hasPrefix("#") ? UInt32(name.dropFirst()) : nil
+            return number.flatMap(Unicode.Scalar.init).map { String(Character($0)) } ?? String(m.0)
+        }
     }
 
     /// Clicked links open elsewhere only for the web and mail. Other schemes (smb:, file:, app handlers) could

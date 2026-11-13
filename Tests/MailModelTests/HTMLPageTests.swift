@@ -54,6 +54,37 @@ struct HTMLPageTests {
         #expect(HTMLPage.contentIDs(in: "<p>No images</p>").isEmpty)
     }
 
+    /// `cid:` is a scheme, not text inside a word.
+    @Test func cidInsideWordsIsNotAReference() {
+        #expect(HTMLPage.contentIDs(in: "<p>Placid:lake and acid:rain, Lucid:dreams</p>").isEmpty)
+    }
+
+    /// An unquoted reference in a self-closing tag ends before `/>`; replaced, the tag still closes.
+    @Test func cidUnquotedSelfClosing() {
+        #expect(HTMLPage.contentIDs(in: "<img src=cid:logo@x/>") == ["logo@x"])
+        let page = HTMLPage.document("<img src=cid:logo@x/>", allowRemote: false,
+                                     inline: ["logo@x": InlineImage(contentType: "image/png", data: Data([1, 2, 3]))])
+        #expect(page.contains("<img src=data:image/png;base64,AQID />"))
+    }
+
+    /// The ID is the attribute value the browser sees: character references are decoded.
+    @Test func cidHTMLEntitiesAreDecoded() {
+        #expect(HTMLPage.contentIDs(in: #"<img src="cid:a&amp;b@x">"#) == ["a&b@x"])
+        #expect(HTMLPage.contentIDs(in: #"<img src="cid:c&#64;x"><img src="cid:d&#x40;x">"#) == ["c@x", "d@x"])
+    }
+
+    /// URL schemes are case-insensitive: an unresolved `CID:` picture is hidden like a `cid:` one.
+    @Test func unresolvedUppercaseCIDHidden() {
+        let page = HTMLPage.document(#"<img src="CID:missing@x">"#, allowRemote: true)
+        #expect(page.contains(#"img[src^="cid:" i]"#))
+    }
+
+    /// Fonts embedded in the mail come from no server: they load without remote content.
+    @Test func embeddedFontsAreAllowedWithoutRemoteContent() {
+        let blocked = csp(HTMLPage.document("<p>Hi</p>", allowRemote: false))
+        #expect(blocked.contains("font-src data:"))
+    }
+
     @Test func inlineImagesBecomeDataURIs() {
         let png = InlineImage(contentType: "image/png", data: Data([1, 2, 3]))
         let html = #"<img src="cid:image001.png@x"><img src="cid:image001.png@x2"><img src="cid:unknown@x">"#

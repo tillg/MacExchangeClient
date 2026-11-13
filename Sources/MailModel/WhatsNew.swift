@@ -12,6 +12,11 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Pictures that are part of an email show even while remote content is blocked, including more signature pictures, and a picture that can't be found no longer leaves an empty frame.",
+            "Emails that bring their own font are shown in it without loading remote content.",
+            "A bar pinned to the bottom of an email, such as \"View in browser\", no longer covers the email's last lines.",
+            "Dashed lists from Apple Mail show dashes, and lists inside numbered lists count 1., a., i., as in Mail.",
+            "You can no longer type into a received email by accident.",
             "Emails that merely mention \"@import\" in their text no longer ask you to load remote content.",
             "Search finds Chinese and Japanese words in the middle of a sentence again.",
             "Search finds Greek words whether or not you type their accents, as it already did for French or German.",

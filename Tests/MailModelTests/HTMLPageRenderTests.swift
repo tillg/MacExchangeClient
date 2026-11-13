@@ -78,6 +78,53 @@ struct HTMLPageRenderTests {
         #expect(r == "560|600", "picture width|page scroll width = \(r)")
     }
 
+    /// Fonts embedded in the mail (`data:`) load with remote content blocked.
+    @Test func embeddedDataFontsLoadWithoutRemoteContent() async throws {
+        let font = try Data(contentsOf: URL(fileURLWithPath: "/System/Library/Fonts/Supplemental/NotoSansCarian-Regular.ttf"))
+        let mail = "<style>@font-face { font-family: Embedded; src: url(data:font/ttf;base64,\(font.base64EncodedString())); }"
+            + " p { font-family: Embedded, Helvetica; }</style><p>Embedded font</p>"
+        let v = await show(HTMLPage.document(mail, allowRemote: false))
+        try? await Task.sleep(for: .milliseconds(1000))
+        let r = (try? await v.evaluateJavaScript("Array.from(document.fonts).map(f => f.family + ':' + f.status).join(',')")) as? String
+        #expect(r == "Embedded:loaded", "\(String(describing: r))")
+    }
+
+    /// Apple Mail's dashed lists and nested numbered lists, as in Mail's MUIWebDocument.css.
+    @Test func appleMailListStyles() async {
+        let mail = #"<ul class="Apple-dash-list" id="u"><li id="l">one</li></ul><ol><li>a<ol id="o2"><li>b<ol id="o3"><li>c</li></ol></li></ol></li></ol>"#
+        let r = await eval(HTMLPage.document(mail, allowRemote: false),
+                           "['u','o2','o3'].map(id => getComputedStyle(document.getElementById(id)).listStyleType).join(' ') + '|' + getComputedStyle(document.getElementById('l'), '::before').content")
+        #expect(r == "none lower-alpha lower-roman|\"\u{2013}\"", "\(r)")
+        // The mail's own numbering wins.
+        let own = #"<ol><li>a<ol type="A" id="t"><li>b</li></ol><ol id="s" style="list-style-type: upper-roman"><li>c</li></ol></li></ol>"#
+        #expect(await eval(HTMLPage.document(own, allowRemote: false),
+                           "['t','s'].map(id => getComputedStyle(document.getElementById(id)).listStyleType).join(' ')") == "upper-alpha upper-roman")
+    }
+
+    /// Received mail is never editable, whatever `contenteditable` it carries.
+    @Test func contentEditableMailIsNotEditable() async {
+        let mail = #"<div contenteditable="true" id="e">Type here to change what I wrote</div>"#
+        let r = await eval(HTMLPage.document(mail, allowRemote: false),
+                           "document.getElementById('e').isContentEditable + '|' + getComputedStyle(document.getElementById('e')).webkitUserModify")
+        #expect(r == "false|read-only", "\(r)")
+    }
+
+    /// Pictures embedded in the mail need no permission: with remote content blocked they stay visible, also with
+    /// a space before `data:`, from `srcset`, or from a `<picture>` source. A blocked one stays hidden.
+    @Test func embeddedPicturesStayVisibleWhenRemoteBlocked() async {
+        let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        let d = "data:image/png;base64,\(png)"
+        let mail = """
+            <img id="a" src=" \(d)" width="10" height="10">
+            <img id="b" srcset="\(d) 1x" width="10" height="10">
+            <picture><source srcset="\(d)"><img id="c" width="10" height="10"></picture>
+            <img id="d" src="http://127.0.0.1:9/x.png" width="10" height="10">
+            """
+        let r = await eval(HTMLPage.document(mail, allowRemote: false),
+                           "['a','b','c','d'].map(i => { const e = document.getElementById(i); return i + ':' + getComputedStyle(e).visibility + ':' + (e.complete && e.naturalWidth > 0) }).join(' ')")
+        #expect(r == "a:visible:true b:visible:true c:visible:true d:hidden:false", "\(r)")
+    }
+
     /// A mail that refreshes or links to `about:blank` must not replace itself with an empty page; the app's own
     /// loads (a second one when remote content is allowed) still show.
     @Test func mailCannotNavigateToAnEmptyPage() async {
