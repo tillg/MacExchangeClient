@@ -39,7 +39,8 @@ flowchart LR
 
 - `MailStore` (`Sources/MailModel/MailStore.swift`) holds every message in one array, `messages`, plus accounts,
   folder trees, sync tokens, the outbox, selection, search state and status text. Each change bumps a `revision`;
-  sidebar counts, the visible list and the conversation of the selected message are cached per revision.
+  sidebar counts, the visible list, the position of the selected message (`selectedMessage`) and its conversation are
+  cached per revision.
 - `MailStore` talks to servers only through `MailBackend` (`Sources/MailModel/MailBackend.swift`): folders,
   newest N, `sync(folder, token)`, body, inline images, attachment content, MailTips size, calendar events, and the
   write operations. `EWSBackend` is the only implementation.

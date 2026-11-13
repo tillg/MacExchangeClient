@@ -230,35 +230,6 @@ struct Probe_Perf4Findings {
         #expect(d1000 < F.limit)
     }
 
-    /// R4-Perf4-03: clicking a message that arrived during this session (appended at the end of `messages`).
-    /// A redraw reads `selectedMessage` 7 times: MailCommands.swift:27, :31, :60, :62, :64, MessageViewer.swift:77,
-    /// MessageDetailView.swift:10.
-    @Test func selectingANewlyArrivedMessageStaysInBudget() {
-        let arrived = Message(accountID: w, from: Contact(name: "New", email: "new@x.com"), to: [], subject: "Just arrived",
-                              body: "", date: Date(timeIntervalSince1970: 2_000_000_000), isRead: false, remoteID: "NEW-1",
-                              serverPreview: "p", bodyLoaded: false)
-        let front = inbox.first { !$0.isRead }!.id
-        func arrive(_ s: MailStore) {
-            s.apply(SyncResult(upserts: [arrived], deletedRemoteIDs: [], token: "t2", more: false), account: w, mailbox: .inbox)
-            s.selectedMailbox = .account(w, .inbox)
-            F.redraw(s)
-        }
-        func click(_ s: MailStore, _ id: Message.ID) {
-            s.selection = [id]
-            s.markSelectionRead()
-            F.redraw(s)                                  // 1 read of selectedMessage
-            for _ in 0..<6 { _ = s.selectedMessage }     // the other 6 reads of the same redraw
-        }
-        let oneRead = F.time("1 read of selectedMessage (new message)", setup: { arrive($0); $0.selection = [arrived.id] }) { s in _ = s.selectedMessage }
-        let atFront = F.time("click unread Inbox message loaded at launch", setup: arrive) { s in click(s, front) }
-        let newest = F.time("click unread message that arrived this session", setup: arrive) { s in
-            let id = s.visibleMessages.first!.id          // top row of the Inbox
-            click(s, id)
-        }
-        print(String(format: "PERF4 R4-Perf4-03 one read %.3fs, click front %.3fs, click newest %.3fs", oneRead, atFront, newest))
-        #expect(newest < F.limit)
-    }
-
     /// R4-Perf4-04: typing in the search field before the index is ready (each launch until it is), or after
     /// "Search failed": memory is scanned on every keystroke.
     @Test func memorySearchKeystrokeStaysInBudget() {
