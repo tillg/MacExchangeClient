@@ -575,6 +575,41 @@ struct EWSFlowTests {
         #expect(s.message(s.messages.first { $0.remoteID == "A" }!.id)?.mailbox == .archive, "status: \(s.status ?? "")")
         #expect(s.outbox.count == 1)
     }
+
+    /// A store whose account has every standard folder, Archive and Junk too, and one unread Inbox message "A".
+    func storeWithA(_ server: ScriptedServer) -> (MailStore, Message.ID) {
+        let s = store(server, folders: false)
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .trash, id: "DEL"),
+                            RemoteFolder(role: .archive, id: "ARCH"), RemoteFolder(role: .junk, id: "JUNK")], account: acct.id)
+        let m = Message(accountID: acct.id, mailbox: .inbox, from: Contact(name: "Ann", email: "ann@x.com"), to: [],
+                        subject: "S A", body: "", date: .now, isRead: false, remoteID: "A", bodyLoaded: false)
+        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "T0", more: false), account: acct.id, mailbox: .inbox)
+        return (s, s.messages[0].id)
+    }
+
+    /// BUG-167: two moves of one message (Inbox → Archive → Junk), both refused: it ends up where the server has it.
+    @Test func twoRefusedMovesPutTheMessageBackWhereTheServerHasIt() async throws {
+        let refused = EWSReply.resp("MoveItem", EWSReply.err("MoveItem", "ErrorAccessDenied", "Access is denied."))
+        let server = ScriptedServer([refused, refused])
+        defer { server.stop() }
+        let (s, a) = storeWithA(server)
+        s.move([a], to: .archive)
+        s.move([a], to: .junk)
+        try await waitFor { server.served == 2 && s.outbox.isEmpty }
+        #expect(s.message(a)?.mailbox == .inbox, "status: \(s.status ?? "")")
+    }
+
+    /// BUG-167: marked read, then unread again; both refused: it stays unread, as on the server.
+    @Test func twoRefusedReadChangesLeaveTheServersState() async throws {
+        let refused = EWSReply.resp("UpdateItem", EWSReply.err("UpdateItem", "ErrorAccessDenied", "Access is denied."))
+        let server = ScriptedServer([refused, refused])
+        defer { server.stop() }
+        let (s, a) = storeWithA(server)
+        s.toggleRead([a])
+        s.toggleRead([a])
+        try await waitFor { server.served == 2 && s.outbox.isEmpty }
+        #expect(s.message(a)?.isRead == false, "status: \(s.status ?? "")")
+    }
 }
 
 /// What the server saw when the send arrived (BUG-177).

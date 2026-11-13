@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "When Exchange refuses two changes to the same message in a row, the message now ends up as it really is on the server.",
             "A message you moved right after launch no longer jumps back when Exchange is briefly unavailable; the move is sent later.",
             "An all-day invitation from a colleague in another time zone now shows its one day, not two.",
             "An invitation that runs past midnight now also warns about clashes after midnight.",

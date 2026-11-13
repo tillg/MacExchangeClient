@@ -1307,6 +1307,14 @@ public final class MailStore {
     }
 
     /// The server refused a change: undo it locally. A message that couldn't be sent is kept in Drafts.
+    /// Gives the next queued change of the same kind for `id` this change's undo value (see `failed`, BUG-167).
+    private func handUndo(of id: Message.ID, account: UUID, after p: PendingChange, kind: (ServerChange) -> Bool,
+                          set: (inout Message) -> Void) {
+        for k in outbox.indices where outbox[k].account == account && kind(outbox[k].change) {
+            if let j = outbox[k].previous.firstIndex(where: { $0.id == id }) { set(&outbox[k].previous[j]); return }
+        }
+    }
+
     public func failed(_ p: PendingChange, _ error: String) {
         outbox.removeAll { $0.id == p.id }
         switch p.change {
@@ -1333,12 +1341,19 @@ public final class MailStore {
                 }
                 changedIDs.insert(old.id)
                 switch p.change {
-                case let .setRead(_, v): if messages[i].isRead == v { messages[i].isRead = old.isRead }
-                case let .setFlagged(_, v): if (messages[i].flag != nil) == v { messages[i].flag = old.flag }
+                // When a later queued change of the same kind has overwritten the value, that change's undo copy
+                // gets this one's: if it is refused too, the message ends up as the server has it (BUG-167).
+                case let .setRead(_, v):
+                    if messages[i].isRead == v { messages[i].isRead = old.isRead }
+                    else { handUndo(of: old.id, account: p.account, after: p) { if case .setRead = $0 { true } else { false } } set: { $0.isRead = old.isRead } }
+                case let .setFlagged(_, v):
+                    if (messages[i].flag != nil) == v { messages[i].flag = old.flag }
+                    else { handUndo(of: old.id, account: p.account, after: p) { if case .setFlagged = $0 { true } else { false } } set: { $0.flag = old.flag } }
                 case let .move(_, box):
                     if let r = messages[i].remoteID, deletedWhileMoving[p.account]?.remove(r) != nil {
                         deletedOnServer.insert(old.id)
                     } else if messages[i].mailbox == box { messages[i].mailbox = old.mailbox }
+                    else { handUndo(of: old.id, account: p.account, after: p) { if case .move = $0 { true } else { false } } set: { $0.mailbox = old.mailbox } }
                 case .respond, .reply, .removeFromCalendar:
                     let holds = switch p.change {
                     case let .respond(_, r): messages[i].invite?.response == r && messages[i].invite?.reply == nil
