@@ -418,15 +418,6 @@ struct Probe_DB2Tests {
 
     // MARK: Tokens
 
-    /// README: the start of words matches. Chinese and Japanese write without spaces, so the tokenizer sees a
-    /// whole sentence as one "word": a word inside it is never found (the old search found it).
-    @Test func probeWordInsideChineseOrJapaneseSentence() throws {
-        let (d, url) = try db([mail("明天的会议取消了"), mail("会議の議事録を送ります")]); defer { cleanup(url) }
-        #expect(try d.search("明天", accounts: nil).count == 1)   // control: start of the run
-        #expect(try d.search("会议", accounts: nil).count == 1, "会议 (meeting) inside a sentence")
-        #expect(try d.search("議事録", accounts: nil).count == 1, "議事録 (minutes) inside a sentence")
-    }
-
     /// Hyphens, apostrophes, dots, @ and digits in what the user types, as Mail matches them.
     @Test(arguments: [
         ("e-mail", "Your e-mail address"), ("mgm-tp", "From x@mgm-tp.com"), ("o'neil", "Bob O'Neil writes"),

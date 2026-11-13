@@ -25,7 +25,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [071](BUG-071-forward-released-without-original-files.md) | P3 | MailStore | A forward whose original files can't be fetched becomes sendable without them, with no message at all when the body couldn't be loaded |
 | [079](BUG-079-mail-of-account-no-longer-set-up-loaded-at-launch.md) | P4 | MailStore | Stored mail of an account that is no longer set up is loaded at launch and shows in All Inboxes and search (its rows are never removed) |
 | [080](BUG-080-switching-account-scope-flashes-no-results.md) | P4 | MailStore | Switching from one account's mailbox to another's during a search shows an empty list (No Results) until the new answer arrives |
-| [081](BUG-081-cjk-words-inside-sentence-not-found.md) | P4 | MailDatabase | Index search can't find a Chinese or Japanese word inside a sentence (the old search could) |
 | [084](BUG-084-ipf-note-subclass-folders-hidden.md) | P4 | EWS | Mail folders whose class is a subclass of IPF.Note (e.g. IPF.Note.OutlookHomepage) are left out of the folder tree |
 | [085](BUG-085-embedded-data-fonts-blocked.md) | P4 | HTMLPage | Fonts embedded in the mail (data: URIs) are blocked unless remote content is allowed |
 | [086](BUG-086-daylayout-zero-length-events-drawn-on-top.md) | P4 | Invite | Day column: zero-length (or end-before-start) events take no room, so they are drawn on top of the event starting at the same time |

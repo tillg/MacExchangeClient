@@ -57,6 +57,10 @@ Before the first answer of a search — no hits yet — the list shows the selec
   No word left: no results.
 - Each word becomes an FTS5 string with prefix star: `"word"*`, with `"` doubled. Words are joined by spaces: all
   must match (AND), each in any indexed field. User input is never FTS syntax.
+- A word with a Han, hiragana or katakana character (`isCJK`) isn't sent to the index (the tokenizer can't split
+  scripts written without spaces): it must occur anywhere in one of the indexed columns (`LIKE '%word%'`, `%`, `_`
+  and `\` escaped). Without other words the query scans `messages` newest first (about 0.4 s for 180,000 synthetic
+  rows with 3 KB bodies and no hit); with other words it narrows the index's hits.
 - A word with a Greek vowel becomes an OR group (`greekVariants`): the word without tonos (ΐ, ΰ as ι, υ), and the
   same with the tonos on each vowel in turn, since the tokenizer keeps Greek accents and a Greek word has at most
   one. So `καλημερα` finds "Καλημέρα" and `ελληνικά` finds "ΕΛΛΗΝΙΚΑ". Dialytika (ϊ, ϋ) in the text are not matched
