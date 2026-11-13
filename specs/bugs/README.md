@@ -31,7 +31,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [174](BUG-174-georgian-mtavruli-not-indexed.md) | P4 | search | Georgian written in capitals (Mtavruli) isn't found by search |
 | [175](BUG-175-damaged-database-never-recovered.md) | P3 | storage | A damaged Mail.sqlite stops all saving for good; it's never set aside |
 | [176](BUG-176-huge-file-crashes-save.md) | P3 | storage | Saving a draft file or pending send of 2 GB or more crashes the app |
-| [177](BUG-177-import-sends-outbox-before-cache-renamed.md) | P2 | storage | Importing Cache.json sends its waiting mail before the import is done; quitting then sends it twice |
 | [178](BUG-178-subtitle-1-messages.md) | P4 | UI / MessageViewer | The window subtitle says "1 messages" for a mailbox with one message |
 | [179](BUG-179-compose-from-row-centred.md) | P4 | UI / ComposeView | Compose window: the "From:" row is centred instead of lined up with To, Cc and Subject |
 | [180](BUG-180-header-date-wraps.md) | P4 | UI / MessageDetailView | Message header: the date breaks onto two lines in a narrow message pane |

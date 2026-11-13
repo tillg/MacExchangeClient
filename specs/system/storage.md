@@ -123,12 +123,14 @@ Runs when `Mail.sqlite` doesn't exist (`MailDatabase.importCache`); the sidebar 
    (`.unreadable-2`, … if taken; never deleted), an empty database is created and returned, and the status says the
    old cache couldn't be read and names the kept file. Mail is then downloaded again from the server.
    Caches from builds whose attachments were plain names decode (see `Attachment` in [domain-model.md](domain-model.md)).
-3. `store.restore(cache)`: messages (skipping known `remoteID`s), sync tokens, outbox, complete folders, folder trees.
+3. `store.restore(cache, sending: false)`: messages (skipping known `remoteID`s), sync tokens, outbox, complete folders, folder trees.
    Then `forgetSyncPositions()`: the cache predates conversations, so, as for an older database, every folder syncs
    once more from the start and the imported mail learns its conversation.
 4. Write everything into `Mail.sqlite.importing` (old leftovers removed first) and check the row count.
 5. Refuse if `Mail.sqlite` exists meanwhile; else move the temp file into place and reopen it.
 6. Rename `Cache.json` to `Cache.json.imported`, or the first free `Cache.json.imported-N` (N ≥ 2) if that exists. Interrupted before that, the next launch imports again.
+7. `store.resumeSending()`: only now do the imported waiting changes go out. Sent earlier, a quit before step 6
+   would import and send them a second time (BUG-177).
 
 `MailCache` (one JSON file with, per account, messages, sync tokens by mailbox, outbox, complete folders and folders)
 is still written by `MailStore.cache()` only for tests and tools; the app no longer saves it.

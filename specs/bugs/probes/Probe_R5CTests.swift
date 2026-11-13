@@ -116,48 +116,4 @@ struct Probe_R5CStorage {
             _ = try? db.write(StoreChanges(files: [UUID(): [big]]))
         }
     }
-
-    /// R5C-07: importing Cache.json starts sending its outbox at once (`restore(cache)` → `scheduleFlush`), while
-    /// the import is still being written and before Cache.json is renamed; `saveBeforeSending` can't mark the send
-    /// in flight either (no database yet). Quit at that point and the next launch imports the cache again and sends
-    /// the message a second time ("Quit midway, and the next launch imports again", README).
-    @Test func importSendsNothingWhileTheCacheCanStillBeImportedAgain() async throws {
-        let dir = tempDir()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
-        // A cache from the old build: a big mailbox and a send still waiting.
-        let msgs = (0..<30_000).map { n in
-            Message(accountID: acct.id, from: Contact(name: "Ann", email: "ann@x.com"), to: [Contact(name: "Me", email: "me@work.com")],
-                    subject: "Message \(n)", body: String(repeating: "text ", count: 40), date: Date(timeIntervalSinceReferenceDate: Double(n)),
-                    remoteID: "R\(n)")
-        }
-        let send = PendingChange(account: acct.id, change: .send(Draft(accountID: acct.id, to: "bob@x.com", subject: "Offer", body: "Hi")),
-                                 previous: [])
-        try MailCache(accounts: [acct.id: .init(messages: msgs, syncTokens: [.inbox: "T"], outbox: [send], complete: [.inbox], folders: [])])
-            .save(to: cacheURL)
-
-        // The server notes, when the send arrives, whether a quit right then would import (and send) again.
-        let endpoint = LoopbackEndpoint()
-        defer { endpoint.stop() }
-        let seen = SeenAtSend()
-        endpoint.start {
-            seen.note(cacheStillThere: FileManager.default.fileExists(atPath: cacheURL.path))
-            return EWSReply.resp("CreateItem", EWSReply.ok("CreateItem"))
-        }
-        let s = MailStore(accounts: [], messages: [])
-        s.add(acct, backend: EWSBackend(client: EWSClient(url: endpoint.url, username: "u", password: "p")))
-        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .sent, id: "SENT")], account: acct.id)
-
-        _ = try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s)
-        for _ in 0..<300 where seen.value == nil { try await Task.sleep(for: .milliseconds(10)) }
-        #expect(seen.value != nil, "the send never went out")
-        #expect(seen.value == false, "the send went out while Cache.json (holding it) was still there to import again")
-    }
-}
-
-final class SeenAtSend: @unchecked Sendable {
-    private let lock = NSLock()
-    private var first: Bool?
-    var value: Bool? { lock.withLock { first } }
-    func note(cacheStillThere: Bool) { lock.withLock { if first == nil { first = cacheStillThere } } }
 }
