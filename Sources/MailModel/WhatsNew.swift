@@ -13,6 +13,7 @@ public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
             "A reply to a meeting invitation, such as \"Accepted: …\", no longer shows Accept and Decline buttons as if it were an invitation.",
+            "Mail brought over from the app's old storage now learns which conversation it belongs to, so opening it shows its replies.",
             "A folder no longer shows twice in the sidebar when folders change on the server while the list is read.",
             "Some formatted emails no longer come out empty when you reply to them or search their text.",
             "A draft you opened here and then changed on another device shows its new text when you open it again, not the text it had before.",

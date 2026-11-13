@@ -499,4 +499,24 @@ struct MailDatabaseTests {
         defer { release.signal() }
         #expect(try db.search("concurrent", accounts: nil) == [m.id])
     }
+
+    /// Every Cache.json predates conversations: like a database from before them, the imported folders sync once more
+    /// from the start, so the imported mail learns its conversation (BUG-058).
+    @Test func importedCacheSyncsAgainToLearnConversations() async throws {
+        let dir = tempURL().deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
+        let old = MailStore(accounts: [work], messages: [])
+        old.apply(SyncResult(upserts: [remote("A"), remote("B")], deletedRemoteIDs: [], token: "T-old", more: false),
+                  account: work.id, mailbox: .inbox)
+        try old.cache().save(to: cacheURL)
+        let s = MailStore(accounts: [work], messages: [])
+        let d = try #require(try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s))
+        #expect(s.messages.count == 2)
+        #expect(s.syncToken(work.id, .inbox) == nil && !s.isComplete(work.id, .inbox),
+                "imported store: token \(s.syncToken(work.id, .inbox) ?? "nil"), complete \(s.isComplete(work.id, .inbox))")
+        let stored = try d.meta().sync
+        #expect(stored.allSatisfy { $0.token == nil && !$0.complete }, "stored sync: \(stored)")
+    }
 }

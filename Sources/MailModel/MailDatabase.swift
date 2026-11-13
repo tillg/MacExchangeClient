@@ -422,6 +422,9 @@ public final class MailDatabase: @unchecked Sendable {
             return db
         }
         store.restore(cache)
+        // The cache predates conversations: as for a database from before them, every folder syncs once more from
+        // the start, so the imported mail learns its conversation.
+        store.forgetSyncPositions()
         let everything = store.storedState()
         let db: MailDatabase
         do {

@@ -1015,6 +1015,12 @@ public final class MailStore {
         scheduleFlush()
     }
 
+    /// Every folder syncs once more from the start (an import of mail from before conversations).
+    func forgetSyncPositions() {
+        syncTokens = [:]
+        complete = []
+    }
+
     // MARK: Write-back
 
     /// Exchange gives moved items new IDs. Updates the messages and the changes still queued.
