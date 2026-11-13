@@ -79,10 +79,11 @@ struct ComposeView: View {
         }
         // Only for a finished address: on leaving To/Cc or pressing Return, not on every keystroke.
         .onChange(of: inRecipients) { if !inRecipients { checkNewRecipients() } }
-        .alert(originalCount == 1 ? "Include Attachment From Original Message?" : "Include Attachments From Original Message?",
+        // Mail's Compose.loctable wording (BUG-233).
+        .alert(originalCount == 1 ? "Include Attachment From Original Message" : "Include Attachments From Original Message",
                isPresented: $askInclude) {
             Button("Include") { draft.loadingOriginal = draft.original }
-            Button("Don't Include", role: .cancel) { excluded = true }
+            Button("Don’t Include", role: .cancel) { excluded = true }
         }
         .alert("This message is larger than your account allows.", isPresented: $confirmSize) {
             Button("Try Sending in Email") { sendNow() }
