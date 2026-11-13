@@ -770,8 +770,11 @@ struct EWSParsingTests {
     @Test func keychainItemIsPerUserAndServer() {
         let a = ExchangeAccount(email: "a@x.com", username: "W\\me", server: "Mail.Work.com")
         let b = ExchangeAccount(email: "b@y.com", username: "W\\me", server: "https://mail.club.org/EWS/Exchange.asmx")
-        #expect(a.keychainAccounts == ["W\\me@mail.work.com", "W\\me"])
-        #expect(b.keychainAccounts == ["W\\me@mail.club.org", "W\\me"])
+        #expect(a.keychainAccounts == ["mail.work.com/W\\me", "W\\me"])
+        #expect(b.keychainAccounts == ["mail.club.org/W\\me", "W\\me"])
+        // A UPN username ("jan@host", stored before under that name) never collides with the new per-server name.
+        let upn = ExchangeAccount(email: "", username: "jan@h.example", server: "h.example")
+        #expect(upn.keychainAccounts == ["h.example/jan@h.example", "jan@h.example"])
         #expect(ExchangeAccount(email: "", username: "u", server: "").keychainAccounts == ["u"])
     }
 

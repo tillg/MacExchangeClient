@@ -19,7 +19,7 @@ is made, retries, undo): [architecture.md](architecture.md). Types: [domain-mode
   (`http` is upgraded, never used). A rest whose path ends in `.asmx` is used as given; a path prefix in front of
   the standard path is kept. Nil when the rest is empty, starts with `/` or contains blanks.
 - `ewsURL` is nil for a server field with a user name or password in it (`me:pw@host`), so it is never saved (BUG-245).
-- `backend()`: nil without a valid URL or without a Keychain password (service `MailReplica-EWS`; account `"<username>@<host>"`, else the older item named by `username` alone; `ExchangeAccount.keychainAccounts`, BUG-252).
+- `backend()`: nil without a valid URL or without a Keychain password (service `MailReplica-EWS`; account `"<host>/<username>"`, else the older item named by `username` alone; `ExchangeAccount.keychainAccounts`, BUG-252).
 - Sign In (Settings ▸ Accounts) calls `folders()` with the typed or stored password before saving anything.
 
 ## Transport (`EWSClient.call`)

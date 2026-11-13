@@ -16,7 +16,7 @@ edited: 2026-11-13
   - [13:20 — Five parallel probe hunters in detached worktrees; bugs numbered from BUG-154](#run-2026-11-13-1235-6)
   - [13:58 — Commit while timing and WebKit tests fail under the hunters' load](#run-2026-11-13-1235-7)
   - [14:40 — BUG-194 deferred: its fix contradicts an existing test](#run-2026-11-13-1235-8)
-  - [14:38 — Keychain items keyed "user@host", old username-only items still read](#run-2026-11-13-1235-9)
+  - [14:38 — Keychain items keyed "host/user", old username-only items still read](#run-2026-11-13-1235-9)
   - [14:48 — The compose wishes get their own change spec, in four shippable parts](#run-2026-11-13-1235-10)
   - [15:24 — The daily app bundle holds a debug build; not rebuilt or relaunched by the run](#run-2026-11-13-1235-11)
   - [15:30 — Five P3 bugs deferred: they need a design choice or a look at real server data](#run-2026-11-13-1235-12)
@@ -992,12 +992,12 @@ edited: 2026-11-13
 - **Alternatives:** prefix hidden names with "_" (still breaks that test); only strip a single leading dot (inconsistent: "..x" stays hidden).
 - **Consequences:** the user decides whether "..:..:etc" is intended; then BUG-194 is a two-line fix.
 
-## 14:38 — Keychain items keyed "user@host", old username-only items still read {#run-2026-11-13-1235-9}
+## 14:38 — Keychain items keyed "host/user", old username-only items still read {#run-2026-11-13-1235-9}
 
 - **Status:** open
 - **Context:** BUG-252: two accounts with the same `DOMAIN\user` on different servers shared one Keychain item (service `MailReplica-EWS`, account = username).
 - **Question:** how to key the item without losing the user's stored password?
-- **Decision:** new items are written as account `"<username>@<host>"` (host of the EWS URL, lower case); reading tries that first, then the old username-only item. Old items are never deleted.
+- **Decision:** new items are written as account `"<host>/<username>"` (first `"<username>@<host>"`; changed at 15:44 after review: a UPN username `jan@host` looked the same) (host of the EWS URL, lower case); reading tries that first, then the old username-only item. Old items are never deleted.
 - **Why:** the user's existing account keeps working with no new sign-in; a new sign-in writes the per-server item.
 - **Alternatives:** `kSecClassInternetPassword` with `kSecAttrServer` (cleaner, but a different item class: the old item would need copying and a new "Always Allow").
 - **Consequences:** until an account signs in again, it can still read a stale shared old item; the README's live-test note (account = username) still works through the fallback. Rollback: revert the commit, the old items are untouched.

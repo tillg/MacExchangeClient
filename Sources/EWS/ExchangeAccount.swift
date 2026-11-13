@@ -46,11 +46,12 @@ public struct ExchangeAccount: Codable, Hashable, Sendable {
         return Account(id: id, name: address.isEmpty ? "Exchange" : address, address: address, isServer: true)
     }
 
-    /// The Keychain accounts its password may be stored under, first match wins: "user@host", so two accounts with
-    /// the same username on different servers keep their own (BUG-252); then the username alone, as stored before.
+    /// The Keychain accounts its password may be stored under, first match wins: "host/user", so two accounts with
+    /// the same username on different servers keep their own (BUG-252), and no username ("jan@host" is a UPN) can look
+    /// like it; then the username alone, as stored before.
     public var keychainAccounts: [String] {
         guard let host = ewsURL?.host?.lowercased() else { return [username] }
-        return ["\(username)@\(host)", username]
+        return ["\(host)/\(username)", username]
     }
 
     public var password: String? { keychainAccounts.lazy.compactMap(Keychain.password(for:)).first }
