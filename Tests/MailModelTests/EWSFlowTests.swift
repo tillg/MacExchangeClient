@@ -647,6 +647,24 @@ struct EWSFlowTests {
         #expect(server.served == 1, "\(server.served) requests went to a server that asked to wait 60 s")
         #expect(s.outbox.map(\.change) == [.setRead(["A"], true)])
     }
+
+    /// BUG-224: while launch reads the database, a mailbox clicked meanwhile doesn't start the history (which would
+    /// sync every folder as new and lose the stored positions); it waits until the stored state is loaded.
+    @Test func historyWaitsWhileTheDatabaseIsRead() async throws {
+        let server = ScriptedServer([])
+        defer { server.stop() }
+        let s = store(server)
+        s.beginLoading()  // AppSetup.loadMail, before the database is read
+        #expect(s.isLoading)
+        s.startHistory()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(server.served == 0)
+        s.restore(StoredMeta())
+        s.restore([], boxes: [MailboxKey(account: acct.id, mailbox: .inbox)])
+        #expect(s.isLoading)
+        s.finishLoading([])
+        #expect(!s.isLoading)
+    }
 }
 
 /// What the server saw when the send arrived (BUG-177).

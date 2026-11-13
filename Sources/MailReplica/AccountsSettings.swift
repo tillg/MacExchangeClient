@@ -37,6 +37,7 @@ enum AppSetup {
                 }
             }
             let first = store.accounts.map { MailboxKey(account: $0.id, mailbox: .inbox) }
+            store.beginLoading()  // checks meanwhile wait for the stored state (BUG-224)
             let (db, meta, inboxes) = try await Task.detached(priority: .userInitiated) {
                 let db = try MailDatabase(url: MailDatabase.defaultURL)
                 return (db, try db.meta(), try db.messages(in: first))

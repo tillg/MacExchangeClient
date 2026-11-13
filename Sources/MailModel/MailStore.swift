@@ -1244,6 +1244,13 @@ public final class MailStore {
     /// True while launch is still loading stored mail.
     public var isLoading: Bool { loadedBoxes != nil }
 
+    /// Launch, step 0: the database is about to be read. From now on the store counts as loading, so a check started
+    /// meanwhile (a mailbox clicked) doesn't start the history before the stored sync positions are in (BUG-224).
+    public func beginLoading() {
+        guard !restoredMeta, loadedBoxes == nil else { return }
+        loadedBoxes = []
+    }
+
     func isLoaded(_ account: UUID, _ box: MailboxKind) -> Bool { loadedBoxes?.contains(key(account, box)) ?? true }
 
     // MARK: Disk cache
