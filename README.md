@@ -68,7 +68,7 @@ In the macOS 27 SDK, `@State` is a macro whose plugin (`SwiftUIMacros`) ships on
 
 ### Connecting to Exchange
 
-Open Settings (⌘,) ▸ Accounts and sign in. The server can be a host name (`mail.example.com`, expanded to `https://mail.example.com/EWS/Exchange.asmx`) or a full EWS URL. Spaces and line breaks around it and a trailing `/` don't matter, and `http://` is changed to `https://`, so the password never travels unencrypted. The app checks the credentials before saving anything.
+Open Settings (⌘,) ▸ Accounts and sign in. The server can be a host name (`mail.example.com`, expanded to `https://mail.example.com/EWS/Exchange.asmx`) or a full EWS URL. Spaces and line breaks around it and a trailing `/` don't matter, a trailing `/EWS` folder is completed to the standard URL, and `http://` is changed to `https://`, so the password never travels unencrypted. The app checks the credentials before saving anything.
 
 Changes to Exchange mail show at once and are then written to the server in order: read state (without sending read receipts), flags, moves (Archive, Junk, Trash, drag & drop), deleting from Trash (recoverable on the server, like Outlook), Send and Save Draft.
 - Exchange knows only *flagged*, so flag colours stay on this Mac.

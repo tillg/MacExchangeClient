@@ -782,4 +782,12 @@ struct EWSParsingTests {
         #expect(ExchangeAccount(email: "", username: "", server: "me@mail.example.com").ewsURL == nil)
         #expect(ExchangeAccount(email: "", username: "", server: "mail.example.com").ewsURL != nil)
     }
+
+    /// BUG-243: the EWS folder pasted without its file ("…/EWS/", "…/ews") gets a second /EWS/ in front of the file.
+    @Test func ewsFolderPastedWithoutTheFileIsTheStandardURL() {
+        let want = "https://mail.example.com/EWS/Exchange.asmx"
+        for s in ["https://mail.example.com/EWS/", "https://mail.example.com/EWS", "mail.example.com/ews/"] {
+            #expect(ExchangeAccount(email: "", username: "", server: s).ewsURL?.absoluteString == want, "\(s) -> \(ExchangeAccount(email: "", username: "", server: s).ewsURL?.absoluteString ?? "nil")")
+        }
+    }
 }

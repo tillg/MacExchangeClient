@@ -26,6 +26,8 @@ public struct ExchangeAccount: Codable, Hashable, Sendable {
         let standard = "/EWS/Exchange.asmx"
         if s.lowercased().hasSuffix(standard.lowercased()) { s.removeLast(standard.count) }
         while s.hasSuffix("/") { s.removeLast() }
+        // The EWS folder without the file ("host/EWS/") is the standard URL too (BUG-243).
+        if s.lowercased().hasSuffix("/ews") { s.removeLast(4) }
         guard !s.isEmpty, !s.hasPrefix("/"), s.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { return nil }
         let path = s.lowercased().hasSuffix(".asmx") && s.contains("/") ? "" : standard
         // A user or password in the field ("me:pw@host") makes it invalid, so it is never saved (BUG-245).
