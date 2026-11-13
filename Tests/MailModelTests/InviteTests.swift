@@ -95,4 +95,22 @@ struct InviteTests {
         #expect(decoded.invite == nil)
         #expect(decoded.isInvite == nil)
     }
+
+    /// The invite card's "when" line names the end's day when the meeting ends on a later day: a three-day offsite,
+    /// an overnight window. An all-day invite's end is the midnight after its last day (BUG-142).
+    @Test func whenLineShowsTheEndsDayWhenItDiffers() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let en = Locale(identifier: "en_US")
+        func when(_ from: Double, _ to: Double, allDay: Bool = false) -> String {
+            Invite(start: at(from), end: at(to), isAllDay: allDay).when(calendar: cal, locale: en)  // day: Monday 23 Nov 2026
+        }
+        let sameDay = when(9, 17), offsite = when(9, 2 * 24 + 17), night = when(22, 26)
+        #expect(sameDay.contains("Monday") && !sameDay.contains("Tuesday"), "\(sameDay)")
+        #expect(offsite.contains("Monday") && offsite.contains("Wednesday") && offsite.contains("25"), "\(offsite)")
+        #expect(night.contains("Monday") && night.contains("Tuesday"), "\(night)")
+        let oneDay = when(0, 24, allDay: true), threeDays = when(0, 3 * 24, allDay: true)
+        #expect(oneDay.contains("all day") && !oneDay.contains("Tuesday"), "\(oneDay)")
+        #expect(threeDays.contains("Monday") && threeDays.contains("Wednesday") && !threeDays.contains("Thursday"), "\(threeDays)")
+    }
 }

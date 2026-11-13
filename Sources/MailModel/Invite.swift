@@ -24,6 +24,23 @@ public struct Invite: Hashable, Codable, Sendable {
         self.organizer = organizer; self.required = required; self.optional = optional; self.response = response
     }
 
+    /// The invite card's "when" line: the day and times, and the end's day too when the meeting ends on a later day
+    /// (an offsite, an overnight window), as Outlook writes it. An all-day invite ends at the midnight after its
+    /// last day, so that midnight isn't counted as a day of its own.
+    public func when(calendar: Calendar = .current, locale: Locale = .current) -> String {
+        let day = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).weekday(.wide).day().month(.wide).year()
+        let time = Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: calendar, timeZone: calendar.timeZone)
+        if isAllDay {
+            let last = end > start ? end.addingTimeInterval(-1) : start
+            if calendar.isDate(last, inSameDayAs: start) { return "\(start.formatted(day)), all day" }
+            return "\(start.formatted(day)) – \(last.formatted(day)), all day"
+        }
+        if end > start, !calendar.isDate(end, inSameDayAs: start) {
+            return "\(start.formatted(day)) at \(start.formatted(time)) – \(end.formatted(day)) at \(end.formatted(time))"
+        }
+        return "\(start.formatted(day)) at \(start.formatted(time)) – \(end.formatted(time))"
+    }
+
     /// Exchange puts an invite on the calendar as a tentative entry with the same subject and times.
     public func isOwnEntry(_ e: CalendarEvent, subject: String) -> Bool {
         e.start == start && e.end == end && e.subject == subject

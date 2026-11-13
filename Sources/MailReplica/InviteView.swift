@@ -17,7 +17,7 @@ struct InviteCard: View {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "calendar").foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(when).font(.system(size: 13, weight: .semibold))
+                        Text(invite.when()).font(.system(size: 13, weight: .semibold))
                         if !invite.location.isEmpty { Text(invite.location).font(.system(size: 13, weight: .semibold)) }
                     }
                 }
@@ -66,13 +66,6 @@ struct InviteCard: View {
                        "exclamationmark.triangle", .yellow)
             }
         }
-    }
-
-    private var when: String {
-        let day = invite.start.formatted(.dateTime.weekday(.wide).day().month(.wide).year())
-        if invite.isAllDay { return "\(day), all day" }
-        let t = { (d: Date) in d.formatted(date: .omitted, time: .shortened) }
-        return "\(day) at \(t(invite.start)) – \(t(invite.end))"
     }
 
     private func attendees(_ label: String, _ list: [Contact]) -> some View {

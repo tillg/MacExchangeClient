@@ -14,6 +14,7 @@ public enum WhatsNew {
         ChangeLogDay(date: "2026-11-13", features: [
             "While a search is still looking, the list keeps the results it showed, and no longer says \"No Results\" before the first answer is in.",
             "Messages received at the same time keep their order in the list after you restart the app.",
+            "An invitation for a meeting that ends on a later day, such as an offsite or a night shift, now shows the day it ends.",
             "A forwarded message now says who the original went to (To and Cc), and its date includes the time zone.",
             "Replies, forwards and invitation answers write a sender who has no name, such as a no-reply address, once instead of twice.",
             "Moving on to the next message before the current one has loaded no longer shows \"Couldn't load message: cancelled\".",
