@@ -558,6 +558,23 @@ struct EWSFlowTests {
         _ = await s.loadedDraft(.replyAll, to: id)
         #expect(server.served == 1)  // known now: not fetched again
     }
+
+    /// BUG-166: reading the folder list for a queued move fails with an Exchange error (store briefly unavailable):
+    /// the move stays queued and the message stays where the user put it; it isn't undone as refused.
+    @Test func failedFolderListDoesNotUndoAQueuedMove() async throws {
+        let e = EWSReply.err("GetFolder", "ErrorMailboxStoreUnavailable", "The mailbox database is temporarily unavailable.")
+        let server = ScriptedServer([EWSReply.resp("GetFolder", String(repeating: e, count: 6))])
+        defer { server.stop() }
+        let s = store(server, folders: false)
+        let m = Message(accountID: acct.id, mailbox: .inbox, from: Contact(name: "Ann", email: "ann@x.com"), to: [],
+                        subject: "Invoice", body: "", date: .now, remoteID: "A", bodyLoaded: false)
+        s.merge([m], account: acct.id, mailbox: .inbox)
+        s.move([s.messages.first { $0.remoteID == "A" }!.id], to: .archive)
+        try await waitFor { server.served == 1 }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(s.message(s.messages.first { $0.remoteID == "A" }!.id)?.mailbox == .archive, "status: \(s.status ?? "")")
+        #expect(s.outbox.count == 1)
+    }
 }
 
 /// What the server saw when the send arrived (BUG-177).

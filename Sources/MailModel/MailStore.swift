@@ -1544,8 +1544,14 @@ public final class MailStore {
         case let .setRead(ids, v): try await b.setRead(ids, v)
         case let .setFlagged(ids, v): try await b.setFlagged(ids, v)
         case let .move(ids, box):
-            // Changes are written before refresh reads the folder list (e.g. a drop right after launch).
-            if remoteFolders[p.account] == nil { setRemoteFolders(try await b.folders(), account: p.account) }
+            // Changes are written before refresh reads the folder list (e.g. a drop right after launch). If that read
+            // fails, Exchange never saw the move: it waits as for a busy server, it isn't undone as refused (BUG-166).
+            if remoteFolders[p.account] == nil {
+                do { setRemoteFolders(try await b.folders(), account: p.account) } catch {
+                    if error is URLError || error is ServerBusy || error is AuthenticationError { throw error }
+                    throw ServerBusy("Couldn't read the folder list: \(error.localizedDescription)")
+                }
+            }
             guard let folder = remoteFolders[p.account]?.first(where: { $0.role == box }) else {
                 throw MailError("There is no \(name(of: box, in: p.account)) folder on the server")
             }
