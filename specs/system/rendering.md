@@ -44,7 +44,9 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
   when the HTML, the remote decision or the set of inline image IDs changes. Its height is measured by an app script
   (bottom of the body div plus the body's bottom margin) after load and on width changes; vertical scrolling goes to
   the surrounding scroll view, horizontal stays in the page.
-- Navigation: `about:blank` is allowed; every other navigation is cancelled. A clicked link opens in the default
+- Navigation (`BodyNavigation`): `about:blank` is allowed only for the app's own load, from `willLoad()` (called before
+  each `loadHTMLString`) until that load commits; a meta refresh or link to `about:blank` afterwards is cancelled, like
+  every other navigation. A clicked link opens in the default
   app only for `http`, `https` and `mailto` (`HTMLPage.opensLink`).
 
 ## Remote content
