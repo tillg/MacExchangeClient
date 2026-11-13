@@ -313,6 +313,20 @@ struct MailStoreSyncTests {
         #expect(s.accounts.map(\.id) == [exchange.id])
     }
 
+    /// Send from an Exchange account that has no password: never shown in Sent, queued, and the status says it
+    /// waits for the sign-in, also before the account has stored anything (BUG-101).
+    @Test func sendFromAnAccountWithoutPasswordSaysItWaits() {
+        let ex = ExchangeAccount(email: "till@work.com", username: "W\\till", server: "mail.work.com")
+        let s = MailStore(accounts: [], messages: [])
+        s.accounts.append(ex.account)  // nothing stored for it yet
+        s.status = "No password in the Keychain for W\\till"
+        let before = s.status
+        s.send(Draft(accountID: ex.id, to: "x@y.com", subject: "Important", body: "b"))
+        #expect(!s.messages.contains { $0.mailbox == .sent }, "shown in Sent")
+        #expect(s.outbox.contains(where: isSend))
+        #expect(s.status != before && s.status?.contains("Important") == true, "status: \(s.status ?? "nil")")
+    }
+
     /// Signing in again (the password entered) gives the same account its backend: no second account, and what
     /// waited goes out.
     @Test func signingInAgainConnectsTheSameAccount() async throws {

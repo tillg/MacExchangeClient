@@ -13,6 +13,7 @@ public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
             "Reply All no longer leaves an empty recipient for \"Undisclosed recipients\" or a group without an address.",
+            "Sending from an Exchange account whose password is missing no longer shows the message as sent: it says it waits until you sign in again.",
             "An invitation you answer while several messages are selected no longer stays selected in Trash, so pressing Delete next can't erase it by accident.",
             "A message sent without a subject shows \"(No Subject)\" in Sent, as in Drafts.",
             "A forward whose original attachments can't be loaded no longer goes out without them unnoticed: the window says so and lets you try again or continue without them.",

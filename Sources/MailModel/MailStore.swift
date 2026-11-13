@@ -1922,8 +1922,13 @@ public final class MailStore {
             return true
         }
         guard let acct = sendingAccount(d) else { return false }
-        if serverAccounts.contains(acct.id) {
+        // An Exchange account is one also before it has stored anything, and while it has no password.
+        if serverAccounts.contains(acct.id) || acct.isServer {
             outbox.append(PendingChange(account: acct.id, change: .send(d), previous: []))
+            if backends[acct.id] == nil {
+                status = "“\(d.subject.isEmpty ? "(No Subject)" : d.subject)” waits in the outbox until “\(acct.name)” "
+                    + "is signed in again in Settings ▸ Accounts."
+            }
             scheduleFlush()
             return true
         }
@@ -1942,7 +1947,7 @@ public final class MailStore {
     public func saveDraft(_ d: Draft) -> Bool {
         if attachmentsPending(d) { return false }
         guard let acct = sendingAccount(d) else { return false }
-        if serverAccounts.contains(acct.id) {
+        if serverAccounts.contains(acct.id) || acct.isServer {
             outbox.append(PendingChange(account: acct.id, change: .saveDraft(d), previous: []))
             scheduleFlush()
             return true
