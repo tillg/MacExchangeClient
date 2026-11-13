@@ -70,6 +70,10 @@ enum EWSReply {
     static func ok(_ op: String, _ inner: String = "") -> String {
         "<m:\(op)ResponseMessage ResponseClass=\"Success\"><m:ResponseCode>NoError</m:ResponseCode>\(inner)</m:\(op)ResponseMessage>"
     }
+    static func err(_ op: String, _ code: String, _ text: String) -> String {
+        "<m:\(op)ResponseMessage ResponseClass=\"Error\"><m:MessageText>\(text)</m:MessageText>"
+            + "<m:ResponseCode>\(code)</m:ResponseCode><m:DescriptiveLinkKey>0</m:DescriptiveLinkKey></m:\(op)ResponseMessage>"
+    }
     static func resp(_ op: String, _ messages: String) -> String {
         env("<m:\(op)Response \(ns)><m:ResponseMessages>\(messages)</m:ResponseMessages></m:\(op)Response>")
     }
@@ -107,6 +111,10 @@ enum EWSReply {
         resp("CreateAttachment", ok("CreateAttachment", "<m:Attachments><t:FileAttachment><t:AttachmentId Id=\"AT0\" "
             + "RootItemId=\"\(root)\" RootItemChangeKey=\"CK2\"/></t:FileAttachment></m:Attachments>"))
     }
+    static func findFolder(_ folders: String = "") -> String {
+        resp("FindFolder", ok("FindFolder", "<m:RootFolder IndexedPagingOffset=\"0\" TotalItemsInView=\"0\" "
+            + "IncludesLastItemInRange=\"true\"><t:Folders>\(folders)</t:Folders></m:RootFolder>"))
+    }
     static func deleted(_ n: Int = 1) -> String { resp("DeleteItem", String(repeating: ok("DeleteItem"), count: n)) }
 }
 
@@ -118,10 +126,12 @@ enum EWSReply {
 struct EWSFlowTests {
     let acct = Account(name: "Exchange", address: "me@work.com")
 
-    /// A store with one Exchange account whose server is `server`; the folder list is already known.
-    func store(_ server: ScriptedServer) -> MailStore {
+    /// A store with one Exchange account whose server is `server`; the folder list is already known unless
+    /// `folders` is false.
+    func store(_ server: ScriptedServer, folders: Bool = true) -> MailStore {
         let s = MailStore(accounts: [], messages: [])
         s.add(acct, backend: EWSBackend(client: EWSClient(url: server.url, username: "u", password: "p")))
+        guard folders else { return s }
         s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .drafts, id: "DRAFTS"),
                             RemoteFolder(role: .sent, id: "SENT"), RemoteFolder(role: .trash, id: "DEL")], account: acct.id)
         return s
@@ -202,5 +212,20 @@ struct EWSFlowTests {
         await s.refresh(history: false)
         #expect(s.messages.filter { $0.mailbox == .drafts }.map(\.remoteID) == ["D2"])
         #expect(s.outbox.isEmpty)
+    }
+
+    /// GetFolder answers each standard folder with an error (mailbox store unavailable, e.g. during a mailbox move):
+    /// the check says so, and the folder list is asked again at the next check.
+    @Test func folderListWithoutInboxIsReportedAndRetried() async throws {
+        let e = EWSReply.err("GetFolder", "ErrorMailboxStoreUnavailable", "The mailbox database is temporarily unavailable.")
+        let server = ScriptedServer([EWSReply.resp("GetFolder", String(repeating: e, count: 6)), EWSReply.findFolder()],
+                                    fallback: EWSReply.sync("", token: "T1"))
+        defer { server.stop() }
+        let s = store(server, folders: false)
+        await s.refresh(history: false)
+        let afterFirst = server.served
+        #expect(s.status?.contains("The mailbox database is temporarily unavailable.") == true, "\(String(describing: s.status))")
+        await s.refresh(history: false)
+        #expect(server.served > afterFirst)
     }
 }

@@ -30,6 +30,12 @@ public struct EWSBackend: MailBackend {
             "<m:GetFolder><m:FolderShape><t:BaseShape>IdOnly</t:BaseShape>\(Self.countProp)</m:FolderShape><m:FolderIds>\(ids)</m:FolderIds></m:GetFolder>",
             strict: false)
         var result = Self.parseGetFolder(doc)
+        // Exchange refused the Inbox (e.g. the mailbox store is unavailable during a move): a list without it would
+        // be kept for the session, so the check fails with that error and the list is asked again next time.
+        if let inbox = doc.all("GetFolderResponseMessage").first, inbox.attr("ResponseClass") == "Error" {
+            throw EWSError(code: inbox.child("ResponseCode")?.stringValue ?? "ErrorFolderNotFound",
+                           message: inbox.child("MessageText")?.stringValue ?? "Exchange didn't return the Inbox")
+        }
         let outbox = doc.all("GetFolderResponseMessage").dropFirst(Self.distinguished.count).first?.first("FolderId")?.attr("Id")
         // Every mail folder, nested. Outlook's Archive folder is a normal top-level folder; there is no distinguished ID for it.
         var found: [XMLNode] = [], offset: Int? = 0
