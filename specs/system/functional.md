@@ -73,6 +73,8 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
   the list stays selected. So a second Delete can never erase a message from Trash that the user didn't see there.
   Read/unread and flag changes don't move the selection to another message, but selected messages they take out of
   the list (unread filter, Flagged) leave the selection; if that was all of it, nothing is selected.
+  With conversations, a selected message counts as in the list while its conversation row is, also when the row
+  stands for a newer message, and "next" is the row after its row (BUG-155).
 - An action on Exchange mail that would move it to another account is reverted with the status "Exchange messages
   can't be moved to another account yet".
 
