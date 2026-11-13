@@ -75,3 +75,9 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [233](BUG-233-ask-include-dialog-wording.md) | P4 | UI / ComposeView | Include-attachments Ask dialog adds a "?" to Mail's title and spells "Don't Include" with a straight apostrophe |
 | [234](BUG-234-unread-smart-mailbox-icon.md) | P4 | UI / SidebarView | Sidebar: the Unread smart mailbox shows a bare gear; Mail's smart mailbox icon is a folder with a gear |
 | [235](BUG-235-message-context-menu-order.md) | P4 | UI / MessageListView | Message list context menu: Move to Junk and Delete come after Archive; in Mail they follow Mark as Read, before Flag, and Move to is missing |
+| [236](BUG-236-cloud-attachment-body-refetched.md) | P4 | attachments / EWS | A message with a cloud attachment (OneDrive/SharePoint link) fetches its body again every time it is shown |
+| [237](BUG-237-attachment-change-on-server-ignored.md) | P3 | Sync / attachments | A file added to or removed from a message on the server (a draft edited in Outlook) never shows: the old attachment list and paperclip stay |
+| [238](BUG-238-forward-of-vanished-original-drops-files.md) | P3 | compose / forward | A forward whose original is gone while its files load is released without them, without a word |
+| [239](BUG-239-reply-to-counts-as-new-recipient.md) | P3 | compose / Include Attachments With Replies | Include Attachments ▸ When Adding Recipients: a reply to a message with Reply-To pulls in the original's files though no one was added |
+| [240](BUG-240-opened-copy-stale-after-message-changed.md) | P4 | attachments / Mail Downloads | After a message changed on the server, Open and Save still give the old version of a file with the same name |
+| [241](BUG-241-symlink-to-alias-attaches-bookmark.md) | P4 | compose / attaching files | A symbolic link to a Finder alias is attached as the alias's bookmark bytes, not the file it points to |
