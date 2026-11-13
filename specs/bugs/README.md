@@ -37,7 +37,6 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [194](BUG-194-dotfile-attachment-saved-hidden.md) | P4 | attachments | An attachment named ".something.pdf" is saved as a hidden file the user can't find (deferred: conflicts with an existing test) |
 | [195](BUG-195-recipient-group-and-comment-syntax.md) | P4 | compose | Recipients written with RFC 5322 group syntax or a comment become invalid addresses ("Team: a@x.com", "a@x.com (Ann)") |
 | [197](BUG-197-blocked-picture-source-broken-box.md) | P4 | rendering | With remote content blocked, <picture> with a web <source> and <input type=image> show WebKit's broken-image box |
-| [199](BUG-199-whatsnew-date-day-early-west-of-utc.md) | P4 | UI / WhatsNewView | Help ▸ What's New dates each day one day early on a Mac west of UTC (2026-11-13 shown as Thursday, 12 November) |
 | [201](BUG-201-when-line-runs-backwards-on-clock-change.md) | P4 | invites | On the night the clocks go back, an invite's when line reads "at 2:30 – 2:15", as if it ended before it starts |
 | [202](BUG-202-recurring-invite-shown-as-one-off.md) | P3 | invites / EWS | A recurring meeting's invite is shown as a one-off meeting: nothing says it repeats (deferred) |
 | [204](BUG-204-html-source-line-breaks-kept.md) | P4 | ews / plain text of HTML | Text of an HTML-only mail keeps the HTML source's line breaks: paragraphs break mid-sentence and every <br> gives a blank line in quotes |

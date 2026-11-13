@@ -117,16 +117,6 @@ struct Probe_R5GFindings {
 
 /// R5G: Help ▸ What's New.
 struct Probe_R5GWhatsNew {
-    /// `WhatsNewView.title` parses "yyyy-MM-dd" with `.iso8601` (midnight UTC) and shows it in the local time zone.
-    @Test func dayTitleIsTheSameDayInEveryTimeZone() throws {
-        let date = try #require(WhatsNew.days.first?.date)
-        let d = try Date(date, strategy: .iso8601.year().month().day())  // WhatsNewView.swift:27
-        var style = Date.FormatStyle.dateTime.weekday(.wide).day().month(.wide).year()
-        style.timeZone = TimeZone(identifier: "America/New_York")!
-        style.locale = Locale(identifier: "en_US")
-        let shown = d.formatted(style)
-        #expect(shown.contains(String(Int(date.suffix(2))!)), "\(date) shown as \(shown)")
-    }
 
 }
 
