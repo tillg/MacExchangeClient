@@ -88,6 +88,23 @@ struct MailStorePerformanceTests {
         #expect(fresh.messages.count == s.messages.count)
     }
 
+    /// A redraw reads `selectedMessage` several times (menu items, viewer, detail). For a message that arrived this
+    /// session, at the far end of `messages`, each read used to scan them all (BUG-137). 100 reads stay in budget.
+    @Test func readingTheSelectedMessageStaysFastAt70kMessages() {
+        let arrived = Message(accountID: work.id, from: Contact(name: "New", email: "new@x.com"), to: [], subject: "Just arrived",
+                              body: "", date: .now, remoteID: "NEW-1", bodyLoaded: false)
+        let t = (0..<3).map { _ in
+            let s = bigStore()
+            s.apply(SyncResult(upserts: [arrived], deletedRemoteIDs: [], token: "t", more: false), account: work.id, mailbox: .inbox)
+            s.selection = [s.messages.last!.id]
+            let start = Date()
+            for _ in 0..<100 { #expect(s.selectedMessage?.remoteID == "NEW-1") }
+            return Date().timeIntervalSince(start)
+        }.min()!
+        print(String(format: "PERF 100 reads of selectedMessage in 70k %.3fs", t))
+        #expect(t < Self.limit)
+    }
+
     /// Undoing a refused batch of 100 (the outbox batch size) far into the message array (BUG-078).
     @Test func undoingARefusedBatchStaysFastAt70kMessages() {
         let t = (0..<3).map { _ in

@@ -408,7 +408,18 @@ public final class MailStore {
     /// The status is a search's own notice (the limit or a failure), which goes with that search.
     private var statusIsAboutSearch: Bool { status == Self.limitNotice || status?.hasPrefix(Self.searchFailed) == true }
 
-    public var selectedMessage: Message? { selection.count == 1 ? selection.first.flatMap(message) : nil }
+    /// Read several times per redraw (menus, viewer, detail): where the selected message sits is kept per revision,
+    /// so mail that arrived this session (at the end of `messages`) isn't found by a scan of all of them each time.
+    public var selectedMessage: Message? {
+        guard selection.count == 1, let id = selection.first else { return nil }
+        _ = messages.count  // registers the dependency for SwiftUI even when the cache answers
+        if let c = selectedCache, c.revision == revision, c.id == id { return c.index.map { messages[$0] } }
+        let i = messages.firstIndex { $0.id == id }
+        selectedCache = (revision, id, i)
+        return i.map { messages[$0] }
+    }
+
+    @ObservationIgnored private var selectedCache: (revision: Int, id: Message.ID, index: Int?)?
 
     @ObservationIgnored private var conversationCache: (revision: Int, id: Message.ID, list: [Message])?
 
