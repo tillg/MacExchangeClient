@@ -67,6 +67,15 @@ struct MessageTests {
         try Data([1]).write(to: dir.appendingPathComponent(file), options: .atomic)
     }
 
+    /// BUG-193: a sender can't disguise a file's type with bidi controls ("invoice\u{202E}fdp.app" shows as
+    /// "invoiceppa.pdf"), and a line break or other control character doesn't end up in a file name.
+    @Test func fileNamesDropBidiAndControlCharacters() {
+        #expect(Attachment(name: "invoice\u{202E}fdp.app").fileName == "invoicefdp.app")
+        #expect(Attachment(name: "a\u{2066}b\u{2069}\u{200F}.pdf").fileName == "ab.pdf")
+        #expect(Attachment(name: "a\nb\tc\u{7}.pdf").fileName == "a b c .pdf")
+        #expect(Attachment(name: "\u{202E}").fileName == "Attachment")
+    }
+
     /// Draft HTML has a line per `<div>`, whatever the line ending (quoted Exchange text uses CRLF).
     @Test func draftHTMLSplitsLinesOnEveryLineEnding() {
         let h = Draft(accountID: UUID(), body: "one\r\ntwo\rthree\n\r\nfour\u{2028}five").html { _ in nil }

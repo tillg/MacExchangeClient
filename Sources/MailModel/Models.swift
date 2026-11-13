@@ -465,8 +465,15 @@ public struct Attachment: Hashable, Codable, Sendable, ExpressibleByStringLitera
 
     /// The name as a file name: the sender's name can't point into another folder.
     /// A "/" becomes ":", which the Finder shows as "/" again. A name over 255 bytes is shortened, keeping its extension.
+    /// Bidi controls go (they could show "x\u{202E}fdp.app" as "xppa.pdf"), other control characters become a blank
+    /// (BUG-193).
     public var fileName: String {
-        let n = name.replacingOccurrences(of: "/", with: ":").replacingOccurrences(of: "\0", with: "")
+        let bidi = Set<UInt32>([0x200E, 0x200F, 0x061C]).union(0x202A...0x202E).union(0x2066...0x2069)
+        var scalars = String.UnicodeScalarView()
+        for u in name.unicodeScalars where u != "\0" && !bidi.contains(u.value) {
+            scalars.append(u.properties.generalCategory == .control ? " " : u)
+        }
+        let n = String(scalars).replacingOccurrences(of: "/", with: ":")
         guard !(n.isEmpty || n == "." || n == "..") else { return "Attachment" }
         let ext = (n as NSString).pathExtension
         guard !ext.isEmpty, ext.utf8.count <= 32 else { return Self.fileName(n, ending: "") }
