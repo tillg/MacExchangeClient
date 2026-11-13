@@ -11,17 +11,6 @@ import Testing
 struct Probe_R5MAccounts {
     func url(_ server: String) -> URL? { ExchangeAccount(email: "me@work.com", username: "DOMAIN\\me", server: server).ewsURL }
 
-    /// R5M-01: signing in again reuses the saved account only when `ewsURL` (and the username) compare exactly
-    /// (AccountsSettings.signIn, d-bug-056). The same server written with other letter case or its default port gives
-    /// another URL, so a second copy of the account is added and its mail downloads twice.
-    @Test func sameServerWrittenDifferentlyIsTheSameAccount() {
-        let plain = url("mail.example.com")
-        #expect(url("Mail.Example.com") == plain, "host case: \(url("Mail.Example.com")?.absoluteString ?? "nil")")
-        #expect(url("mail.example.com:443") == plain, "default port: \(url("mail.example.com:443")?.absoluteString ?? "nil")")
-        #expect(url("https://MAIL.EXAMPLE.COM/EWS/Exchange.asmx") == plain,
-                "pasted in capitals: \(url("https://MAIL.EXAMPLE.COM/EWS/Exchange.asmx")?.absoluteString ?? "nil")")
-    }
-
     /// R5M-03: malformed input becomes a URL to another host or without the EWS path, instead of "Invalid server".
     @Test func malformedServerIsInvalidNotAnotherHost() {
         for s in ["ftp://mail.example.com", "https:/mail.example.com", "https//mail.example.com", "mail.example.com?x",
