@@ -1802,9 +1802,11 @@ public final class MailStore {
     public func files(_ urls: [URL]) -> [DraftAttachment] {
         var files: [DraftAttachment] = [], skipped: [String] = []
         for url in urls {
-            let isFolder = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            // A symbolic link to a folder goes as the folder, under the link's name, as the Finder does.
+            let target = url.resolvingSymlinksInPath()
+            let isFolder = (try? target.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
             if isFolder {
-                guard let zip = Self.zipped(url) else { skipped.append(url.lastPathComponent); continue }
+                guard let zip = Self.zipped(target) else { skipped.append(url.lastPathComponent); continue }
                 files.append(DraftAttachment(name: url.lastPathComponent + ".zip", contentType: "application/zip", data: zip))
                 continue
             }

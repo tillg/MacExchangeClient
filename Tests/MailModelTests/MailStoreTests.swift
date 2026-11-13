@@ -1241,6 +1241,21 @@ struct MailStoreTests {
         #expect(s.status == nil)
     }
 
+    /// A symbolic link to a folder is attached as a zip of the folder, under the link's name.
+    @Test func symlinkToFolderIsAttachedAsZip() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ZipTests-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let folder = dir.appendingPathComponent("Photos"), link = dir.appendingPathComponent("Photos alias")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: folder.appendingPathComponent("a.txt"))
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: folder)
+        let s = store([])
+        let files = s.files([link])
+        #expect(files.map(\.name) == ["Photos alias.zip"] && files.first?.contentType == "application/zip",
+                "files: \(files.map(\.name)) status: \(s.status ?? "nil")")
+        #expect(files.first?.data.prefix(2) == Data("PK".utf8))
+    }
+
     /// Edit ▸ Include Attachments With Replies: Always adds them to a reply, Never and Ask don't by themselves.
     /// Forward always does. The draft remembers the original either way, for the Include Attachments button.
     @Test func repliesIncludeAttachmentsPerSetting() {
