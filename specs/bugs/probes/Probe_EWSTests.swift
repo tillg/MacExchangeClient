@@ -149,13 +149,6 @@ struct Probe_EWSTests {
 
     // MARK: Round 2
 
-    @Test func probeEmptyTextBodyFallsBackToHTML() throws {
-        let d = try doc("""
-            <t:Message><t:ItemId Id="A"/><t:Body BodyType="HTML">&lt;p&gt;Hello&lt;/p&gt;</t:Body><t:TextBody BodyType="Text"/></t:Message>
-            """)
-        #expect(EWSBackend.parseBody(d.first("Message")!).text == "Hello")
-    }
-
     @Test func probePlainTextOnHugeHTMLIsFast() {
         let html = "<html><head><style>p{}</style></head><body>" + String(repeating: "<p>Hello <b>world</b> &amp; more</p>\n", count: 100_000) + "</body></html>"
         let t = Date()

@@ -94,7 +94,7 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
   `ReadFlagChange` → read state; `more` when `IncludesLastItemInRange` is "false"; token from `SyncState`.
   `ErrorInvalidSyncStateData` for a request that carried a token is thrown as `SyncTokenRejected` (any other error,
   and that code without a token, as `EWSError`).
-- **Body** (`parseBody`): `html` = `Body` when `BodyType="HTML"`. `text` = `TextBody` if present (even empty), else a
+- **Body** (`parseBody`): `html` = `Body` when `BodyType="HTML"`. `text` = `TextBody` if present (an empty or blank one only without an HTML body), else a
   rough plain text of the HTML (`plainText`, one linear pass: drop comments and head/style/script, an unclosed one
   to the end; line breaks for `br` (with attributes too) and closing p/div/tr/li/h1–h6, a space for closing td/th,
   strip other tags; decode `&#n;`, `&#xh;` and named references (Latin-1 and common punctuation, no-break space as
