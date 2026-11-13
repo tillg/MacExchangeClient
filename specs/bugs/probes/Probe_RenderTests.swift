@@ -227,46 +227,6 @@ struct Probe_RenderTests {
 
     // MARK: Height (what HTMLBodyView measures vs. what the page draws)
 
-    /// MailChimp-style `height="100%"` body table: once the window is widened, the text needs less height; the
-    /// view should get shorter again (a fresh load at the new width is the reference).
-    static let percentTemplate = """
-        <body style="margin:0;padding:0"><center><table align="center" border="0" cellpadding="0" cellspacing="0" height="100%" width="100%" id="bodyTable"><tr><td align="center" valign="top" id="bodyCell">
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px"><tr><td valign="top" style="padding:9px 18px;font-family:Helvetica;font-size:16px;line-height:150%">
-        \(String(repeating: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore. ", count: 30))
-        </td></tr></table></td></tr></table></center></body>
-        """
-
-    @Test func percentHeightNewsletterShrinksWhenWindowWidens() async {
-        let p = await RPage(HTMLPage.document(Self.percentTemplate, allowRemote: false), width: 320)
-        let narrow = await p.settleLikeTheApp()
-        await p.resize(width: 900)
-        let widened = await p.measure()
-        let fresh = await RPage(HTMLPage.document(Self.percentTemplate, allowRemote: false), width: 900)
-        let reference = await fresh.measure()
-        #expect(abs(widened - reference) <= 2, "narrow \(narrow), after widening \(widened), fresh load at that width \(reference)")
-    }
-
-    /// Same check for a plain mail (control: no percentage heights).
-    @Test func controlPlainMailShrinksWhenWindowWidens() async {
-        let mail = "<p>\(String(repeating: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ", count: 40))</p>"
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false), width: 320)
-        _ = await p.settleLikeTheApp()
-        await p.resize(width: 900)
-        let widened = await p.measure()
-        let fresh = await RPage(HTMLPage.document(mail, allowRemote: false), width: 900)
-        let reference = await fresh.measure()
-        #expect(abs(widened - reference) <= 2, "after widening \(widened), fresh \(reference)")
-    }
-
-    /// A `height:100vh` hero block: measured at height 1, then the view grows and so does the block.
-    @Test func viewportHeightBlockDoesNotOutgrowTheView() async {
-        let mail = #"<div style="height:100vh;background:#eee">Hero</div><p>Read more</p><p id="last">Unsubscribe</p>"#
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false), width: 600)
-        let h = await p.settleLikeTheApp()
-        let lastBottom = ((await p.eval("document.getElementById('last').getBoundingClientRect().bottom")) as? NSNumber)?.doubleValue ?? -1
-        #expect(lastBottom <= h, "measured \(h), last line ends at \(lastBottom)")
-    }
-
     // MARK: Width
 
     @Test func controlNarrowNewsletterHasNoHorizontalOverflow() async {

@@ -504,3 +504,14 @@ edited: 2026-11-13
 - **Context:** BUG-073. While a move is on its way, the destination's sync can merge the moved item under its new ID as a new message. `renameRemote` then gave the original the same ID: two messages, one of them a stale duplicate forever.
 - **Decision:** `renameRemote` first drops any message of the account that already has one of the new IDs (and isn't itself being renamed); the renamed message keeps its local ID, loaded body and selection (a selected copy is replaced by it in the selection). The dropped copy is removed from disk with the next save.
 - **Why:** One server item is one message. The original carries what the user has (body, selection); the copy has nothing the next sync of the destination won't bring again.
+
+## 02:14 — Viewport units follow the window, through WebKit SPI {#d-bug-110}
+
+- **Status:** decided (uses a private WebKit method)
+- **Context:** BUG-110. The body view is as tall as the page, so the page's viewport was the view itself: `100vh` blocks were 1 pt when measured and then grew with the view (the end of the mail below the view), and `html, body { height: 100% }` kept the height measured at a narrow window forever. MailChimp's `height="100%"` table was already fixed by almost-standards mode (d-bug-066).
+- **Decision:**
+  - The page's style has `html:root { height: auto !important; min-height: 0 !important }` (more specific than a mail's `html { … !important }`).
+  - `HTMLPage.pinViewportUnits(of:to:)` calls `-[WKWebView _setViewportSizeForCSSViewportUnits:]` (checked with `responds(to:)`; does nothing if a later WebKit drops it). `BodyWebView.layout` sets it to the view's width and the window's content height whenever that changes: `100vh` is the window's height, as a reader of the mail expects.
+- **Why:** There is no public API: `setMinimumViewportInset` only changes `lvh`/`svh`, and plain `vh` can't be overridden in CSS. Without it a re-measure on page changes (BUG-109) would make a `100vh` block grow without end. Verified in a real `WKWebView`: with the size pinned, the block's height stays the same when the view grows.
+- **Risk:** private method; if it disappears, viewport units fall back to the old behaviour (no crash), and 109's re-measuring is not installed then (see d-bug-109).
+- **Alternatives:** Rewrite `vh` in the mail's CSS (rejected: needs parsing of style sheets and inline styles). Measure in a hidden second web view (rejected: double the work for every message).

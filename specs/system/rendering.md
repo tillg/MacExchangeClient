@@ -47,7 +47,11 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
   `autofocus` field, is measured from its top; at least the body's top plus its `scrollHeight` and bottom margin,
   which counts `position: absolute` content inside a positioned element (absolute content with no positioned
   ancestor isn't counted). None of these terms depends on the view's own height, so the view shrinks again when
-  the window widens) after load and on width changes; vertical scrolling goes to
+  the window widens). The page's style forces `html:root { height: auto; min-height: 0 }` (`!important`), so mail
+  that makes the root as tall as the view can't keep it from shrinking; percentage heights such as MailChimp's
+  `height="100%"` table resolve to auto in almost-standards mode. Viewport units (`vh`, `vw`, …) resolve against the
+  window's content size and the view's width (`HTMLPage.pinViewportUnits`, set in `BodyWebView.layout`), not
+  against the view, which grows to the page's height after load and on width changes; vertical scrolling goes to
   the surrounding scroll view, horizontal stays in the page.
 - Navigation (`BodyNavigation`): `about:blank` is allowed only for the app's own load, from `willLoad()` (called before
   each `loadHTMLString`) until that load commits; a meta refresh or link to `about:blank` afterwards is cancelled, like
