@@ -259,30 +259,4 @@ struct Probe_Store2Tests {
         #expect(back.count == 1)
         if case let .send(d2)? = back.first?.change { #expect(d2 == d) } else { Issue.record("no send: \(back)") }
     }
-
-    /// Forward of an Exchange message whose files can't be fetched (body not loaded, account without
-    /// connection): the forward must not become sendable without its files, silently.
-    @Test func forwardWhoseFilesCannotLoadIsNotSilentlySendable() async {
-        var m = summary(work, "A", subject: "Contract")
-        m.hasAttachments = true
-        let s = store([])
-        s.merge([m], account: work.id, mailbox: .inbox)
-        var d = s.draft(.forward, to: s.messages[0].id)
-        #expect(d.loadingOriginal != nil)
-        await s.includeOriginalAttachments(in: &d)
-        #expect(d.loadingOriginal != nil || !d.attachments.isEmpty || s.status != nil,
-                "loadingOriginal: \(String(describing: d.loadingOriginal)), files: \(d.attachments.count), status: \(s.status ?? "nil")")
-    }
-
-    /// One of two files can't be loaded: the forward is released with only the other one.
-    @Test func forwardWithOneUnavailableFileStaysBlocked() async {
-        var m = msg(work, subject: "Two files"); m.attachments = ["a.pdf", "b.pdf"]
-        let s = store([m])
-        s.downloadsFolder = tempDir()
-        s.setAttachmentData([Data([1])], for: m.id)  // b.pdf's content can't be had
-        var d = s.draft(.forward, to: m.id)
-        await s.includeOriginalAttachments(in: &d)
-        #expect(d.attachments.count == 2 || d.loadingOriginal != nil,
-                "files: \(d.attachments.map(\.name)), loadingOriginal: \(String(describing: d.loadingOriginal)), status: \(s.status ?? "nil")")
-    }
 }

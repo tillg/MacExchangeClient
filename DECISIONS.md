@@ -730,3 +730,18 @@ edited: 2026-11-13
 - **Why:** the reply is right as soon as it opens, as in Mail; no change to `Draft` or stored data.
 - **Not covered:** offline, the quote stays empty (the list preview is cut short and isn't quoted as if it were the message). The probe's synchronous expectation (an address with no body and no server) can't be met; the regression test loads the body from a `file://` fixture instead.
 - **Alternatives:** quote `serverPreview` (rejected: a cut-off text passed off as the message); open the window at once and fill it when the body arrives (rejected: the user may already be typing in To).
+
+## 03:56 — A forward's original files are added all or none, and a failure keeps it blocked {#d-bug-071}
+
+- **Status:** decided
+- **Context:** BUG-071. `includeOriginalAttachments` released the forward whatever happened, so it could go out without the original's files (none when the body couldn't be loaded, some when one file failed).
+- **Decision:** All or none. If the original's body can't be loaded or any file can't be had, nothing is added, `loadingOriginal` stays set and `status` names the files. The compose window then shows "The original attachments couldn't be added." with Try Again and Continue Without Them (the latter counts as Exclude Attachments). No change to `Draft`.
+- **Why:** the README promises a forward isn't sent before its files are in; the user decides, not a silent fallback. All or none keeps Try Again simple (no duplicates).
+- **Alternatives:** keep the files that loaded and report the rest (rejected: a retry would have to merge, and the message is easy to send half-complete).
+
+## 03:56 — Send that can't go ahead keeps the compose window open {#d-bug-069}
+
+- **Status:** decided
+- **Context:** BUG-069, BUG-070. The compose window closed after Send whatever happened, so an answer to an invite that had vanished, or a draft of an account that was removed, was dropped (or sent from another account) without a word.
+- **Decision:** `send` returns false (and `saveDraft` already did) when the message can't go ahead; the window stays open and shows the status in an alert. An invite answer whose invite is gone says "the invitation is no longer in your mailbox"; a draft of a removed account is never sent or saved from another account, and the From picker is shown so another one can be chosen.
+- **Alternatives:** send the answer by the remote ID kept in the draft (rejected: `InviteAnswer` is stored in the outbox; and the invite is usually gone because it was answered elsewhere). Fall back to the first account (the old behaviour; rejected: mail from the wrong identity).

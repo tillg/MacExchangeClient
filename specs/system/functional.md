@@ -115,7 +115,9 @@ and Unread refuse drops. Messages already in the target are left out. Resting on
   "@" wasn't on the original; while the original's addresses aren't known, a recipient with the name of one of its
   people counts as on it; Always). Ask and When Adding Recipients work for every reply; Always only for replies
   from the menu bar, since toolbar and context-menu replies don't pass the setting to `draft()`. The Include/Exclude Attachments button adds or removes them by hand. Send and Save are blocked
-  while they load.
+  while they load. All or none: if the original can't be loaded or one of its files can't be had, nothing is added,
+  `loadingOriginal` stays set (Send and Save stay blocked), the status names the files, and the window shows "The
+  original attachments couldn't be added." with Try Again and Continue Without Them.
 - Attaching: Attach button, File ▸ Attach Files… (⇧⌘A), dropping or pasting files. A folder is sent as "Name.zip".
   Files sit in the text at a U+FFFC mark ([domain-model.md](domain-model.md#draft)); JPEG, PNG and GIF placed in the
   text are sent inline in an HTML body ([rendering.md](rendering.md#html-of-sent-mail)).
