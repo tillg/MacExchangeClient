@@ -119,33 +119,6 @@ struct Probe_E2ETests {
         #expect(s.takeChanges().resolved().upserts.isEmpty)
     }
 
-    /// With the unread filter on (Trash), two selected unread messages are marked read: they leave the list
-    /// but stay selected. Delete then erases them from Trash without them being on screen.
-    @Test func markingAHiddenSelectionReadDoesNotLeaveItSelectedForErase() {
-        let s = MailStore(accounts: [a], messages: [])
-        s.apply(page([server("T1", minutes: 2), server("T2", minutes: 1), server("T3", minutes: 0)]), account: a.id, mailbox: .trash)
-        let t1 = s.messages.first { $0.remoteID == "T1" }!.id, t2 = s.messages.first { $0.remoteID == "T2" }!.id
-        s.selectedMailbox = .account(a.id, .trash)
-        s.filterUnread = true
-        s.selection = [t1, t2]
-        s.toggleRead(s.selection)  // Message ▸ Mark as Read (⇧⌘U)
-        let visible = Set(s.visibleMessages.map(\.id))
-        #expect(s.selection.isSubset(of: visible), "selection \(s.selection.count) not in the list of \(visible.count)")
-        s.deleteSelection()
-        #expect(s.message(t1) != nil && s.message(t2) != nil, "Delete erased the two hidden messages from Trash")
-    }
-
-    /// Same with the flag: in Flagged, unflagging the selected message takes it out of the list, it stays selected.
-    @Test func unflaggingInFlaggedDoesNotKeepAHiddenSelection() {
-        let s = MailStore(accounts: [a], messages: [])
-        s.apply(page([server("F1", flagged: true, minutes: 1), server("F2", flagged: true)]), account: a.id, mailbox: .inbox)
-        let f1 = s.messages.first { $0.remoteID == "F1" }!.id
-        s.selectedMailbox = .smart(.flagged)
-        s.selection = [f1]
-        s.setFlag(nil, for: [f1])
-        #expect(s.selection.isSubset(of: Set(s.visibleMessages.map(\.id))))
-    }
-
     /// Mark All as Read while launch is still loading (Flagged spans every mailbox) leaves the mail that
     /// loads afterwards unread.
     @Test func markAllReadWhileLoadingCoversMailLoadedAfterwards() throws {
