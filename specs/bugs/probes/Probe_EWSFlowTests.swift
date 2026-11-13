@@ -659,8 +659,8 @@ struct Probe_EWSFlowTests {
     }
 
     // file:// fixture
-    /// Every step against garbage and against an empty (0-byte) answer: the user gets a status, a refused change is
-    /// undone, a failed send is kept in Drafts, nothing is marked complete (control table).
+    /// Every step against garbage and against an empty (0-byte) answer: the user gets a status, a change stays
+    /// queued (BUG-061), a failed send is kept in Drafts, nothing is marked complete (control table).
     @Test func controlGarbageAndEmptyAnswerAtEachStep() async throws {
         for (label, answer) in [("garbage", "<html><body>Proxy error<br></body>"), ("empty", "")] {
             let (s, url) = try fileStore(answer)
@@ -679,15 +679,16 @@ struct Probe_EWSFlowTests {
             await s.loadDay(for: b); check("calendar")
             await s.refresh(history: false); check("refresh")
             await s.syncHistory(); check("history")
-            s.toggleRead([a]); try await waitFor { s.outbox.isEmpty }
-            let readUndone = s.message(a)?.isRead == false; check("mark read")
             s.send(Draft(accountID: acct.id, to: "bob@x.com", subject: "Report", body: "x")); try await waitFor { s.outbox.isEmpty }
             let kept = s.messages.contains { $0.mailbox == .drafts && $0.subject == "Report" }; check("send")
             s.respond(.accept, to: b); try await waitFor { s.outbox.isEmpty }
             let inviteBack = s.message(b)?.mailbox == .inbox; check("respond")
+            // Not an Exchange answer, so not a refusal (BUG-061): the change stays queued.
+            s.toggleRead([a]); try await waitFor { s.status != nil }
+            let readKept = s.message(a)?.isRead == true && !s.outbox.isEmpty; check("mark read")
             try? FileManager.default.removeItem(at: url)
-            #expect(!notes.contains { $0.hasSuffix("NO STATUS") } && readUndone && kept && inviteBack && !s.isComplete(acct.id, .inbox),
-                    "\(label): \(notes.joined(separator: " | ")); read undone \(readUndone), send kept \(kept), invite back \(inviteBack)")
+            #expect(!notes.contains { $0.hasSuffix("NO STATUS") } && readKept && kept && inviteBack && !s.isComplete(acct.id, .inbox),
+                    "\(label): \(notes.joined(separator: " | ")); read kept \(readKept), send kept \(kept), invite back \(inviteBack)")
         }
     }
 }

@@ -79,8 +79,9 @@ flowchart LR
   1.5 s. Phase 2 syncs one folder at a time in pages of 512 (`MaxChangesReturned`), collecting pages for up to 1.5 s
   (`historyBatch`) and applying them in one merge; after each batch the next folder is chosen again. Order:
   the selected mailbox, then Inbox, Drafts, Archive, Junk, Trash, the user's folders, Sent last. A folder that fails
-  is skipped for the session; a `URLError` or `ServerBusy` sets that account aside until the next check, while the
-  other accounts go on (`nextHistoryFolder(skipping:)`). Phase 3 syncs changes of every complete folder that the
+  is skipped for the session; a `URLError` or a `ServerBusy` with a back-off (throttling) sets that account aside until the next check, while the
+  other accounts go on (`nextHistoryFolder(skipping:)`); a `ServerBusy` without one (a page that isn't an Exchange
+  answer) fails only that folder. Phase 3 syncs changes of every complete folder that the
   quick check doesn't cover, for the accounts not set aside.
 - **Progress:** `progress` shows "Synchronizing “name”" with the share of the server's `TotalCount` already here.
 - **Merge rules** (`merge`): a known `remoteID` keeps its local ID; a server flag keeps the local colour; a summary
