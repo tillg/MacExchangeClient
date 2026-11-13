@@ -564,16 +564,20 @@ public final class MailStore {
 
     // MARK: Server sync
 
-    /// Adds a server account. Its mail arrives with the next `refresh()`.
-    public func add(_ account: Account, backend: any MailBackend) {
-        accounts.append(account)
+    /// Adds a server account. Its mail arrives with the next `refresh()`. Without a backend (no password yet) it is
+    /// still a server account: its changes wait in the outbox. Adding an account that is already here (signing in
+    /// again) gives it the backend.
+    public func add(_ account: Account, backend: (any MailBackend)?) {
+        if self.account(account.id) == nil { accounts.append(account) }
         backends[account.id] = backend
+        if backend != nil { paused.remove(account.id) }
         serverAccounts.insert(account.id)
     }
 
-    /// Drops accounts without a server (the sample data) and their local messages.
+    /// Drops accounts without a server (the sample data) and their local messages. A server account stays, also
+    /// while it has no backend (no password).
     public func removeLocalAccounts() {
-        let local = Set(accounts.filter { backends[$0.id] == nil }.map(\.id))
+        let local = Set(accounts.filter { !$0.isServer && backends[$0.id] == nil }.map(\.id))
         accounts.removeAll { local.contains($0.id) }
         messages.removeAll { local.contains($0.accountID) && $0.remoteID == nil }
         selection = []

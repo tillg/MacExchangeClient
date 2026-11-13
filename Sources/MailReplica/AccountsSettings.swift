@@ -96,13 +96,12 @@ enum AppSetup {
         }
     }
 
+    /// Without a password in the Keychain the account is still an Exchange account: its mail and drafts stay,
+    /// and its changes wait until it is signed in again.
     static func connect(_ a: ExchangeAccount, to store: MailStore) {
-        if let backend = a.backend() {
-            store.add(a.account, backend: backend)
-        } else {
-            store.accounts.append(a.account)
-            store.status = "No password in the Keychain for \(a.username)"
-        }
+        let backend = a.backend()
+        store.add(a.account, backend: backend)
+        if backend == nil { store.status = "Password needed for \(a.email). Sign in again in Settings ▸ Accounts." }
     }
 }
 
@@ -149,7 +148,11 @@ struct AccountsSettings: View {
     private func signIn() async {
         busy = true
         defer { busy = false }
-        let account = ExchangeAccount(email: email, username: username, server: server)
+        // Signing in again (e.g. to enter a missing password) keeps the account and its mail.
+        let typed = ExchangeAccount(email: email, username: username, server: server)
+        let account = saved.first {
+            $0.email.caseInsensitiveCompare(email) == .orderedSame && $0.username == username && $0.ewsURL == typed.ewsURL
+        } ?? typed
         guard let url = account.ewsURL else { message = "Invalid server"; return }
         guard let pw = password.isEmpty ? Keychain.password(for: username) : password else {
             message = "Enter the password"; return
@@ -164,7 +167,7 @@ struct AccountsSettings: View {
         if !password.isEmpty, !Keychain.setPassword(password, for: username) {
             message = "Couldn't save the password in the Keychain"; return
         }
-        saved.append(account)
+        if !saved.contains(account) { saved.append(account) }
         ExchangeAccount.save(saved)
         store.removeLocalAccounts()
         AppSetup.connect(account, to: store)

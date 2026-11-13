@@ -13,7 +13,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 
 ## Features
 
-- **Exchange accounts over EWS:** sign in under Settings ▸ Accounts with email, `DOMAIN\user`, password and server, as in iOS Mail. Inbox, Drafts, Sent, Junk, Deleted Items and Archive are synced, and so are your own mail folders and subfolders. What you look at drives the order, as described under [How mail is fetched](#how-mail-is-fetched). The password is kept in the Keychain
+- **Exchange accounts over EWS:** sign in under Settings ▸ Accounts with email, `DOMAIN\user`, password and server, as in iOS Mail. Inbox, Drafts, Sent, Junk, Deleted Items and Archive are synced, and so are your own mail folders and subfolders. What you look at drives the order, as described under [How mail is fetched](#how-mail-is-fetched). The password is kept in the Keychain. If it is missing there, the account and its mail stay, the status says the password is needed, and changes wait; signing in again with the same email, username and server connects the same account.
 
 - **Meeting invites, as in Outlook:** for each invite you see:
   - when and where, with the required and optional attendees;

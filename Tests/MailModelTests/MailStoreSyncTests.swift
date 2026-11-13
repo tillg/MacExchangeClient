@@ -256,4 +256,60 @@ struct MailStoreSyncTests {
         try MailDatabase(url: url).write(s.takeChanges())
         #expect(try MailDatabase(url: url).meta().files[id] == [Data("A".utf8)])
     }
+
+    // MARK: An Exchange account without a password is not sample data (BUG-056)
+
+    /// Set up in Settings, unlike the sample data's accounts.
+    var exchange: Account { Account(id: work.id, name: "Exchange", address: "me@work.com", isServer: true) }
+
+    /// An Exchange account whose password is missing has no backend, but its mail is from the server: signing in
+    /// another account must not remove it while its mail stays in All Inboxes.
+    @Test func removeLocalAccountsKeepsExchangeAccountWithoutPassword() {
+        var r = remote("R1"); r.accountID = exchange.id
+        let sample = Message(accountID: home.id, from: Contact(name: "Ann", email: "ann@x.com"), to: [], subject: "sample",
+                             body: "b", date: .now)
+        let s = MailStore(accounts: [exchange, home], messages: [sample])
+        s.merge([r], account: exchange.id, mailbox: .inbox)  // exchange's mail came from the server (or the database)
+        s.removeLocalAccounts()
+        #expect(s.accounts.map(\.id) == [exchange.id])
+        #expect(s.messages.allSatisfy { m in s.accounts.contains { $0.id == m.accountID } })
+    }
+
+    /// Its draft kept after a failed send stays too.
+    @Test func removeLocalAccountsKeepsTheDraftsOfAnExchangeAccountWithoutPassword() {
+        let s = MailStore(accounts: [exchange, home], messages: [])
+        s.merge([(.inbox, [])], account: exchange.id)
+        s.failed(PendingChange(account: exchange.id, change: .send(Draft(accountID: exchange.id, to: "a@x.com", subject: "S")),
+                               previous: []), "busy")
+        let kept = s.messages[0].id
+        _ = s.takeChanges()
+        s.removeLocalAccounts()
+        #expect(s.message(kept) != nil)
+        #expect(s.takeChanges().removed.isEmpty)
+    }
+
+    /// Connected without a password (and before any mail is stored), the account is still an Exchange account:
+    /// it isn't removed, and what is sent from it waits in the outbox instead of showing as sent.
+    @Test func exchangeAccountWithoutPasswordIsAServerAccount() {
+        let s = MailStore(accounts: [home], messages: [])
+        s.add(exchange, backend: nil)
+        s.send(Draft(accountID: exchange.id, to: "a@x.com", subject: "Waits", body: "b"))
+        #expect(s.outbox.count == 1)
+        #expect(!s.messages.contains { $0.subject == "Waits" })
+        s.removeLocalAccounts()
+        #expect(s.accounts.map(\.id) == [exchange.id])
+    }
+
+    /// Signing in again (the password entered) gives the same account its backend: no second account, and what
+    /// waited goes out.
+    @Test func signingInAgainConnectsTheSameAccount() async throws {
+        let s = MailStore(accounts: [], messages: [])
+        s.add(exchange, backend: nil)
+        s.merge([remote("R1")], account: exchange.id, mailbox: .inbox)
+        s.send(Draft(accountID: exchange.id, to: "a@x.com", subject: "Waits", body: "b"))
+        s.add(exchange, backend: backend(try responseFile(success)))  // file:// fixture
+        #expect(s.accounts.map(\.id) == [exchange.id])
+        await s.refresh(history: false)
+        #expect(s.outbox.isEmpty, "status: \(s.status ?? "")")
+    }
 }

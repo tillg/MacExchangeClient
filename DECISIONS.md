@@ -328,3 +328,14 @@ edited: 2026-11-13
 - **Decision:** A new table `files(message, position, data)`, created with `CREATE TABLE IF NOT EXISTS` (an older database simply gets it when opened; no other change). `MailStore.failed` keeps the content for writing when the account is stored; `takeChanges` carries it in `StoreChanges.files`, `retry` and `storedState` include it, `meta()` reads it back at launch, and removing the message removes its rows. Sample data still keeps file content in memory only.
 - **Why:** The outbox already stores a draft's files inside its JSON row; once the change leaves the outbox the kept message needs its own copy. A separate table keeps the 22-column `messages` row unchanged.
 - **Alternatives:** A BLOB column on `messages` (rejected: every message row and the upsert would change for a rare case). Files in a folder next to the database (rejected: a second store that can get out of step with the database).
+
+## 01:18 — An account set up in Settings is never removed as sample data {#d-bug-056}
+
+- **Status:** decided
+- **Context:** BUG-056. `removeLocalAccounts` (run on every sign-in) treated every account without a backend as sample data. An Exchange account whose Keychain password is missing has no backend, so signing in to re-enter the password removed it while its server mail stayed in All Inboxes without an account. Sign-in also created a new account ID, so the same mail would download twice.
+- **Decision:**
+  - `Account` gets `isServer` (default false; `ExchangeAccount.account` sets it). `removeLocalAccounts` drops only accounts that are neither `isServer` nor have a backend. The existing test `removeLocalAccountsDropsSampleDataOnly` (a plain account that received a sync is dropped) still holds, which is why the store's `serverAccounts` set (filled by any sync) couldn't be the rule.
+  - `add(_:backend:)` takes an optional backend. `AppSetup.connect` registers a password-less account through it (a server account whose changes wait in the outbox) and shows "Password needed for … Sign in again in Settings ▸ Accounts." instead of appending it as a plain account.
+  - Signing in with the same email, username and server as a saved account reuses that account (its ID and mail); `add` then gives the existing account its backend and lifts a sign-in pause, instead of adding a second account.
+- **Why:** The lead's rule: decide by the account's kind, not by whether a backend exists.
+- **Alternatives:** Use `serverAccounts` (rejected: breaks the pinned test above). Remove the account's server mail too (rejected: it is the user's mail).

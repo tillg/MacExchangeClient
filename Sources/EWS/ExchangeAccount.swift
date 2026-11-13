@@ -31,7 +31,7 @@ public struct ExchangeAccount: Codable, Hashable, Sendable {
         return url
     }
 
-    public var account: Account { Account(id: id, name: "Exchange", address: email) }
+    public var account: Account { Account(id: id, name: "Exchange", address: email, isServer: true) }
 
     /// A backend for this account, or nil if the server is invalid or no password is stored.
     public func backend() -> EWSBackend? {
