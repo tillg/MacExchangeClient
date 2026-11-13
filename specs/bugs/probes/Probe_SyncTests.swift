@@ -36,41 +36,6 @@ struct Probe_SyncTests {
 
     // MARK: Merging server updates
 
-    /// After the body is loaded the recipients carry addresses; a later summary upsert (e.g. read on the phone)
-    /// must not replace them with display names only, since the body is never fetched again.
-    @Test func laterSummaryKeepsTheRecipientAddressesOfALoadedBody() {
-        // EWS summaries: From/To/Cc as names only (EWSBackend.summaryProps comment).
-        func summary(read: Bool) -> Message { var m = remote("A", read: read); m.from = Contact(name: "Ann", email: ""); return m }
-        let s = store()
-        s.apply(page([summary(read: false)], token: "t0"), account: work.id, mailbox: .inbox)
-        let a = id(s, "A")
-        let from = Contact(name: "Ann", email: "ann@x.com")
-        let to = [Contact(name: "Me", email: "me@work.com")], cc = [Contact(name: "Bob", email: "bob@y.com")]
-        s.setBody(MessageBody(text: "Full", attachments: [], from: from, to: to, cc: cc), for: a)
-        s.apply(page([summary(read: true)], token: "t1"), account: work.id, mailbox: .inbox)
-        #expect(s.message(a)?.isRead == true)
-        #expect(s.message(a)?.needsBody == false, "body is not fetched again")
-        #expect(s.message(a)?.from == from)
-        #expect(s.message(a)?.to == to)
-        #expect(s.message(a)?.cc == cc)
-        #expect(s.draft(.reply, to: a).to == "ann@x.com", "Reply after the sync: \(s.draft(.reply, to: a).to)")
-        let d = s.draft(.replyAll, to: a)
-        #expect(d.to.contains("bob@y.com"), "Reply All after the sync: \(d.to)")
-    }
-
-    /// The same through the newest-N lookup, which re-merges the newest 50 on every check of a folder whose
-    /// full sync hasn't finished.
-    @Test func newestLookupKeepsTheRecipientAddressesOfALoadedBody() {
-        var sum = remote("A"); sum.from = Contact(name: "Ann", email: "")
-        let s = store()
-        s.merge([sum], account: work.id, mailbox: .inbox)
-        let a = id(s, "A")
-        s.setBody(MessageBody(text: "Full", attachments: [], from: Contact(name: "Ann", email: "ann@x.com"),
-                              to: [Contact(name: "Me", email: "me@work.com")], cc: []), for: a)
-        s.merge([sum], account: work.id, mailbox: .inbox)  // the next 15-second check: the same summary again
-        #expect(s.draft(.reply, to: a).to == "ann@x.com", "Reply goes to: '\(s.draft(.reply, to: a).to)'")
-    }
-
     /// A message erased from Trash (delete still queued) must not come back when a Trash page that was
     /// fetched before the erase reached the server lists it.
     @Test func erasedMessageIsNotBroughtBackByATrashPageWhileItsDeleteIsQueued() {
@@ -357,20 +322,6 @@ struct Probe_SyncTests {
         s.removeLocalAccounts()
         #expect(s.accounts.map(\.id) == [work.id], "the Exchange account left the sidebar")
         #expect(s.messages.contains { $0.subject == "Kept" }, "the unsent message kept in Drafts is gone")
-    }
-
-    /// Exchange can report HasAttachments for a message whose only files are inline (left out of the list):
-    /// once the body showed there are no attachments, the next summary must not bring the paperclip back.
-    @Test func laterSummaryKeepsWhatTheBodySaidAboutAttachments() {
-        var sum = remote("A"); sum.hasAttachments = true
-        let s = store()
-        s.apply(page([sum], token: "t0"), account: work.id, mailbox: .inbox)
-        let a = id(s, "A")
-        s.setBody(MessageBody(text: "Full", attachments: []), for: a)
-        #expect(s.message(a)?.hasAttachments == false)
-        sum.isRead = true
-        s.apply(page([sum], token: "t1"), account: work.id, mailbox: .inbox)
-        #expect(s.message(a)?.hasAttachments == false, "paperclip back on a message without attachments")
     }
 
     /// The 70k account of MailStorePerformanceTests, limit 0.25 s (its budget).

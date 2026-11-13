@@ -496,34 +496,6 @@ struct Probe_DB2Tests {
         #expect(stored.allSatisfy { $0.token == nil && !$0.complete }, "stored sync: \(stored)")
     }
 
-    /// The body brings the full sender and recipients ("list summaries may lack email addresses"). A later
-    /// update of the same message from the server (here the from-scratch re-sync after the upgrade; also any
-    /// change made elsewhere) keeps body, attachments and invite, but puts back the summary's recipients.
-    @Test func probeResyncKeepsAddressesLoadedWithTheBody() throws {
-        let s = MailStore(accounts: [work], messages: [])
-        var summary = mail("Plan", rid: "R1")
-        summary.from = Contact(name: "Bob Builder", email: "")
-        summary.to = [Contact(name: "Me", email: ""), Contact(name: "Carol", email: "")]
-        summary.cc = [Contact(name: "Dan", email: "")]
-        s.apply(SyncResult(upserts: [summary], deletedRemoteIDs: [], token: "T1", more: false), account: work.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        s.setBody(MessageBody(text: "Hi all", attachments: [], from: Contact(name: "Bob Builder", email: "bob@x.com"),
-                              to: [Contact(name: "Me", email: "me@work.com"), Contact(name: "Carol", email: "carol@x.com")],
-                              cc: [Contact(name: "Dan", email: "dan@x.com")]), for: id)
-        #expect(s.message(id)?.to.map(\.email) == ["me@work.com", "carol@x.com"])
-        // The server sends the summary again (read on the phone, or a sync from the start).
-        var again = summary; again.isRead = true; again.conversationID = "C1"
-        s.apply(SyncResult(upserts: [again], deletedRemoteIDs: [], token: "T2", more: false), account: work.id, mailbox: .inbox)
-        let m = try #require(s.message(id))
-        #expect(m.body == "Hi all")  // control: the body is kept
-        #expect(m.from.email == "bob@x.com", "from: \(m.from)")
-        #expect(m.to.map(\.email) == ["me@work.com", "carol@x.com"], "to: \(m.to.map(\.email))")
-        #expect(m.cc.map(\.email) == ["dan@x.com"], "cc: \(m.cc.map(\.email))")
-        // What Reply All would address.
-        let reply = s.draft(.replyAll, to: id)
-        #expect(reply.to.contains("carol@x.com") && reply.to.contains("bob@x.com"), "reply all to: \(reply.to.debugDescription)")
-    }
-
     /// README: "Case and accents don't matter (`muller` finds "Müller")". Accented letters of other scripts.
     @Test(arguments: [("καλημερα", "Καλημέρα σας"), ("αθηνα", "Ταξίδι στην Αθήνα"), ("ελληνικα", "ΕΛΛΗΝΙΚΆ"),
                       ("cafe", "Café"), ("zurich", "Zürich"), ("sao", "São Paulo")])

@@ -25,7 +25,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [049](BUG-049-local-send-empty-subject-inconsistent.md) | P4 | MailStore | Sending without a server stores an empty subject; Drafts and failed sends use "(No Subject)" |
 | [050](BUG-050-reply-all-trailing-comma-for-addressless-recipient.md) | P4 | MailStore | Reply All leaves a trailing ", " (empty recipient) when the original lists a recipient without address |
 | [051](BUG-051-symlink-to-folder-cannot-be-attached.md) | P4 | MailStore | Attaching a symbolic link to a folder fails with "Couldn't attach" instead of zipping the folder |
-| [057](BUG-057-summary-sync-wipes-loaded-addresses.md) | P2 | MailStore | A later list summary of an opened message replaces its sender/recipient addresses with names only (Reply/Reply All go to empty addresses) and brings back the paperclip |
 | [058](BUG-058-imported-cache-never-learns-conversations.md) | P3 | MailDatabase | Mail imported from Cache.json keeps the cache's sync positions, so it never learns its conversation |
 | [059](BUG-059-one-missing-item-fails-whole-batch.md) | P3 | EWS | One item gone on the server makes a whole batch (read, flag, move, delete) fail: the other items changed on Exchange but are undone here, moved ones lose their new IDs |
 | [060](BUG-060-response-without-result-taken-as-success.md) | P3 | EWS | A response without any EWS result (empty SOAP body, a well-formed proxy/error page) counts as success: Send reports nothing, a sync "completes" with an empty token |

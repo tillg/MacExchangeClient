@@ -79,7 +79,9 @@ flowchart LR
   complete folder that the quick check doesn't cover.
 - **Progress:** `progress` shows "Synchronizing “name”" with the share of the server's `TotalCount` already here.
 - **Merge rules** (`merge`): a known `remoteID` keeps its local ID; a server flag keeps the local colour; a summary
-  doesn't drop a loaded body, attachments, invite or HTML; a message with a pending outbox change keeps its local
+  doesn't drop a loaded body, attachments, invite or HTML, nor the body's addresses (`keeping`: a names-only contact
+  naming the same person keeps the loaded one) or its paperclip state. A summary that names other people (a draft
+  edited elsewhere) replaces the contacts and drops the loaded body, which is fetched again when shown; a message with a pending outbox change keeps its local
   read state, flag and mailbox. A deletion reported for a message with a pending move is ignored; other deletions
   win. If nothing changed, `messages` is not reassigned.
 - **Sync from the start** (no token: a new folder, after the conversation upgrade): when it begins, the store notes
