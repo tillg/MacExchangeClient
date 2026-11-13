@@ -5,6 +5,18 @@ public struct ChangeLogDay: Identifiable, Sendable {
     public let date: String  // yyyy-MM-dd
     public let features: [String]
     public var id: String { date }
+
+    /// The day as a heading ("Friday, 13 November 2026"), the date taken as a day in `calendar`, not as midnight UTC,
+    /// so it isn't a day early west of UTC (BUG-199).
+    public func title(calendar: Calendar = .current, locale: Locale = .current) -> String {
+        let parts = date.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3,
+              let d = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])) else { return date }
+        var style = Date.FormatStyle.dateTime.weekday(.wide).day().month(.wide).year()
+        style.timeZone = calendar.timeZone
+        style.locale = locale
+        return d.formatted(style)
+    }
 }
 
 /// The change log, newest day first. Written for people who use the app, not for developers:
@@ -12,6 +24,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Help ▸ What's New shows the right weekday and date on Macs set to a time zone west of Europe.",
             "Replies to \"Re[2]: …\" no longer stack a second \"Re:\", Reply All to a note to yourself goes to you, and invisible characters pasted with an address are dropped.",
             "A few menus, icons and labels now match Apple Mail more closely (Include Attachments order, View Options and Unread icons, the include-attachments question).",
             "The window title says \"1 message\" instead of \"1 messages\".",

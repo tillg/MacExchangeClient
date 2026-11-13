@@ -24,7 +24,6 @@ struct WhatsNewView: View {
     }
 
     private func title(_ date: String) -> String {
-        guard let d = try? Date(date, strategy: .iso8601.year().month().day()) else { return date }
-        return d.formatted(.dateTime.weekday(.wide).day().month(.wide).year())
+        WhatsNew.days.first { $0.date == date }?.title() ?? date
     }
 }
