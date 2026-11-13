@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Mail moved into a folder that was then deleted on the server comes back where it was, and a deleted Archive folder takes its mail with it.",
             "When Exchange asks the app to slow down, it now waits for the whole account instead of asking again folder by folder.",
             "When Exchange refuses two changes to the same message in a row, the message now ends up as it really is on the server.",
             "A message you moved right after launch no longer jumps back when Exchange is briefly unavailable; the move is sent later.",

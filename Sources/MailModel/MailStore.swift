@@ -185,10 +185,30 @@ public final class MailStore {
     /// The server's folder list: the user's own folders become the account's tree. A folder of the tree the list no
     /// longer has was removed on the server: its mail and sync position go, and its selection moves to the Inbox.
     func setRemoteFolders(_ remote: [RemoteFolder], account: UUID) {
+        let hadArchive = remoteFolders[account]?.contains { $0.role == .archive } == true
+            || syncTokens[key(account, .archive)] != nil
         remoteFolders[account] = remote
-        let gone = Set((folders[account] ?? []).map(\.box)).subtracting(remote.map(\.role))
+        var gone = Set((folders[account] ?? []).map(\.box)).subtracting(remote.map(\.role))
+        // Archive isn't in the tree but can go too (deleted in Outlook): its mail goes with it (BUG-163).
+        if hadArchive && !remote.contains(where: { $0.role == .archive }) { gone.insert(.archive) }
         folders[account] = remote.filter { !$0.role.isStandard }.map { Folder(box: $0.role, name: $0.name, parent: $0.parent) }
         guard !gone.isEmpty else { return }
+        // A queued move into a folder that is gone never reached the server: the message is still where it came from
+        // there, so it goes back there here, and the move is dropped (BUG-253).
+        for p in outbox where p.account == account {
+            guard case let .move(_, box) = p.change, gone.contains(box) else { continue }
+            for old in p.previous { movedBack[old.id] = old.mailbox }
+        }
+        if !movedBack.isEmpty {
+            outbox.removeAll { p in
+                guard p.account == account, case let .move(_, box) = p.change else { return false }
+                return gone.contains(box)
+            }
+            for i in messages.indices where messages[i].accountID == account {
+                if let back = movedBack[messages[i].id] { messages[i].mailbox = back; changedIDs.insert(messages[i].id) }
+            }
+            status = "A move into a folder that no longer exists on the server was undone."
+        }
         for box in gone {
             let k = key(account, box)
             if syncTokens[k] != nil { syncTokens[k] = nil }
@@ -208,13 +228,17 @@ public final class MailStore {
 
     /// Folders removed on the server while launch was still loading, by account.
     @ObservationIgnored private var removedFolders: [UUID: Set<MailboxKind>] = [:]
+    /// Messages whose queued move into a removed folder was dropped, and the mailbox they go back to (BUG-253);
+    /// also for stored mail that loads afterwards.
+    @ObservationIgnored private var movedBack: [Message.ID: MailboxKind] = [:]
 
     /// Stored mail without the mail of folders removed on the server meanwhile; that mail is removed from disk.
     private func withoutRemovedFolders(_ msgs: [Message]) -> [Message] {
         guard !removedFolders.isEmpty else { return msgs }
         var kept: [Message] = [], gone = Set<Message.ID>()
-        for m in msgs {
-            if removedFolders[m.accountID]?.contains(m.mailbox) == true { gone.insert(m.id) } else { kept.append(m) }
+        for var m in msgs {
+            if let back = movedBack[m.id] { m.mailbox = back; changedIDs.insert(m.id); kept.append(m) }
+            else if removedFolders[m.accountID]?.contains(m.mailbox) == true { gone.insert(m.id) } else { kept.append(m) }
         }
         forget(gone)
         return kept
@@ -1351,6 +1375,9 @@ public final class MailStore {
                     else { handUndo(of: old.id, account: p.account, after: p) { if case .setFlagged = $0 { true } else { false } } set: { $0.flag = old.flag } }
                 case let .move(_, box):
                     if let r = messages[i].remoteID, deletedWhileMoving[p.account]?.remove(r) != nil {
+                        deletedOnServer.insert(old.id)
+                    } else if !old.mailbox.isStandard, !(folders[p.account] ?? []).contains(where: { $0.box == old.mailbox }) {
+                        // It would go back into a folder the account no longer has: gone with it (BUG-254).
                         deletedOnServer.insert(old.id)
                     } else if messages[i].mailbox == box { messages[i].mailbox = old.mailbox }
                     else { handUndo(of: old.id, account: p.account, after: p) { if case .move = $0 { true } else { false } } set: { $0.mailbox = old.mailbox } }
