@@ -255,8 +255,10 @@ public struct EWSBackend: MailBackend {
         }
     }
 
+    /// Only for meeting requests and cancellations, as `message()` decides: a response ("Accepted: …") is no invite.
     static func parseInvite(_ item: XMLNode) -> Invite? {
-        guard let start = item.child("Start")?.stringValue.flatMap(isoDate),
+        guard ["MeetingRequest", "MeetingCancellation"].contains(item.localName ?? ""),
+              let start = item.child("Start")?.stringValue.flatMap(isoDate),
               let end = item.child("End")?.stringValue.flatMap(isoDate) else { return nil }
         let attendees = { (tag: String) in (item.child(tag)?.children("Attendee") ?? []).compactMap { $0.child("Mailbox").map(contact) } }
         return Invite(start: start, end: end, location: item.child("Location")?.stringValue ?? "",

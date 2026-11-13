@@ -465,6 +465,17 @@ struct EWSParsingTests {
             + #"<t:RemoveItem><t:ReferenceItemId Id="C&amp;1"/></t:RemoveItem></m:Items></m:CreateItem>"#)
     }
 
+    /// An "Accepted: …" response with Start/End is no invite, in the list and in the body.
+    @Test func meetingResponseIsNotAnInvite() throws {
+        let d = try doc("""
+            <t:MeetingResponse><t:ItemId Id="R1"/><t:Body BodyType="Text">ok</t:Body>
+            <t:Start>2026-11-23T11:30:00Z</t:Start><t:End>2026-11-23T12:00:00Z</t:End><t:Location>Room</t:Location></t:MeetingResponse>
+            """)
+        let item = try #require(d.first("MeetingResponse"))
+        #expect(EWSBackend.message(item)?.isInvite == false)
+        #expect(EWSBackend.parseBody(item).invite == nil)
+    }
+
     @Test func meetingRequestBodyCarriesTheInvite() throws {
         let d = try doc("""
             <t:MeetingRequest><t:ItemId Id="M1"/><t:Body BodyType="Text">Agenda</t:Body>
