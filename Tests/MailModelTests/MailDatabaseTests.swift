@@ -315,6 +315,25 @@ struct MailDatabaseTests {
         #expect(try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s) == nil)
     }
 
+    /// A Cache.json.imported from an earlier import (copied back to go back) doesn't fail this one: the cache
+    /// gets the next free name and the earlier copy stays.
+    @Test func importWhenAnImportedCacheIsAlreadyThere() async throws {
+        let dir = tempURL().deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let cacheURL = dir.appendingPathComponent("Cache.json"), dbURL = dir.appendingPathComponent("Mail.sqlite")
+        let old = MailStore(accounts: [work], messages: [])
+        old.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "t", more: false), account: work.id, mailbox: .inbox)
+        try old.cache().save(to: cacheURL)
+        try FileManager.default.copyItem(at: cacheURL, to: cacheURL.appendingPathExtension("imported"))
+        let s = MailStore(accounts: [work], messages: [])
+        let db = try #require(try await MailDatabase.importCache(from: cacheURL, into: dbURL, store: s))
+        #expect(try db.messages().map(\.remoteID) == ["A"])
+        #expect(!FileManager.default.fileExists(atPath: cacheURL.path))
+        #expect(FileManager.default.fileExists(atPath: cacheURL.path + ".imported"))
+        #expect(FileManager.default.fileExists(atPath: cacheURL.path + ".imported-2"))
+    }
+
     /// A Cache.json that can't be decoded is set aside (never deleted) and an empty database is created, so the
     /// next launch doesn't fail the same way again; mail comes back from the server.
     @Test func anUnreadableCacheIsSetAsideAndTheDatabaseIsCreated() async throws {

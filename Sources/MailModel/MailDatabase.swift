@@ -399,22 +399,27 @@ public final class MailDatabase: @unchecked Sendable {
 
     // MARK: Moving from Cache.json
 
+    /// `url` with the extension `ext`, or `ext-2`, `ext-3` … if that name is taken.
+    static func freeName(_ url: URL, _ ext: String) -> URL {
+        var aside = url.appendingPathExtension(ext), n = 2
+        while FileManager.default.fileExists(atPath: aside.path) {
+            aside = url.appendingPathExtension("\(ext)-\(n)")
+            n += 1
+        }
+        return aside
+    }
+
     /// Moves the old JSON cache into a new database, once: loads it into `store` (decoding off the main
     /// thread), writes everything under a temporary name, checks the count, and only then gives the database
-    /// its name and renames the cache to `Cache.json.imported`. Interrupted at any point, the next launch
-    /// imports again. Returns nil when there is no cache to import. A cache that can't be decoded is renamed
+    /// its name and renames the cache to `Cache.json.imported` (`.imported-2` … if taken). Interrupted at any
+    /// point, the next launch imports again. Returns nil when there is no cache to import. A cache that can't be decoded is renamed
     /// to `Cache.json.unreadable` (never deleted) and an empty database is created: mail comes back from the server.
     @MainActor
     public static func importCache(from cacheURL: URL = MailCache.defaultURL, into url: URL = defaultURL,
                                    store: MailStore) async throws -> MailDatabase? {
         guard FileManager.default.fileExists(atPath: cacheURL.path) else { return nil }
         guard let cache = await Task.detached(priority: .userInitiated, operation: { MailCache.load(from: cacheURL) }).value else {
-            var aside = cacheURL.appendingPathExtension("unreadable")
-            var n = 2
-            while FileManager.default.fileExists(atPath: aside.path) {
-                aside = cacheURL.appendingPathExtension("unreadable-\(n)")
-                n += 1
-            }
+            let aside = freeName(cacheURL, "unreadable")
             try FileManager.default.moveItem(at: cacheURL, to: aside)
             let db = try await Task.detached(priority: .userInitiated) { try MailDatabase(url: url) }.value
             store.status = "The old mail cache couldn't be read. It was kept as \(aside.lastPathComponent); "
@@ -451,7 +456,8 @@ public final class MailDatabase: @unchecked Sendable {
             removeFiles(importingURL(for: url))
             throw error
         }
-        try FileManager.default.moveItem(at: cacheURL, to: cacheURL.appendingPathExtension("imported"))
+        // A Cache.json.imported from an earlier import (copied back to go back) stays: this one gets the next free name.
+        try FileManager.default.moveItem(at: cacheURL, to: freeName(cacheURL, "imported"))
         return db
     }
 
