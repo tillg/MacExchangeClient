@@ -54,21 +54,6 @@ struct Probe_Store2Tests {
 
     // MARK: Accounts
 
-    /// Signing in a further account resets what the user is looking at although nothing was removed.
-    @Test func removeLocalAccountsWithNothingLocalKeepsTheView() {
-        let s = MailStore(accounts: [], messages: [])
-        let backend = EWSBackend(client: EWSClient(url: URL(string: "https://example.invalid/EWS/Exchange.asmx")!,
-                                                   username: "u", password: "p"))
-        s.add(work, backend: backend)
-        var r = msg(work, .sent); r.remoteID = "R1"
-        s.merge([r], account: work.id, mailbox: .sent)
-        s.selectedMailbox = .account(work.id, .sent)
-        s.selection = [s.messages[0].id]
-        s.removeLocalAccounts()
-        #expect(s.selectedMailbox == .account(work.id, .sent))
-        #expect(s.selection == [s.messages[0].id])
-    }
-
     // MARK: Conversations / inline images
 
     /// Images of a message arriving after the user moved on must not throw away the images of the message on screen.

@@ -177,7 +177,8 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
 
 - Settings ▸ Accounts: list of accounts; Add Exchange Account (email, `DOMAIN\user`, password, server). Sign In
   checks the credentials with a folder request before saving, stores the password in the Keychain, removes the
-  sample accounts (never an account set up in Settings, even without a password) and runs a quick check. Signing in
+  sample accounts (never an account set up in Settings, even without a password; when there are none, the selected
+  mailbox and messages stay) and runs a quick check. Signing in
   with the email, username and server of a saved account reconnects that account instead of adding another. Accounts can't be removed or edited in the app.
 - Settings ▸ Viewing: conversations on/off. Settings ▸ Privacy: Download external images — Always, My organisation
   (default), Ask before downloading ([rendering.md](rendering.md)).
