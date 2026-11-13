@@ -103,7 +103,9 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
   generic and the `Name`'s extension is an image or unknown): only pictures are placed in the body, so any other
   inline file would be invisible. They come last so positions in bodies stored before stay valid. A missing or blank
   name becomes "Attachment" plus the extension of its `ContentType` (`UTType`), if any;
-  `ItemAttachment` gets `.eml` appended and type `message/rfc822`; size from `Size`. Content: the first
+  `ItemAttachment` gets `.eml` appended and type `message/rfc822`; size from `Size`. A `ReferenceAttachment` (cloud
+  file) gets `.webloc` appended, no size or type; its content is a `.webloc` plist whose `URL` is `AttachLongPathName`,
+  only for http/https links (else no content). Content: the first
   element under `m:Attachments` only: a `FileAttachment`'s own `Content`, or the `MimeContent` directly under an
   `ItemAttachment`'s item (never a nested attachment's), base64-decoded.
 - **Inline images** (`inlineAttachmentIDs`): `FileAttachment`s with `ContentType` starting `image/`, or generic

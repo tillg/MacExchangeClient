@@ -79,7 +79,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [142](BUG-142-invite-time-drops-end-date.md) | P3 | Invite | Invite card shows only the start day for a meeting that ends on a later day |
 | [143](BUG-143-unloadable-picture-spins-forever.md) | P3 | Attachments | A picture attachment that can't be loaded shows a spinner forever |
 | [144](BUG-144-quick-look-shows-another-file.md) | P4 | MailStore | Space on an attachment that cannot be loaded opens Quick Look on a different attachment of the message |
-| [145](BUG-145-reference-attachment-listed-but-unopenable.md) | P4 | EWS | A cloud attachment (ReferenceAttachment, OneDrive/SharePoint link) is listed like a file but every open, save or Quick Look fails with "The server sent no content" |
 | [146](BUG-146-memory-search-per-keystroke-freeze.md) | P4 | MailStore | Search without the index (index build failed or still building, or "Search failed") freezes 0.6-1 s per keystroke on 180,000 messages |
 | [147](BUG-147-late-quick-look-replaces-newer.md) | P4 | MailStore | Quick Look jumps back to an earlier message’s attachment when its download finishes after you looked at another message |
 | [148](BUG-148-day-column-overnight-hours.md) | P4 | Invite | Day column of an overnight invite starts at 2 o'clock and the invite's slot is outside the grid |

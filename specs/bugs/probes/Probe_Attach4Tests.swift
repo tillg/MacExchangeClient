@@ -224,24 +224,6 @@ struct Probe_Attach4Tests {
         #expect(url.flatMap { try? Data(contentsOf: $0) } == Data([1, 2, 3]), "status \(s.status ?? "")")
     }
 
-    /// file:// fixture: a cloud attachment (ReferenceAttachment, a OneDrive/SharePoint link) is listed like a file;
-    /// opening it must not fail with "no content".
-    @Test func probeReferenceAttachmentOpens() async throws {
-        let item = """
-            <t:Message><t:ItemId Id="M" ChangeKey="CK"/><t:Body BodyType="Text">Hi</t:Body><t:Attachments>\
-            <t:ReferenceAttachment><t:AttachmentId Id="AT1"/><t:Name>Budget.xlsx</t:Name><t:Size>0</t:Size>\
-            <t:IsInline>false</t:IsInline><t:AttachLongPathName>https://contoso.sharepoint.com/Budget.xlsx</t:AttachLongPathName>\
-            <t:ProviderType>OneDrivePro</t:ProviderType></t:ReferenceAttachment></t:Attachments></t:Message>
-            """
-        let (s, _) = try fileStore(env(item))
-        s.merge([serverMessage("M")], account: acct.id, mailbox: .inbox)
-        let id = s.messages[0].id
-        await s.loadBody(id)
-        let listed = s.message(id)?.attachments.map(\.name) ?? []
-        let url = listed.isEmpty ? nil : await s.attachmentFile(0, of: id)
-        #expect(listed.isEmpty || url != nil, "listed \(listed); open: \(s.status ?? "")")
-    }
-
     // MARK: Quick Look
 
     /// Space on the second file, which can't be had: Quick Look must not show another file instead.
