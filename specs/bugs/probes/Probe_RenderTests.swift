@@ -133,14 +133,6 @@ struct Probe_RenderTests {
 
     // MARK: Mail's MUIWebDocument.css rules (MailUI.framework/Resources/MUIWebDocument.css)
 
-    /// Mail caps pictures sent by Apple Mail (`img.Apple-web-attachment`) at the page width.
-    @Test func appleMailPictureFitsTheWindow() async {
-        let mail = #"<div>Look:</div><div><img class="Apple-web-attachment Singleton" id="i" width="3024" height="40" src="data:image/png;base64,\#(png1x1)"></div>"#
-        let p = await RPage(HTMLPage.document(mail, allowRemote: false))
-        let r = await p.string("document.getElementById('i').getBoundingClientRect().width + '|' + document.documentElement.scrollWidth")
-        #expect(r == "560|600", "picture width|page scroll width = \(r)")
-    }
-
     /// Mail draws Apple Mail's dash lists with dashes, and nested ordered lists as 1. a. i.
     @Test func appleMailListStyles() async {
         let mail = #"<ul class="Apple-dash-list" id="u"><li>one</li></ul><ol><li>a<ol id="o2"><li>b<ol id="o3"><li>c</li></ol></li></ol></li></ol>"#

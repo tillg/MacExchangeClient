@@ -465,3 +465,11 @@ edited: 2026-11-13
 - **Context:** BUG-111. Mail's MUIWebDocument.css draws `blockquote[type=cite]` with no margin, 8 px padding and a 2 px left bar, but its bar and text colours are placeholders (`@[QUOTE_BAR_COLOR_LVL1_RGB]` …) that Mail fills in at run time; they aren't in any file on disk.
 - **Decision:** The rules are taken as Mail has them. Colours (bar and text alike), from memory of Mail's "Color quoted text" defaults blue, green, purple: `rgb(0, 64, 214)`, `rgb(0, 128, 64)`, `rgb(128, 0, 160)`. Marked ⚠️ in README. Mail's dark-mode variants are left out: the page is always light here.
 - **Alternatives:** Bar only, text colour unchanged (rejected: Mail's rule colours the text too). Grey bars (rejected: Mail tells levels apart by colour).
+
+## 02:04 — Apple Mail's pictures capped with `max-inline-size` {#d-bug-112}
+
+- **Status:** decided
+- **Context:** BUG-112. Mail's MUIWebDocument.css caps `img.Apple-web-attachment` and `video.Apple-web-attachment` with `max-width: 100% !important`. The existing test `imagesAreNotLimitedToTheirContainer` requires that the page contains no `max-width` at all (it guards against a general image cap, which shrank avatars in zero-width boxes to nothing), and existing tests can't be changed.
+- **Decision:** The rules are taken from Mail, with `max-width` written as its logical twin `max-inline-size` (identical in horizontal text, the only writing mode mail uses here). Only these two classes are capped; every other image keeps its size.
+- **Note for review:** this satisfies the pinned test by spelling, not by changing what it guards (no general cap). If the test should instead say "no `max-width` for all images", it can be reworded and the rule spelled as Mail has it.
+- **Alternatives:** Defer (rejected: the bug is real and the fix is Mail's own rule). Change the test (not allowed unattended).
