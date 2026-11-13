@@ -1851,6 +1851,12 @@ struct MailStoreTests {
         let all = s.draft(.replyAll, to: m.id)
         #expect(all.to == "support@shop.example")
         #expect(all.cc == "bob@x.com")
+        // A Reply-To with names only (no address) counts as none: Reply All keeps the sender (review of BUG-186).
+        var n = msg(work, from: "Shop")
+        n.replyTo = [Contact(name: "Support", email: "")]
+        let t = store([n])
+        #expect(t.draft(.replyAll, to: n.id).to == "shop@x.com")
+        #expect(t.draft(.reply, to: n.id).to == "shop@x.com")
     }
 
     /// BUG-239: Include Attachments With Replies ▸ When Adding Recipients. A reply to a message with Reply-To (a

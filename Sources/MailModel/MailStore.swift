@@ -2122,7 +2122,8 @@ public final class MailStore {
             let replyTo = addresses(m.replyTo ?? [])
             to = !recipients.isEmpty ? recipients : !replyTo.isEmpty ? replyTo : m.from.email
         case .replyAll:
-            to = addresses((m.replyTo.flatMap { $0.isEmpty ? nil : $0 } ?? [m.from]) + m.to)
+            let replyTo = (m.replyTo ?? []).filter { !$0.email.isEmpty }  // names only count as none
+            to = addresses((replyTo.isEmpty ? [m.from] : replyTo) + m.to)
             cc = addresses(m.cc)
         case .forward: break
         }
