@@ -32,6 +32,20 @@ struct MailStoreTests {
         #expect(s.visibleMessages.map(\.subject) == ["new", "old"])
     }
 
+    /// Messages with the same time keep one order whatever order they were loaded in (a relaunch loads Inboxes first).
+    @Test func sameTimeMessagesHaveAFixedOrder() {
+        let a = msg(work, .archive, subject: "a", flag: .red), b = msg(work, subject: "b", flag: .red)
+        var orders: Set<[String]> = []
+        for msgs in [[a, b], [b, a]] {
+            let s = store(msgs)
+            s.selectedMailbox = .smart(.flagged)
+            orders.insert(s.visibleMessages.map(\.subject))
+            s.searchText = "body"
+            orders.insert(s.visibleMessages.map(\.subject))
+        }
+        #expect(orders.count == 1, "\(orders)")
+    }
+
     @Test func deleteMovesToSameAccountTrashThenErasesFromTrash() {
         let m = msg(home)
         let s = store([m])

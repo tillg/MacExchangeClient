@@ -291,7 +291,7 @@ public final class MailStore {
             if filterUnread && m.isRead { return false }
             return true
         }
-        .sorted { $0.date > $1.date }
+        .sorted(by: Self.newestFirst)
         listCache = (revision, key, list)
         return list
     }
@@ -309,7 +309,14 @@ public final class MailStore {
                 hits.contains(m.id) && scope?.contains(m.accountID) != false && !isDeleted(m, inTrash) && m.mailbox != .junk
             }
         }
-        return parts.flatMap { $0 }.sorted { $0.date > $1.date }
+        return parts.flatMap { $0 }.sorted(by: Self.newestFirst)
+    }
+
+    /// Newest first; messages with the same time by their ID, so their order doesn't depend on the order they were
+    /// loaded in (a relaunch loads the Inboxes first).
+    nonisolated static func newestFirst(_ a: Message, _ b: Message) -> Bool {
+        guard a.date == b.date else { return a.date > b.date }
+        return withUnsafeBytes(of: a.id.uuid) { x in withUnsafeBytes(of: b.id.uuid) { y in memcmp(x.baseAddress!, y.baseAddress!, 16) < 0 } }
     }
 
     /// The typed words, folded as memory search compares them.
@@ -436,7 +443,7 @@ public final class MailStore {
                 $0.id == id || ($0.conversationID == conv && $0.accountID == m.accountID && !skip.contains($0.mailbox)
                                 && !isDeleted($0))
             }
-            .sorted { $0.date > $1.date }
+            .sorted(by: Self.newestFirst)
         }
         conversationCache = (revision, id, list)
         return list
