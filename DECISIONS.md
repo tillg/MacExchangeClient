@@ -339,3 +339,12 @@ edited: 2026-11-13
   - Signing in with the same email, username and server as a saved account reuses that account (its ID and mail); `add` then gives the existing account its backend and lifts a sign-in pause, instead of adding a second account.
 - **Why:** The lead's rule: decide by the account's kind, not by whether a backend exists.
 - **Alternatives:** Use `serverAccounts` (rejected: breaks the pinned test above). Remove the account's server mail too (rejected: it is the user's mail).
+
+## 01:21 — A summary keeps what only the loaded body knows, field by field {#d-bug-057}
+
+- **Status:** decided
+- **Context:** BUG-057. EWS list summaries carry From/To/Cc as names only. When a message whose body was loaded was merged again (a sync after it was read on the phone, or the newest-50 lookup every 15 s), `merge` kept the body but took the names-only contacts and `HasAttachments` from the summary. Reply then went to "" and the paperclip came back.
+- **Decision:** For a loaded message and a summary, each contact (From, then each To and Cc in order) is kept from the body when the summary's contact has no address and names the same person (name, any case, or the address shown as the name); a summary contact that has an address replaces it. `hasAttachments` follows the kept attachment list. When a summary names other people (or a different number of them), the message changed on the server (a draft edited elsewhere): the summary is taken as it is and the body is no longer kept, so it is fetched again when shown and no empty address stays with a body marked loaded.
+- **Why:** The body fetch exists to bring the addresses (`MessageBody` doc); the summary can only tell that the people changed, not who they are.
+- **Risk:** If Exchange's `DisplayTo` ever names a recipient differently from the body's `Mailbox` name for unchanged mail, that message's body is fetched again each time it is shown (correct, but extra requests). Not seen in the documented shapes.
+- **Alternatives:** Always keep the body's contacts (rejected: an edited draft would show stale recipients for good).

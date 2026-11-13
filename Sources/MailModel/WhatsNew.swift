@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Reply and Reply All keep the right addresses after a message you opened is changed on another device, and the paperclip no longer comes back on emails without files.",
             "If the app can't find your Exchange password, your account and its mail stay; sign in again in Settings to enter it, and your changes go out then.",
             "A message that couldn't be sent keeps its attached files in Drafts, also after you quit and reopen the app.",
             "A mailbox that the server stopped updating (for example after it was moved to another server) catches up again by itself.",

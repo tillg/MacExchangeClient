@@ -723,9 +723,14 @@ public final class MailStore {
                     let old = ms[i]
                     m.id = old.id
                     if old.flag != nil && m.flag != nil { m.flag = old.flag }  // the server has no colours
-                    if old.bodyLoaded && !m.bodyLoaded {
+                    // What only the body knows is kept: addresses (summaries may carry names only) and the
+                    // attachment list with its paperclip. Unless the summary names other people: then the message
+                    // changed on the server (a draft edited elsewhere), and its body is fetched again when shown.
+                    if old.bodyLoaded && !m.bodyLoaded, let from = Self.keeping([m.from], old: [old.from])?.first,
+                       let to = Self.keeping(m.to, old: old.to), let cc = Self.keeping(m.cc, old: old.cc) {
                         m.body = old.body; m.attachments = old.attachments; m.invite = old.invite; m.bodyLoaded = true
                         m.html = old.html; m.htmlChecked = old.htmlChecked
+                        m.from = from; m.to = to; m.cc = cc; m.hasAttachments = old.hasAttachments
                     }
                     if pending.contains(rid) { m.isRead = old.isRead; m.flag = old.flag; m.mailbox = old.mailbox }
                     guard m != old else { continue }
@@ -742,6 +747,21 @@ public final class MailStore {
             if let i = index[rid], ms[i].isRead != read { ms[i].isRead = read; changedIDs.insert(ms[i].id); changed = true }
         }
         if changed { messages = ms }
+    }
+
+    /// The loaded contacts, with any address a summary gives in their place; nil when the summary names other people.
+    /// A summary contact without an address matches a loaded one by name (any case) or by the address shown as name.
+    nonisolated static func keeping(_ summary: [Contact], old: [Contact]) -> [Contact]? {
+        guard summary.count == old.count else { return nil }
+        var out: [Contact] = []
+        for (s, o) in zip(summary, old) {
+            if !s.email.isEmpty { out.append(s); continue }
+            let name = s.name.trimmingCharacters(in: .whitespaces)
+            guard name.caseInsensitiveCompare(o.name.trimmingCharacters(in: .whitespaces)) == .orderedSame
+                    || name.caseInsensitiveCompare(o.email) == .orderedSame else { return nil }
+            out.append(o)
+        }
+        return out
     }
 
     // MARK: Database

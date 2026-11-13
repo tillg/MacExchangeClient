@@ -312,4 +312,67 @@ struct MailStoreSyncTests {
         await s.refresh(history: false)
         #expect(s.outbox.isEmpty, "status: \(s.status ?? "")")
     }
+
+    // MARK: A summary doesn't overwrite what the loaded body knows (BUG-057)
+
+    func id(_ s: MailStore, _ rid: String) -> Message.ID { s.messages.first { $0.remoteID == rid }!.id }
+
+    /// EWS summaries carry From/To/Cc as names only. After the body filled in the addresses, a later summary of the
+    /// same message (read on the phone) keeps them: Reply and Reply All still have somewhere to go.
+    @Test func laterSummaryKeepsTheRecipientAddressesOfALoadedBody() {
+        var sum = remote("A"); sum.cc = [Contact(name: "Bob", email: "")]
+        let s = MailStore(accounts: [work], messages: [])
+        s.apply(SyncResult(upserts: [sum], deletedRemoteIDs: [], token: "t0", more: false), account: work.id, mailbox: .inbox)
+        let a = id(s, "A")
+        let from = Contact(name: "Ann", email: "ann@x.com")
+        let to = [Contact(name: "Me", email: "me@work.com")], cc = [Contact(name: "Bob", email: "bob@y.com")]
+        s.setBody(MessageBody(text: "Full", attachments: [], from: from, to: to, cc: cc), for: a)
+        sum.isRead = true
+        s.apply(SyncResult(upserts: [sum], deletedRemoteIDs: [], token: "t1", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.isRead == true)
+        #expect(s.message(a)?.needsBody == false)
+        #expect(s.message(a)?.from == from)
+        #expect(s.message(a)?.to == to)
+        #expect(s.message(a)?.cc == cc)
+        #expect(s.draft(.reply, to: a).to == "ann@x.com")
+        #expect(s.draft(.replyAll, to: a).to.contains("ann@x.com"))
+        #expect(s.draft(.replyAll, to: a).cc == "bob@y.com")
+    }
+
+    /// The same through the newest-50 lookup, which merges the same summaries on every check of a folder still syncing.
+    @Test func newestLookupKeepsTheRecipientAddressesOfALoadedBody() {
+        let s = MailStore(accounts: [work], messages: [])
+        s.merge([remote("A")], account: work.id, mailbox: .inbox)
+        let a = id(s, "A")
+        s.setBody(MessageBody(text: "Full", attachments: [], from: Contact(name: "Ann", email: "ann@x.com"),
+                              to: [Contact(name: "Me", email: "me@work.com")], cc: []), for: a)
+        s.merge([remote("A")], account: work.id, mailbox: .inbox)
+        #expect(s.draft(.reply, to: a).to == "ann@x.com")
+    }
+
+    /// The paperclip follows the attachment list the body brought (Exchange counts inline pictures as attachments).
+    @Test func laterSummaryKeepsWhatTheBodySaidAboutAttachments() {
+        var sum = remote("A"); sum.hasAttachments = true
+        let s = MailStore(accounts: [work], messages: [])
+        s.apply(SyncResult(upserts: [sum], deletedRemoteIDs: [], token: "t0", more: false), account: work.id, mailbox: .inbox)
+        let a = id(s, "A")
+        s.setBody(MessageBody(text: "Full", attachments: []), for: a)
+        sum.isRead = true
+        s.apply(SyncResult(upserts: [sum], deletedRemoteIDs: [], token: "t1", more: false), account: work.id, mailbox: .inbox)
+        #expect(s.message(a)?.hasAttachments == false)
+    }
+
+    /// When the summary's names differ from the loaded ones (a draft edited elsewhere), the server changed the
+    /// message: the new names show and the body is fetched again, so addresses are never left empty unnoticed.
+    @Test func summaryWithOtherRecipientsFetchesTheBodyAgain() {
+        let s = MailStore(accounts: [work], messages: [])
+        s.merge([remote("A")], account: work.id, mailbox: .drafts)
+        let a = id(s, "A")
+        s.setBody(MessageBody(text: "Old text", attachments: [], from: Contact(name: "Ann", email: "ann@x.com"),
+                              to: [Contact(name: "Me", email: "me@work.com")], cc: []), for: a)
+        var edited = remote("A"); edited.to = [Contact(name: "Me", email: ""), Contact(name: "Carol", email: "")]
+        s.merge([edited], account: work.id, mailbox: .drafts)
+        #expect(s.message(a)?.to.map(\.name) == ["Me", "Carol"])
+        #expect(s.message(a)?.needsBody == true)
+    }
 }
