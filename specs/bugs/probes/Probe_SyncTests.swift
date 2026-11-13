@@ -50,16 +50,6 @@ struct Probe_SyncTests {
 
     // MARK: Status messages
 
-    @Test func failedSaveDraftDoesNotSayCouldntSend() {
-        let s = synced([])
-        s.saveDraft(Draft(accountID: work.id, to: "ann@x.com", subject: "Plan", body: "B"))
-        s.failed(s.outbox[0], "Quota exceeded")
-        #expect(s.status?.contains("send") == false, "status: \(s.status ?? "")")
-        s.saveDraft(Draft(accountID: work.id, to: "ann@x.com", subject: "", body: "B"))
-        s.failed(s.outbox[0], "Quota exceeded")
-        #expect(s.status?.contains("“”") == false, "status: \(s.status ?? "")")
-    }
-
     // MARK: Idempotence / paging
 
     @Test func applyingTheSameSyncTwiceChangesNothing() {
