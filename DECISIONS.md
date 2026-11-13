@@ -762,3 +762,11 @@ edited: 2026-11-13
 - **Decision:** `keepInDrafts` also stores `Draft.html` with the placed pictures as `cid:file<k>@local` (k = index in its files); `loadInlineImages` answers such references of a message without `remoteID` from its kept files. `body` stays plain text for list, search and replies. No storage change: `html` and the files are already stored columns.
 - **Not covered:** local Send and Save Draft without a server (sample data) still store only the text; the picture also stays in the attachment list.
 - **Alternatives:** keep the U+FFFC marks in `body` (rejected: they would show as boxes in the list preview, search and quotes).
+
+## 04:16 — Forward header: To and Cc lines, date with time zone {#d-bug-116}
+
+- **Status:** decided
+- **Context:** BUG-116. "Begin forwarded message:" listed only From, Subject and Date (medium date, short time, no zone).
+- **Decision:** From, Subject, Date, To, then Cc (only when there is one); recipients as `Contact.formatted`, comma-separated. The date uses the long date and long time styles (seconds and zone, e.g. "13 November 2026 at 10:15:23 CET"). The reply attribution is unchanged.
+- **Why:** the order and the seconds-and-zone time are Mail's as recalled (⚠️ not read from Mail's bundle); the recipient lines are the information that was lost.
+- **Alternatives:** Reply-To line (left out: `Message` has no Reply-To).

@@ -330,6 +330,26 @@ struct MailStoreTests {
         #expect(s.answerDraft(.accept, to: m.id).to == "org@x.com")
     }
 
+    /// The forwarded-message block names who the original went to, and its time with the time zone.
+    @Test func forwardHeaderHasTimeZoneAndRecipients() {
+        var m = msg(work, from: "Ann")
+        m.to = [Contact(name: "Bob", email: "bob@x.com")]
+        m.cc = [Contact(name: "Cy", email: "cy@x.com")]
+        let s = store([m])
+        let body = s.draft(.forward, to: m.id).body
+        let dateLine = body.split(separator: "\n").first { $0.hasPrefix("Date:") }.map(String.init) ?? ""
+        let tz = TimeZone.current
+        let zoneNames = [tz.abbreviation(for: m.date) ?? "~", "GMT", "UTC", tz.identifier,
+                         tz.localizedName(for: .standard, locale: .current) ?? "~",
+                         tz.localizedName(for: .daylightSaving, locale: .current) ?? "~"]
+        #expect(zoneNames.contains { dateLine.contains($0) }, "Date line has no time zone: \(dateLine)")
+        #expect(body.contains("\nTo: Bob <bob@x.com>\n"), "no To line: \(body.debugDescription)")
+        #expect(body.contains("\nCc: Cy <cy@x.com>\n"), "no Cc line: \(body.debugDescription)")
+        // No Cc line without Cc.
+        m.cc = []
+        #expect(!store([m]).draft(.forward, to: m.id).body.contains("Cc:"))
+    }
+
     @Test func replyDraftQuotesOriginal() {
         let m = msg(work, subject: "Plans", from: "Ann")
         let s = store([m])

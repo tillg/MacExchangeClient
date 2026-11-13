@@ -1788,8 +1788,13 @@ public final class MailStore {
             .joined(separator: "\n")
         // A summary not loaded yet has names without addresses: no empty "<>".
         let sender = m.from.formatted
+        // As Mail's forwarded-message block: who it went to, and the time with seconds and zone (for readers elsewhere).
+        let fdf = DateFormatter(); fdf.dateStyle = .long; fdf.timeStyle = .long
+        let recipients = [("To", m.to), ("Cc", m.cc)].filter { !$0.1.isEmpty }
+            .map { "\($0.0): \($0.1.map(\.formatted).joined(separator: ", "))\n" }.joined()
         let header = kind == .forward
-            ? "\n\nBegin forwarded message:\n\nFrom: \(sender)\nSubject: \(m.subject)\nDate: \(df.string(from: m.date))\n\n"
+            ? "\n\nBegin forwarded message:\n\nFrom: \(sender)\nSubject: \(m.subject)\nDate: \(fdf.string(from: m.date))\n"
+                + recipients + "\n"
             : "\n\nOn \(df.string(from: m.date)), \(sender) wrote:\n\n"
         // Each address once, whatever its case, and never my own; the first occurrence is kept. A recipient
         // without an address ("Undisclosed recipients") is left out.
