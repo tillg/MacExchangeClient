@@ -34,13 +34,8 @@ final class RPage {
 
     func string(_ js: String) async -> String { (await eval(js)).map { "\($0)" } ?? "nil" }
 
-    /// HTMLBodyView.Coordinator.measure's script, verbatim.
-    static let measureJS = """
-        Math.ceil(document.getElementById('\(HTMLPage.bodyID)').getBoundingClientRect().bottom
-            + parseFloat(getComputedStyle(document.body).marginBottom))
-        """
-
-    func measure() async -> Double { ((await eval(Self.measureJS)) as? NSNumber)?.doubleValue ?? -1 }
+    /// The app's own measuring script.
+    func measure() async -> Double { ((await eval(HTMLPage.measureScript)) as? NSNumber)?.doubleValue ?? -1 }
 
     func resize(width: CGFloat? = nil, height: CGFloat? = nil) async {
         v.setFrameSize(NSSize(width: width ?? v.frame.width, height: height ?? v.frame.height))
@@ -256,7 +251,9 @@ struct Probe_RenderTests {
             """
         let p = await RPage(HTMLPage.document(mail, allowRemote: false), dark: false)
         let r = await p.string("getComputedStyle(document.body).backgroundColor + '|' + getComputedStyle(document.getElementById('p')).color")
-        #expect(r == "rgb(255, 255, 255)|rgb(0, 0, 0)", "\(r)")
+        // Since BUG-065 the page sets no background of its own (as Mail): the body is transparent and the light
+        // colour scheme paints the canvas white (checked by snapshot); the mail's dark-mode CSS must not apply.
+        #expect(r == "rgba(0, 0, 0, 0)|rgb(0, 0, 0)", "\(r)")
     }
 
     @Test func defaultFontIsHelvetica14() async {
