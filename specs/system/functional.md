@@ -88,6 +88,8 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
   first, each on its own card. A message from another mailbox than the selected one is labelled "Found in Sent –
   Exchange Mailbox". The view scrolls to the selected card, again after 0.6 s. The list itself is not grouped.
 - **Attachments** (`AttachmentsView.swift`): pictures in place, other files as Finder icon with "name (size)".
+  A picture that can't be loaded (file not available, or not drawable) moves to the icons, where it can be opened
+  (trying again) or saved; a load cancelled because another message was selected changes nothing.
   Double-click opens, Space opens Quick Look, drag to Finder copies, Control-click: Open Attachment, Open With, Quick
   Look, Save Attachment…, Save to Downloads Folder, View as Icon / View in Place. File ▸ Save Attachments… and Quick
   Look Attachments… (⌘Y). Quick Look shows all of the message's files, at the chosen one (⌘Y: the first that
@@ -146,7 +148,8 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
 
 ## Meeting invites
 
-- `InviteView.swift`: required and optional attendees (first 8 + "N more"), date/time and location, then Accept,
+- `InviteView.swift`: required and optional attendees (first 8 + "N more"), date/time (with the end's day too when the meeting ends on a later day, `Invite.when`; an all-day invite
+  as its first – last day) and location, then Accept,
   Tentative and Decline menus (Respond with Comments…, Respond without Comments, Do Not Send a Response) and Propose
   New Time (with Tentative or Decline). The answer given is outlined in the accent colour. A cancellation shows only
   Remove from Calendar.
