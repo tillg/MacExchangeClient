@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Saving an attachment next to a broken alias with the same name no longer fails: the copy gets a number, as in the Finder.",
             "A link to a folder can be attached: the folder goes as a zip archive, as when you attach the folder itself.",
             "Reply All no longer leaves an empty recipient for \"Undisclosed recipients\" or a group without an address.",
             "Sending from an Exchange account whose password is missing no longer shows the message as sent: it says it waits until you sign in again.",

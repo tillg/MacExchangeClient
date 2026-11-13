@@ -1507,7 +1507,8 @@ public final class MailStore {
     static func freeURL(for name: String, in folder: URL) -> URL {
         let ext = (name as NSString).pathExtension, base = (name as NSString).deletingPathExtension
         var url = folder.appendingPathComponent(name), n = 2
-        while FileManager.default.fileExists(atPath: url.path) {
+        // The item itself, not what a link points to: a broken link or alias also takes the name.
+        while (try? FileManager.default.attributesOfItem(atPath: url.path)) != nil {
             url = folder.appendingPathComponent(Attachment.fileName(base, ending: ext.isEmpty ? " \(n)" : " \(n).\(ext)"))
             n += 1
         }

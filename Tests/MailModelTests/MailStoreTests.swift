@@ -1420,6 +1420,18 @@ struct MailStoreTests {
         #expect(try Data(contentsOf: b) == Data([1]))
     }
 
+    /// A broken symbolic link (or alias) with the attachment's name counts as taken, as in the Finder.
+    @Test func savingNextToABrokenLinkGetsAFreeName() async throws {
+        let (s, id, dir) = attachmentStore(["Report.pdf"], data: [Data([1])])
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let target = dir.appendingPathComponent("Downloads")
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: target.appendingPathComponent("Report.pdf").path,
+                                                   withDestinationPath: "/nonexistent/old-report.pdf")
+        let saved = await s.saveAttachment(0, of: id, to: target)
+        #expect(saved?.lastPathComponent == "Report 2.pdf", "status: \(s.status ?? "nil")")
+    }
+
     /// A name longer than a file name may be (255 bytes) is shortened, keeping its extension, so the attachment
     /// still opens and saves, also a second time.
     @Test func attachmentsWithVeryLongNamesOpenAndSave() async throws {
