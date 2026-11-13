@@ -113,4 +113,30 @@ struct HTMLPageTests {
         #expect(!RemoteImages.ask.loadsAutomatically(from: from("ci-noreply@northwind.example"), account: me))
         #expect(RemoteImages.defaultValue == .organisation)
     }
+
+    /// `<link>` resource hints (preconnect, dns-prefetch, prefetch, preload, prerender) reach the sender's server
+    /// although the policy blocks everything: with remote content blocked, no `<link>` of the mail stays a link,
+    /// however it is written.
+    @Test(arguments: [
+        #"<link rel="preconnect" href="https://t.example/">"#,
+        #"<LINK REL="DNS-Prefetch" HREF="//t.example">"#,
+        #"<link rel=prefetch href=https://t.example/a>"#,
+        #"<link href="https://t.example/p.png" as="image" rel="preload">"#,
+        #"<link rel="icon prerender" href="https://t.example/">"#,
+        "<link\nrel=\"preconnect\"\nhref=\"https://t.example/\">",
+        #"<link/rel="preconnect" href="https://t.example/"/>"#,
+        "<link\trel=preconnect href=https://t.example/>",
+    ])
+    func blockedMailKeepsNoLinkElement(_ link: String) {
+        let page = HTMLPage.document("<p>Hi</p>" + link + "<p>Bye</p>", allowRemote: false)
+        #expect(page.range(of: #"<link[\s/>]"#, options: [.regularExpression, .caseInsensitive]) == nil, "\(page)")
+        #expect(page.contains("<p>Hi</p>") && page.contains("<p>Bye</p>"))
+    }
+
+    /// Allowed remote content keeps the mail's links (its stylesheets load then), and words like "linked" stay.
+    @Test func allowedMailAndTextKeepTheirLinks() {
+        let link = #"<link rel="stylesheet" href="https://t.example/s.css">"#
+        #expect(HTMLPage.document(link, allowRemote: true).contains(link))
+        #expect(HTMLPage.document("<p>linked &lt;link&gt; <linkage></p>", allowRemote: false).contains("<p>linked &lt;link&gt; <linkage></p>"))
+    }
 }

@@ -9,9 +9,10 @@ public enum HTMLPage {
     /// `inline` replaces `cid:` references with the message's own images, as `data:` URIs the policy allows.
     /// References without an image stay `cid:` and hidden.
     public static func document(_ html: String, allowRemote: Bool, inline: [String: InlineImage] = [:]) -> String {
-        let html = inline.isEmpty ? html : replacingContentIDs(in: html) { id in
+        var html = inline.isEmpty ? html : replacingContentIDs(in: html) { id in
             inline[id].map { "data:\(safeType($0.contentType));base64,\($0.data.base64EncodedString())" }
         }
+        if !allowRemote { html = withoutLinks(html) }
         let csp = allowRemote
             ? "default-src 'none'; style-src * 'unsafe-inline'; img-src * data:; font-src * data:"
             : "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
@@ -32,6 +33,14 @@ public enum HTMLPage {
             </style>
             <div id="\(bodyID)">\(html)</div>
             """
+    }
+
+    /// The mail's `<link>` elements, renamed to an element that does nothing. WebKit opens connections for resource
+    /// hints (`preconnect`, `dns-prefetch`, `prefetch`, `preload`, `prerender`) without asking the policy, which tells
+    /// the sender the mail was opened. Everything else a link loads is blocked anyway while remote content is.
+    /// Renaming needs only the tag's start, so no way of writing its attributes gets past it.
+    static func withoutLinks(_ html: String) -> String {
+        html.replacing(/<(link)(?=[\s\/>])/.ignoresCase(), with: { _ in "<x-blocked-link" })
     }
 
     /// The sender's content type, reduced to a lowercased `type/subtype` of token characters (parameters dropped),

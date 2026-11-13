@@ -376,3 +376,12 @@ edited: 2026-11-13
 - **Context:** BUG-096. The outbox is one queue for all accounts, and `drain` stopped at the first network error, so a VPN-only or down server held up every other account's changes and sends.
 - **Decision:** On a `URLError` for a change that isn't a send or invite answer, `drain` notes the account as unreachable for the rest of this drain and goes on with the oldest change of any other account. All later changes of the unreachable account wait, so its order is kept; they go with the next refresh. The status text stays "Offline – changes will be sent to Exchange later".
 - **Why:** README: offline, changes wait until the next refresh; offline is per server. The quick check already treats accounts independently.
+
+## 01:33 — With remote content blocked, every `<link>` of the mail is disabled {#d-bug-097}
+
+- **Status:** decided
+- **Context:** BUG-097. With remote content blocked, `<link rel="preconnect">` still made WebKit open a TCP connection (and DNS lookup) to the sender's host: resource hints aren't covered by the Content-Security-Policy, so the sender learns the mail was opened.
+- **Decision:** `HTMLPage.document` renames every `<link` tag start of the mail (any case, followed by blank, `/` or `>`) to `<x-blocked-link` when remote content is blocked. An unknown element does nothing. With remote content allowed the mail is left as it is. Tested in a real `WKWebView` against a 127.0.0.1 listener (13 vectors, including preconnect, dns-prefetch, prefetch, preload and prerender) and at string level (case, unquoted values, `href` before `rel`, several rel tokens, line breaks and tabs, `<link/`).
+- **Why:** Matching all `<link>` rather than certain `rel` values can't be bypassed by spelling the value differently, and nothing else a link loads (stylesheets, icons) is allowed while remote content is blocked anyway. Renaming only the tag start needs no parsing of attributes.
+- **Alternatives:** Remove only links whose `rel` names a hint (rejected: rel parsing is easy to get wrong). Turn hints off in the web view's preferences (rejected: no public `WKPreferences` switch for preconnect).
+- **Not covered:** DNS prefetching of plain `<a href>` hosts couldn't be observed with a loopback address; not changed.
