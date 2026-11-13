@@ -55,7 +55,10 @@ flowchart LR
    "Password needed for …"). Otherwise the store gets `SampleData.store()`, and
    nothing is read from or written to disk.
 2. `pollForMail()` (`MailReplicaApp.swift`) runs `AppSetup.loadMail`, then loops: `store.refresh()`,
-   `AppSetup.saveChanges(store)`, sleep 15 s. It is off while `MAIL_SNAPSHOT` is set.
+   `AppSetup.saveChanges(store)`, sleep 15 s. It is off while `MAIL_SNAPSHOT` is set. Every viewer window runs it,
+   but one loop polls at a time (`AppSetup.isPolling`; another window takes over when that one closes), and
+   `loadMail` runs once per launch. The store ignores a second `restore(meta)`, and `restore(_:boxes:)` /
+   `finishLoading` after loading has finished (BUG-219).
 3. `loadMail`: without `Mail.sqlite`, `MailDatabase.importCache` moves `Cache.json` in (see [storage.md](storage.md)).
    Otherwise, on a detached task: open the database, read `meta()` and the Inbox of every account. The store
    `restore`s meta (sync tokens, folders, outbox; `loadedBoxes = []`), then the Inboxes. A second task reads the rest

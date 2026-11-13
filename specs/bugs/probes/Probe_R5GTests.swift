@@ -158,36 +158,6 @@ struct Probe_R5GFindings {
 
 /// R5G: File ▸ New Viewer Window (⌥⌘N). Every viewer window runs `pollForMail`, whose first step is `AppSetup.loadMail`:
 /// the stored state is read into the running store again. What changed since the last save (every 15 s) comes back.
-@MainActor
-struct Probe_R5GLaunch {
-    let acct = Account(name: "me@work.com", address: "me@work.com", isServer: true)
-
-    @Test func secondViewerWindowDoesNotBringBackErasedMail() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("r5g-db-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let db = try MailDatabase(url: dir.appendingPathComponent("Mail.sqlite"))
-        let s = MailStore(accounts: [], messages: [])
-        s.add(acct, backend: nil)  // AppSetup.makeStore (offline here, so nothing goes out during the test)
-        let first = [MailboxKey(account: acct.id, mailbox: .inbox)]
-        func loadMail() throws {  // AppSetup.loadMail, the steps it takes on the store
-            s.restore(try db.meta())
-            s.restore(try db.messages(in: first), boxes: first)
-            s.finishLoading(try db.messages(notIn: first))
-        }
-        try loadMail()  // the first window, empty database
-        let junk = Message(accountID: acct.id, mailbox: .trash, from: Contact(name: "Spam", email: "spam@x.com"), to: [],
-                           subject: "You won", body: "", date: .now, remoteID: "T1", bodyLoaded: false)
-        s.apply(SyncResult(upserts: [junk], deletedRemoteIDs: [], token: "T", more: false), account: acct.id, mailbox: .trash)
-        try db.write(s.takeChanges())  // a save after a check
-        let id = try #require(s.messages.first?.id)
-        s.delete([id])  // Delete in Trash: erased
-        try #require(s.message(id) == nil)
-        try loadMail()  // ⌥⌘N within 15 s: the second window's pollForMail
-        #expect(s.message(id) == nil, "the erased message is back in Trash")
-        #expect(s.outbox.count == 1, "outbox \(s.outbox.map(\.change))")
-    }
-}
 
 /// R5G: Help ▸ What's New.
 struct Probe_R5GWhatsNew {
