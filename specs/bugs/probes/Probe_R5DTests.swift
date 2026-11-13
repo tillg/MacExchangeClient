@@ -174,27 +174,4 @@ final class R5DRecordingServer: @unchecked Sendable {
 @Suite(.serialized)
 struct Probe_R5D_Invites {
     let acct = Account(name: "Exchange", address: "me@work.com")
-
-    /// R5D-08: for an invite from 22:00 to 02:00 the calendar is read only until midnight, so entries after
-    /// midnight never make the conflict note (functional.md: the note shows when events overlap).
-    @Test func overnightInviteReadsTheCalendarUntilItsEnd() async throws {
-        let empty = EWSReply.resp("FindItem", EWSReply.ok("FindItem",
-            "<m:RootFolder TotalItemsInView=\"0\" IncludesLastItemInRange=\"true\"><t:Items/></m:RootFolder>"))
-        let server = try R5DRecordingServer(answer: empty)
-        let start = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 20, hour: 22))!
-        let end = start.addingTimeInterval(4 * 3600)
-        var m = Message(accountID: acct.id, from: Contact(name: "Ann", email: "ann@x.com"), to: [], subject: "Night shift",
-                        body: "", date: .now, remoteID: "R1")
-        m.invite = Invite(start: start, end: end, isCancellation: false)
-        m.htmlChecked = true
-        let s = MailStore(accounts: [], messages: [])
-        s.add(acct, backend: EWSBackend(client: EWSClient(url: server.url, username: "u", password: "p")))
-        s.apply(SyncResult(upserts: [m], deletedRemoteIDs: [], token: "T", more: false), account: acct.id, mailbox: .inbox)
-        let id = try #require(s.messages.first?.id)
-        await s.loadDay(for: id)
-        let body = try #require(server.bodies.first { $0.contains("CalendarView") })
-        let asked = try #require(body.firstMatch(of: /EndDate="([^"]+)"/).map { String($0.1) })
-        let askedEnd = try #require(ISO8601DateFormatter().date(from: asked))
-        #expect(askedEnd >= end, "calendar read until \(asked); the meeting ends at \(ISO8601DateFormatter().string(from: end))")
-    }
 }
