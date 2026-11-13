@@ -232,19 +232,4 @@ struct Probe_R5BTests {
 
     // MARK: R5B-09
 
-    /// The email was pasted into Settings ▸ Accounts with a trailing blank. The account's name is trimmed (BUG-124),
-    /// its address isn't: an invitation you sent yourself then counts as someone else's and offers answer buttons
-    /// (functional.md: `canAnswer` is false when the sender is the account's address), and MailTips is asked for
-    /// " me@work.com " instead of the address.
-    @Test func r5b09_addressPastedWithABlankIsStillTheAccountsAddress() throws {
-        let ex = ExchangeAccount(email: "me@work.com ", username: "W\\me", server: "mail.work.com")
-        let s = MailStore(accounts: [ex.account], messages: [])
-        var m = Message(accountID: ex.id, mailbox: .inbox, from: Contact(name: "Me", email: "me@work.com"), to: [],
-                        subject: "Planning", body: "", date: .now, remoteID: "R1", bodyLoaded: true)
-        m.invite = Invite(start: .now, end: .now.addingTimeInterval(1800))
-        s.merge([m], account: ex.id, mailbox: .inbox)
-        let id = s.messages.first { $0.remoteID == "R1" }!.id
-        #expect(!s.canAnswer(id), "own invitation answerable; account address is \"\(ex.account.address)\"")
-        #expect(EWSBackend.mailTipsRequest(from: ex.account.address).contains("<t:EmailAddress>me@work.com</t:EmailAddress>"))
-    }
 }

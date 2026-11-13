@@ -187,7 +187,7 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
 
 ## Settings, menus, help
 
-- Settings ▸ Accounts: list of accounts; Add Exchange Account (email, `DOMAIN\user`, password, server). Sign In
+- Settings ▸ Accounts: list of accounts; Add Exchange Account (email, `DOMAIN\user`, password, server). The email is the account's name and address, without blanks around it (BUG-169). Sign In
   checks the credentials with a folder request before saving, stores the password in the Keychain, removes the
   sample accounts (never an account set up in Settings, even without a password; when there are none, the selected
   mailbox and messages stay) and runs a quick check. Signing in
