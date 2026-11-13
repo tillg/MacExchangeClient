@@ -1030,8 +1030,12 @@ public final class MailStore {
             // stay, and a message erased since isn't brought back. Only a refused erase re-adds the message.
             // A refused move of a message the server reported deleted meanwhile: that deletion was real.
             var deletedOnServer = Set<Message.ID>()
+            // One pass finds the whole batch (a batch of 100 among 180,000 messages), not one search per message.
+            let wanted = Set(p.previous.map(\.id))
+            var at: [Message.ID: Int] = [:]
+            for i in messages.indices where wanted.contains(messages[i].id) { at[messages[i].id] = i }
             for old in p.previous {
-                guard let i = messages.firstIndex(where: { $0.id == old.id }) else {
+                guard let i = at[old.id] else {
                     if case .delete = p.change {
                         removedIDs.remove(old.id); changedIDs.insert(old.id)
                         messages.append(old)

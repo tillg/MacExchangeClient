@@ -87,4 +87,21 @@ struct MailStorePerformanceTests {
         print(String(format: "PERF cache 70k: save %.2fs, load %.2fs, restore %.2fs, %.1f MB", save, load, restore, Double(size) / 1e6))
         #expect(fresh.messages.count == s.messages.count)
     }
+
+    /// Undoing a refused batch of 100 (the outbox batch size) far into the message array (BUG-078).
+    @Test func undoingARefusedBatchStaysFastAt70kMessages() {
+        let t = (0..<3).map { _ in
+            let s = bigStore()
+            let ids = Set(s.messages.filter { $0.mailbox == .trash }.suffix(100).map(\.id))
+            s.archive(ids)
+            let p = s.outbox[0]
+            let start = Date()
+            s.failed(p, "refused")
+            let t = Date().timeIntervalSince(start)
+            #expect(s.messages.filter { ids.contains($0.id) }.allSatisfy { $0.mailbox == .trash })
+            return t
+        }.min()!
+        print(String(format: "PERF failed() 100 in 70k %.3fs", t))
+        #expect(t < Self.limit)
+    }
 }
