@@ -54,7 +54,7 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 
 | Action | Effect |
 |---|---|
-| Delete (⌘⌫) | Messages in Trash are erased (removed; server: `DeleteItem` SoftDelete); others move to the account's Trash |
+| Delete (⌘⌫) | Messages in Trash are erased (removed; server: `DeleteItem` SoftDelete); others move to the account's Trash. While a text view has the focus (compose text, a field, search), ⌘⌫ deletes to the start of the line instead (BUG-218) |
 | Archive (⌃⌘A) | Move to `.archive`, also when already there |
 | Junk (⇧⌘J) | All to Junk if any selected message is outside Junk; if all are in Junk, all to the Inbox (Not Junk) |
 | Mark as Read/Unread (⇧⌘U) | All become read if any is unread, else all unread |
