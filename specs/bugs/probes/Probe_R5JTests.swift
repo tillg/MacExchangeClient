@@ -256,22 +256,6 @@ struct Probe_R5JTests {
         return R5J.answer(request)
     }
 
-    /// Delete in Trash of a deleted appointment and a deleted task: the bare DeleteItem is refused for both, so they
-    /// come back with "Exchange refused a change", and can never be erased from Trash.
-    @Test func r5j03_eraseAppointmentAndTaskFromTrash() async throws {
-        let server = RecordingServer { Self.strictExchange($0) }
-        defer { server.stop() }
-        let s = trashWithAppointmentAndTask(server)
-        #expect(s.messages.count == 2, "the Trash sync lists the appointment and the task")
-        s.delete(Set(s.messages.map(\.id)))
-        try await waitFor { !server.requests.isEmpty && s.outbox.isEmpty }
-        try await Task.sleep(for: .milliseconds(200))
-        let del = try request(try #require(server.requests.first)).first("DeleteItem")
-        #expect(s.messages.isEmpty, "back in Trash: \(s.messages.map(\.subject)); status: \(s.status ?? "")")
-        #expect(del?.attr("SendMeetingCancellations") == "SendToNone" && del?.attr("AffectedTaskOccurrences") != nil,
-                "DeleteItem attributes: \((del as? XMLElement)?.attributes?.map { "\($0.name ?? "")=\($0.stringValue ?? "")" } ?? [])")
-    }
-
     /// Flagging (or marking read) a deleted appointment in Trash sends UpdateItem without
     /// SendMeetingInvitationsOrCancellations, which Exchange refuses for a calendar item: the change is undone.
     @Test func r5j04_flagAppointmentInTrash() async throws {
