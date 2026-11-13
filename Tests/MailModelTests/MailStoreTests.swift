@@ -1766,6 +1766,26 @@ struct MailStoreTests {
         #expect(s.visibleMessages.map(\.subject) == ["Report one"])
     }
 
+    /// Switching from one account's mailbox to another's during a search keeps the previous results on screen until
+    /// the answer for the new account arrives: no empty list ("No Results") meanwhile (BUG-080).
+    @Test func switchingAccountScopeDoesNotFlashEmptyResults() async throws {
+        let w = msg(work, subject: "Report work"), h = msg(home, subject: "Report home")
+        let (db, url) = try searchDB([w, h])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let s = store([w, h])
+        searching(s, db)
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.searchText = "report"
+        await s.searchTask?.value
+        #expect(s.visibleMessages.map(\.subject) == ["Report work"])
+        s.searchDebounce = .milliseconds(150)
+        s.selectedMailbox = .account(home.id, .inbox)
+        let meanwhile = s.visibleMessages.map(\.subject)
+        await s.searchTask?.value
+        #expect(s.visibleMessages.map(\.subject) == ["Report home"])
+        #expect(!meanwhile.isEmpty, "the list is empty (No Results) until the new answer arrives")
+    }
+
     /// Typed while the index wasn't ready yet: memory answers, then the index takes over by itself.
     @Test func searchTypedBeforeTheIndexIsReady() async throws {
         let m = msg(work, subject: "Misreported")

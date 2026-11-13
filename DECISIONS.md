@@ -808,3 +808,11 @@ edited: 2026-11-13
 - **Decision:** `restore(_:boxes:)` and `finishLoading` add only messages of the accounts set up. Their rows stay in the database (nothing deletes them); the search index may still list them, but a hit that isn't in memory isn't shown.
 - **Why:** there is no UI to remove an account; an account dropped by editing the saved accounts may come back, and deleting its mail would make it download everything again. Not loading is the safe half of the fix.
 - **Alternatives:** delete the rows (and index entries) of unknown accounts at launch (rejected for now: irreversible, a product call once removing an account is a feature).
+
+## 06:40 — During a search, another account's mailbox keeps showing the previous answer as it was {#d-bug-080}
+
+- **Status:** decided
+- **Context:** BUG-080. `searchHits` was keyed by the query only; after selecting another account's mailbox, the old hits were filtered by the new account, so the list was empty ("No Results") until the new answer came.
+- **Decision:** `searchHits` also keeps the scope it was asked for, and the list filters the hits by that scope until the next answer. For about 150 ms plus the query, the list still shows the previous account's results.
+- **Why:** fast-search spec §4: keep the previous results while the next answer is on its way, never flash an empty list.
+- **Alternatives:** show the new mailbox's normal content meanwhile (rejected: a flash of other content, and "No Results" when it's empty).

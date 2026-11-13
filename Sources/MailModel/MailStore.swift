@@ -39,8 +39,9 @@ public final class MailStore {
             searchAgain()
         }
     }
-    /// The index's answer for a query; shown until the next query's answer arrives.
-    public private(set) var searchHits: (query: String, ids: Set<Message.ID>)? { didSet { hitsGeneration &+= 1 } }
+    /// The index's answer for a query in a scope (the accounts searched); shown as it is until the next answer
+    /// arrives, also after another account's mailbox was selected (BUG-080).
+    public private(set) var searchHits: (query: String, scope: Set<UUID>?, ids: Set<Message.ID>)? { didSet { hitsGeneration &+= 1 } }
     @ObservationIgnored private var hitsGeneration = 0
     /// A query the index couldn't answer: memory is scanned for it instead.
     private var fallbackQuery: String?
@@ -275,7 +276,7 @@ public final class MailStore {
         _ = messages.count  // registers the dependency for SwiftUI even when the cache answers
         if let c = listCache, c.revision == revision, c.key == key { return c.list }
         if let hits, !q.isEmpty {
-            let list = Self.hitList(messages, hits.ids, scope: searchScope(selectedMailbox), inTrash: foldersInTrash)
+            let list = Self.hitList(messages, hits.ids, scope: hits.scope, inTrash: foldersInTrash)
             listCache = (revision, key, list)
             return list
         }
@@ -402,7 +403,7 @@ public final class MailStore {
             }.value
             guard !Task.isCancelled, normalizedSearch == q, searchScope(selectedMailbox) == scope else { return }
             fallbackQuery = nil
-            searchHits = (q, hits)
+            searchHits = (q, scope, hits)
             // The list is ready unless mail changed meanwhile; then `visibleMessages` makes it again.
             if revision == snapshotRevision {
                 listCache = (revision, ListKey(mailbox: selectedMailbox, query: q, filterUnread: filterUnread,
