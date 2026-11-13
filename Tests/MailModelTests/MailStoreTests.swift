@@ -1155,6 +1155,34 @@ struct MailStoreTests {
         #expect(d.loadingOriginal == nil)
     }
 
+    /// A forward whose original files can't be had (body not loaded, no connection) isn't released without them:
+    /// it stays blocked and says so (BUG-071).
+    @Test func forwardWhoseFilesCannotLoadStaysBlocked() async {
+        var m = Message(accountID: work.id, from: Contact(name: "Ann Lee", email: ""), to: [], subject: "Contract", body: "",
+                        date: Date(timeIntervalSince1970: 1_000_000), remoteID: "A", bodyLoaded: false)
+        m.hasAttachments = true
+        let s = store([])
+        s.merge([m], account: work.id, mailbox: .inbox)
+        var d = s.draft(.forward, to: s.messages[0].id)
+        await s.includeOriginalAttachments(in: &d)
+        #expect(d.loadingOriginal != nil && d.attachments.isEmpty)
+        #expect(s.status?.contains("original") == true, "status: \(s.status ?? "nil")")
+    }
+
+    /// One of two files can't be loaded: none is added and the forward stays blocked; once they can be had,
+    /// trying again adds both.
+    @Test func forwardWithOneUnavailableFileStaysBlocked() async {
+        let (s, id, dir) = attachmentStore(["a.pdf", "b.pdf"], data: [Data([1])])  // b.pdf's content can't be had
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var d = s.draft(.forward, to: id)
+        await s.includeOriginalAttachments(in: &d)
+        #expect(d.loadingOriginal == id && d.attachments.isEmpty, "files: \(d.attachments.map(\.name))")
+        #expect(s.status?.contains("b.pdf") == true, "status: \(s.status ?? "nil")")
+        s.setAttachmentData([Data([1]), Data([2])], for: id)
+        await s.includeOriginalAttachments(in: &d)
+        #expect(d.loadingOriginal == nil && d.attachments.map(\.name) == ["a.pdf", "b.pdf"])
+    }
+
     /// A folder is attached as a zip archive of it.
     @Test func foldersAreAttachedAsZip() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ZipTests-\(UUID())")

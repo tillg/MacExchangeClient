@@ -12,6 +12,8 @@ struct ComposeView: View {
     @State private var excluded = false
     @State private var askInclude = false
     @State private var confirmSize = false
+    /// The original's files couldn't be added; the window offers Try Again or Continue Without Them.
+    @State private var originalFailed = false
     /// Why Send or Save couldn't go ahead; the window stays open with the message.
     @State private var sendError: String?
     @FocusState private var inRecipients: Bool
@@ -44,8 +46,19 @@ struct ComposeView: View {
                             files: draft.inviteAnswer == nil ? { store.files($0) } : nil)
             if draft.loadingOriginal != nil {
                 Divider()
-                ProgressView("Adding the original attachments…").controlSize(.small).padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if originalFailed {
+                    // The original's files couldn't all be had: nothing goes out without them unless the user says so.
+                    HStack {
+                        Text("The original attachments couldn't be added.").foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Try Again") { originalFailed = false; Task { await includeOriginal() } }
+                        Button("Continue Without Them") { originalFailed = false; excluded = true; draft.loadingOriginal = nil }
+                    }
+                    .controlSize(.small).padding(12)
+                } else {
+                    ProgressView("Adding the original attachments…").controlSize(.small).padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in drop(providers) }
@@ -194,6 +207,7 @@ struct ComposeView: View {
         var d = draft
         d.attachments = []  // files the user adds meanwhile stay as they are
         await store.includeOriginalAttachments(in: &d)
+        guard d.loadingOriginal == nil else { return originalFailed = true }  // nothing was added
         draft.attachments += d.attachments
         draft.loadingOriginal = nil
         excluded = false

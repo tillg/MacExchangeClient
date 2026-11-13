@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "A forward whose original attachments can't be loaded no longer goes out without them unnoticed: the window says so and lets you try again or continue without them.",
             "A message you wrote for an account that has since been removed is no longer sent from another account; the window asks you to choose one in From.",
             "If an invitation disappears before you send your answer with a comment, the window stays open and tells you, so your comment isn't lost.",
             "Archiving a message that is already in Archive no longer jumps to the next message.",

@@ -1817,16 +1817,31 @@ public final class MailStore {
     }
 
     /// Adds the original message's attachments (a forward, or a reply that includes them), fetched from the
-    /// server if needed, as in Mail.
+    /// server if needed, as in Mail. All or none: if the original or one of its files can't be had, nothing is
+    /// added, `loadingOriginal` stays set (the message can't be sent or saved without them by accident) and
+    /// `status` says which; the compose window offers to try again or to go on without them.
     public func includeOriginalAttachments(in draft: inout Draft) async {
         guard let id = draft.loadingOriginal, let m = message(id) else { draft.loadingOriginal = nil; return }
         if m.needsBody { await loadBody(id) }
-        for (i, a) in (message(id)?.attachments ?? []).enumerated() {
-            guard let url = await originalAttachmentFile(i, of: id), let data = try? Data(contentsOf: url) else { continue }
-            draft.attachments.append(DraftAttachment(
+        guard let loaded = message(id), loaded.bodyLoaded, !(loaded.hasAttachments && loaded.attachments.isEmpty) else {
+            status = "Couldn't add the original attachments: the original message couldn't be loaded."
+            return
+        }
+        var files: [DraftAttachment] = [], missing: [String] = []
+        for (i, a) in loaded.attachments.enumerated() {
+            guard let url = await originalAttachmentFile(i, of: id), let data = try? Data(contentsOf: url) else {
+                missing.append(a.name)
+                continue
+            }
+            files.append(DraftAttachment(
                 name: a.name, contentType: a.contentType ?? UTType(filenameExtension: url.pathExtension)?.preferredMIMEType,
                 data: data, fromOriginal: true))
         }
+        guard missing.isEmpty else {
+            status = "Couldn't add the original attachments: \(missing.map { "“\($0)”" }.joined(separator: ", ")) couldn't be loaded."
+            return
+        }
+        draft.attachments += files
         draft.loadingOriginal = nil
     }
 
