@@ -2,7 +2,7 @@
 title: 'Search without the index (index build failed or still building, or "Search failed") freezes 0.6-1 s per keystroke on 180,000 messages'
 priority: P4
 area: MailStore
-status: open
+status: deferred
 found: 2026-11-13
 ---
 ## Summary
@@ -167,3 +167,6 @@ Expectation failed: times.last! < F.limit
 The full-field fold came with the BUG-052 fix (commit a213327, which added `fold`, `searchWords` and the joined-fields `matches`).
 
 Possible fixes: fold once per message per revision (a cached folded text), or run the memory scan detached and debounced like the index path.
+
+## Deferred
+2026-11-13. The probe times each keystroke on a fresh store of 180,000 messages, so only a memory search that leaves the main actor (debounced and detached, like the index path) can stay under 0.25 s with the 10× margin the test rules ask for: a cold scan that folds every message once is ≥ 0.5 s, and a cached folded text per message doubles the memory of all loaded bodies. Making the memory path asynchronous changes the contract that existing tests pin: they read `visibleMessages` right after setting `searchText` (without an index) and expect the results at once (`searchTypedBeforeTheIndexIsReady`, `aFailedIndexSearchFallsBackToMemory`, `memorySearchStaysFastAt70kMessages` and the search tests in `MailStoreTests`). Changing those needs the user's decision. See DECISIONS.md {#d-bug-146}.

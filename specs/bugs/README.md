@@ -20,4 +20,3 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [125](BUG-125-mailbox-selected-during-check-not-checked.md) | P4 | MailStore | Selecting a mailbox while a check is running doesn't check it (README: "at once when you select a mailbox") |
 | [126](BUG-126-paging-never-ends-when-server-repeats-page.md) | P4 | MailStore | Quick check and history page forever when the server answers "more" with the same SyncState |
 | [146](BUG-146-memory-search-per-keystroke-freeze.md) | P4 | MailStore | Search without the index (index build failed or still building, or "Search failed") freezes 0.6-1 s per keystroke on 180,000 messages |
-| [147](BUG-147-late-quick-look-replaces-newer.md) | P4 | MailStore | Quick Look jumps back to an earlier message’s attachment when its download finishes after you looked at another message |

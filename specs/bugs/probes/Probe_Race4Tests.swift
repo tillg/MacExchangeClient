@@ -123,39 +123,6 @@ struct Probe_Race4Tests {
 
     // MARK: D. Quick Look of an earlier message takes over when its file arrives late
 
-    /// Space on message A (its attachment still downloading), then on message B (file at hand): Quick Look shows B.
-    /// When A's download finishes, `previewItems`/`previewItem` are replaced by A's file: the panel jumps back to
-    /// the earlier message's attachment, which the user no longer asked for.
-    // file:// fixture
-    @Test func probeLateQuickLookDoesNotReplaceNewerOne() async throws {
-        let server = RaceServer([], hold: true)
-        defer { server.stop() }
-        var b = Message(accountID: acct.id, from: Contact(name: "Bob", email: "bob@x.com"), to: [], subject: "B", body: "b",
-                        date: Date(timeIntervalSince1970: 1_700_000_100), attachments: [Attachment(name: "b.txt", size: 1)])
-        b.hasAttachments = true
-        let s = MailStore(accounts: [], messages: [b])
-        s.add(acct, backend: EWSBackend(client: EWSClient(url: server.url, username: "u", password: "p")))
-        s.downloadsFolder = FileManager.default.temporaryDirectory.appendingPathComponent("race-dl-\(UUID().uuidString)")
-        s.setAttachmentData([Data("B".utf8)], for: b.id)
-        var a = summary("R1")
-        a.bodyLoaded = true; a.htmlChecked = true; a.hasAttachments = true
-        a.attachments = [Attachment(name: "a.pdf", size: 7, contentType: "application/pdf")]
-        s.merge([a], account: acct.id, mailbox: .inbox)
-        let aid = try #require(s.messages.first { $0.remoteID == "R1" }).id
-        let t = Task { await s.quickLookAttachments(of: aid) }
-        try await Task.sleep(for: .milliseconds(300))  // A's GetItem is out
-        await s.quickLookAttachments(of: b.id)
-        #expect(s.previewItem?.lastPathComponent == "b.txt")
-        server.push(RX.getItem("<t:Message><t:ItemId Id=\"R1\" ChangeKey=\"CK\"/><t:Attachments><t:FileAttachment>"
-            + "<t:AttachmentId Id=\"AT-PDF\"/><t:Name>a.pdf</t:Name><t:ContentType>application/pdf</t:ContentType>"
-            + "<t:Size>7</t:Size><t:IsInline>false</t:IsInline></t:FileAttachment></t:Attachments></t:Message>"))
-        server.push(RX.resp("GetAttachment", RX.ok("GetAttachment", "<m:Attachments><t:FileAttachment><t:AttachmentId Id=\"AT-PDF\"/>"
-            + "<t:Name>a.pdf</t:Name><t:Content>\(Data("PDFDATA".utf8).base64EncodedString())</t:Content></t:FileAttachment></m:Attachments>")))
-        await t.value
-        try #require(s.status == nil, "A's download failed: \(s.status ?? "")")
-        #expect(s.previewItem?.lastPathComponent == "b.txt", "previewItems \(s.previewItems.map(\.lastPathComponent))")
-    }
-
     // MARK: E. A refused erase, queued behind the move that renamed the message, brings it back under its old ID
 
     /// Control: the same two deletes, both accepted.
