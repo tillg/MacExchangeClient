@@ -42,14 +42,16 @@ query of the SQLite FTS5 index. Design history: [../change/fast-search.md](../ch
 3. On success: `searchHits = (query, ids)`; the list is cached for the current revision. If the index returned
    2,000 IDs, `status` becomes "Showing the newest 2,000 results"; otherwise that notice, or a "Search failed"
    notice, is cleared.
-4. On error: `fallbackQuery = query` (memory answers this query) and `status` is "Search failed: …".
+4. On error: `fallbackQuery = query` (memory answers this query), `searchHits` is cleared and `status` is "Search failed: …".
 5. After every successful background save, `searchAgain()` runs the current query again without debounce, so mail
    written in the last ≤15 s becomes findable.
 6. Clearing the field cancels the task, drops the hits and the fallback, and clears the 2,000 notice or a "Search
    failed" notice. Any other status stays.
 
-What the list shows meanwhile: the latest answer's results (the previous query's while the next is on its way).
-Before the first answer of a search — no hits yet — the list shows the selected mailbox's normal content.
+What the list shows meanwhile: the latest answer's results (the previous query's while the next is on its way),
+also when that answer came from memory (`memoryQuery`, the query of the memory scan last shown). Before the first
+answer of a search — no hits, no memory results — the list shows the selected mailbox's normal content, and
+`awaitingSearchResults` is true.
 
 ### Query and matching (`MailDatabase.search`, `matchExpression`)
 
@@ -97,4 +99,5 @@ Junk since the last save isn't found by the index until that save.
 - At most 2,000 IDs from the index, Trash and Junk already left out; the in-memory re-check (moved since the last
   save, account) can show a few fewer.
 - No paging, no server search, no search of HTML-only text, no search tokens, scopes or suggestions.
-- No results: `ContentUnavailableView.search` ("No Results for …") in the list.
+- No results: `ContentUnavailableView.search` ("No Results for …") in the list; not while `awaitingSearchResults`
+  (an empty list then shows nothing).

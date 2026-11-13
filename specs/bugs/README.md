@@ -19,7 +19,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [122](BUG-122-mark-all-read-while-loading-misses-later-mail.md) | P4 | MailStore | Mark All as Read while launch is still loading leaves the mail loaded afterwards unread |
 | [125](BUG-125-mailbox-selected-during-check-not-checked.md) | P4 | MailStore | Selecting a mailbox while a check is running doesn't check it (README: "at once when you select a mailbox") |
 | [126](BUG-126-paging-never-ends-when-server-repeats-page.md) | P4 | MailStore | Quick check and history page forever when the server answers "more" with the same SyncState |
-| [132](BUG-132-pending-search-shows-mailbox-instead-of-results.md) | P4 | MailStore | While the next search answer is on its way, the list jumps back to the plain mailbox (or "No Results") when the previous results came from memory |
 | [142](BUG-142-invite-time-drops-end-date.md) | P3 | Invite | Invite card shows only the start day for a meeting that ends on a later day |
 | [143](BUG-143-unloadable-picture-spins-forever.md) | P3 | Attachments | A picture attachment that can't be loaded shows a spinner forever |
 | [144](BUG-144-quick-look-shows-another-file.md) | P4 | MailStore | Space on an attachment that cannot be loaded opens Quick Look on a different attachment of the message |

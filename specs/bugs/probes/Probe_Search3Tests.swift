@@ -185,59 +185,6 @@ struct Probe_Search3Tests {
 
     // MARK: Pending answers
 
-    /// Typed before the index was ready (memory answered), then the index arrives and the user types on: until the
-    /// index answers, the list should keep the previous results, not jump back to the mailbox.
-    @Test func probe_typingOnAfterIndexBecomesReadyShowsMailboxNotResults() async throws {
-        let hit = msg(work, subject: "Report Q3", minutesAgo: 5, remote: "a"),
-            other = msg(work, subject: "Lunch", minutesAgo: 1, remote: "b")
-        let s = store([hit, other])
-        s.selectedMailbox = .account(work.id, .inbox)
-        s.searchText = "report"
-        #expect(s.visibleMessages.map(\.subject) == ["Report Q3"])  // memory
-        for a in [work] { s.merge([], account: a.id) }
-        let (db, url) = try tempDB()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        try db.write(s.storedState())
-        let gate = Gate(slow: ["report", "report q"])
-        s.searchDebounce = .zero
-        s.searcher = { q, a in await gate.pass(q); return try db.search(q, accounts: a) }
-        var started = gate.entered.makeAsyncIterator()
-        _ = await started.next()
-        #expect(s.visibleMessages.map(\.subject) == ["Report Q3"])  // memory still answers
-        s.searchText = "report q"
-        _ = await started.next()
-        // Pending: previous results expected, not the plain Inbox (which includes "Lunch").
-        #expect(s.visibleMessages.map(\.subject) == ["Report Q3"], "\(s.visibleMessages.map(\.subject))")
-        gate.release("report"); gate.release("report q")
-        await s.searchTask?.value
-    }
-
-    /// The index failed for one query (memory answered); while the next query is on its way the list falls
-    /// back to the mailbox instead of the previous results.
-    @Test func probe_afterFailedQueryNextPendingShowsMailbox() async throws {
-        let hit = msg(work, subject: "Report Q3", minutesAgo: 5), other = msg(work, subject: "Lunch", minutesAgo: 1)
-        let s = store([hit, other])
-        s.selectedMailbox = .account(work.id, .inbox)
-        let gate = Gate(slow: ["report q"])
-        final class Flag: @unchecked Sendable { var fail = true }
-        let flag = Flag()
-        s.searchDebounce = .zero
-        s.searcher = { q, _ in
-            if flag.fail { throw DatabaseError(errorDescription: "busy") }
-            await gate.pass(q)
-            return [hit.id]
-        }
-        await search(s, "report")
-        #expect(s.visibleMessages.map(\.subject) == ["Report Q3"])  // memory fallback
-        flag.fail = false
-        var started = gate.entered.makeAsyncIterator()
-        s.searchText = "report q"
-        _ = await started.next()
-        #expect(s.visibleMessages.map(\.subject) == ["Report Q3"], "\(s.visibleMessages.map(\.subject))")
-        gate.release("report q")
-        await s.searchTask?.value
-    }
-
     // MARK: Debounce
 
     /// A burst of keystrokes asks the index once, for the final text.
@@ -520,25 +467,6 @@ struct Probe_Search3Tests {
     }
 
     // MARK: Pending first answer
-
-    /// The first index answer is pending in an empty mailbox: the list is empty, so "No Results" shows though
-    /// the search will find mail.
-    @Test func probe_firstPendingAnswerInEmptyMailboxShowsNoResults() async throws {
-        let archived = msg(work, .archive, subject: "Report archived", remote: "a")
-        let s = store([archived])
-        let (db, url) = try indexed(s, accounts: [work])
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let gate = Gate(slow: ["report"])
-        s.searcher = { q, a in await gate.pass(q); return try db.search(q, accounts: a) }
-        s.selectedMailbox = .account(work.id, .inbox)  // empty
-        var started = gate.entered.makeAsyncIterator()
-        s.searchText = "report"
-        _ = await started.next()
-        #expect(!s.visibleMessages.isEmpty, "list while the answer is pending: \(s.visibleMessages.map(\.subject))")
-        gate.release("report")
-        await s.searchTask?.value
-        #expect(s.visibleMessages.map(\.subject) == ["Report archived"])
-    }
 
     /// Clearing the field while an answer is pending: the late answer changes nothing.
     @Test func probe_lateAnswerAfterClearIsDropped() async throws {
