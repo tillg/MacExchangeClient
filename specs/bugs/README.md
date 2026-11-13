@@ -26,7 +26,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [050](BUG-050-reply-all-trailing-comma-for-addressless-recipient.md) | P4 | MailStore | Reply All leaves a trailing ", " (empty recipient) when the original lists a recipient without address |
 | [051](BUG-051-symlink-to-folder-cannot-be-attached.md) | P4 | MailStore | Attaching a symbolic link to a folder fails with "Couldn't attach" instead of zipping the folder |
 | [058](BUG-058-imported-cache-never-learns-conversations.md) | P3 | MailDatabase | Mail imported from Cache.json keeps the cache's sync positions, so it never learns its conversation |
-| [063](BUG-063-inline-flagged-attachment-without-reference-invisible.md) | P3 | EWS | An attachment Exchange flags IsInline that the body doesn't show (text mail, no cid: reference) is neither listed nor shown: it can't be seen or saved |
 | [068](BUG-068-reply-forward-of-unopened-exchange-message-uses-summary.md) | P3 | MailStore | Reply / Reply All / Forward on an Exchange message that hasn't been opened yet: empty To, 'Ann Lee <>' attribution, nothing quoted, wrong When-Adding-Recipients answer |
 | [069](BUG-069-invite-answer-for-vanished-invite-silently-dropped.md) | P3 | Invite | Respond with Comments: if the invite is gone by the time you press Send, the answer and comment vanish without a word |
 | [070](BUG-070-draft-of-removed-account-sent-from-another-account.md) | P3 | MailStore | A message written for an account that no longer exists is silently sent (or saved) from the first other account |

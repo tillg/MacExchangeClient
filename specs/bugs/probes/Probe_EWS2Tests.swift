@@ -59,21 +59,6 @@ struct Probe_EWS2Tests {
         #expect(EWSBackend.folderTree(d.all("Folder"), known: [], skip: []).map(\.id) == ["RSS"])
     }
 
-    // MARK: Attachments
-
-    /// An attachment Exchange flags inline that the body never shows (text body, no cid: reference): it is
-    /// neither listed nor shown, so the user can't see or save it.
-    @Test func probeInlineAttachmentNotReferencedIsListed() throws {
-        let d = try doc("""
-            <t:Message><t:ItemId Id="A"/><t:Body BodyType="Text">See the attached scan.</t:Body>
-            <t:Attachments><t:FileAttachment><t:AttachmentId Id="AT1"/><t:Name>scan.pdf</t:Name>
-            <t:ContentType>application/pdf</t:ContentType><t:ContentId>3A1F@apple</t:ContentId><t:Size>1234</t:Size>
-            <t:IsInline>true</t:IsInline></t:FileAttachment></t:Attachments></t:Message>
-            """)
-        let b = EWSBackend.parseBody(d.first("Message")!)
-        #expect(b.attachments.map(\.name) == ["scan.pdf"])
-    }
-
     // MARK: Randomized round-trips of every request builder (controls)
 
     struct RNG: RandomNumberGenerator {

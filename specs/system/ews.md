@@ -97,7 +97,10 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
 - **Body** (`parseBody`): `html` = `Body` when `BodyType="HTML"`. `text` = `TextBody` if present (even empty), else a
   rough plain text of the HTML (`plainText`: drop head/style/script, line breaks for `br` and closing block tags,
   strip tags, decode six entities, trim lines, drop empty ones), else the body. From/To/Cc from the full `Mailbox`es.
-- **Attachments** (`listedAttachments`): every child of `Attachments` with a `Name` and `IsInline` not "true";
+- **Attachments** (`listedAttachments`): every child of `Attachments` with a `Name` and `IsInline` not "true",
+  then those with `IsInline` "true" that aren't pictures (a `FileAttachment` whose `ContentType` starts `image/`, or is
+  generic and the `Name`'s extension is an image or unknown): only pictures are placed in the body, so any other
+  inline file would be invisible. They come last so positions in bodies stored before stay valid;
   `ItemAttachment` gets `.eml` appended and type `message/rfc822`; size from `Size`. Content: the first
   element under `m:Attachments` only: a `FileAttachment`'s own `Content`, or the `MimeContent` directly under an
   `ItemAttachment`'s item (never a nested attachment's), base64-decoded.
