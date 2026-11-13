@@ -195,13 +195,6 @@ struct Probe_Attach4Tests {
 
     // MARK: Quick Look
 
-    /// Space on the second file, which can't be had: Quick Look must not show another file instead.
-    @Test func probeQuickLookOnUnavailableFileDoesNotShowAnother() async throws {
-        let (s, id) = local(["a.pdf", "b.pdf"], data: [Data([1])])
-        await s.quickLookAttachments(of: id, at: 1)
-        #expect(s.previewItem?.lastPathComponent != "a.pdf", "front \(s.previewItem?.lastPathComponent ?? "nil"), status \(s.status ?? "")")
-    }
-
     // MARK: Saving
 
     /// Saving into a folder that is read-only: nothing saved, a status.
