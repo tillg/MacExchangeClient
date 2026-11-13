@@ -745,4 +745,17 @@ struct EWSParsingTests {
         let none = try doc(#"<t:Message><t:ItemId Id="ID2"/><t:Body BodyType="Text">x</t:Body></t:Message>"#)
         #expect(EWSBackend.parseBody(try #require(none.first("Message"))).replyTo == [])
     }
+
+    /// BUG-169: an email pasted with a blank is the account's address without it (own invites, MailTips, Reply All).
+    @MainActor @Test func addressPastedWithABlankIsStillTheAccountsAddress() throws {
+        let ex = ExchangeAccount(email: "me@work.com ", username: "W\\me", server: "mail.work.com")
+        let s = MailStore(accounts: [ex.account], messages: [])
+        var m = Message(accountID: ex.id, mailbox: .inbox, from: Contact(name: "Me", email: "me@work.com"), to: [],
+                        subject: "Planning", body: "", date: .now, remoteID: "R1", bodyLoaded: true)
+        m.invite = Invite(start: .now, end: .now.addingTimeInterval(1800))
+        s.merge([m], account: ex.id, mailbox: .inbox)
+        let id = s.messages.first { $0.remoteID == "R1" }!.id
+        #expect(!s.canAnswer(id), "own invitation answerable; account address is \"\(ex.account.address)\"")
+        #expect(EWSBackend.mailTipsRequest(from: ex.account.address).contains("<t:EmailAddress>me@work.com</t:EmailAddress>"))
+    }
 }

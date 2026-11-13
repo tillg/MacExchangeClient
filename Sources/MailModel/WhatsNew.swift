@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "An email address entered with a blank before or after it no longer makes your own invitations show Accept and Decline.",
             "Erasing an unread message from Trash no longer lets its sender know that it was deleted unread.",
             "Deleted appointments and tasks in Trash can now be erased; before, they came back with \"Exchange refused a change\".",
             "Opening a second viewer window (File ▸ New Viewer Window) no longer brings back mail you just erased or says a message being sent \"may already have been sent\".",

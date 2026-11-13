@@ -31,10 +31,11 @@ public struct ExchangeAccount: Codable, Hashable, Sendable {
         return url
     }
 
-    /// Named after its address, so two accounts can be told apart in the sidebar, titles and notices.
+    /// Named after its address, so two accounts can be told apart in the sidebar, titles and notices. The address
+    /// is the email without blanks around it (pasted), so comparisons with it work (BUG-169).
     public var account: Account {
         let address = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        return Account(id: id, name: address.isEmpty ? "Exchange" : address, address: email, isServer: true)
+        return Account(id: id, name: address.isEmpty ? "Exchange" : address, address: address, isServer: true)
     }
 
     /// A backend for this account, or nil if the server is invalid or no password is stored.
