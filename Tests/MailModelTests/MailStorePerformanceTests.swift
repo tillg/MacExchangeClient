@@ -220,4 +220,21 @@ struct MailStorePerformanceTests {
         #expect(s.messages.filter { ids.contains($0.id) }.allSatisfy { $0.flag == .red })
         #expect(t < 0.1)
     }
+
+    /// BUG-222: with conversations on, opening the next unread message marks it read without building the whole list
+    /// once more just to find its conversation (the redraw builds it anyway).
+    @Test func openingTheNextUnreadStaysFastWithConversations() {
+        let s = bigStore(times: 3)
+        s.groupsConversations = true
+        s.selectedMailbox = .account(work.id, .sent)
+        let unread = s.messages.filter { $0.mailbox == .sent && !$0.isRead }.suffix(2).map(\.id)
+        guard unread.count == 2 else { Issue.record("fixture has no two unread"); return }
+        s.selection = [unread[0]]; s.markSelectionRead(); _ = s.visibleMessages
+        let start = Date()
+        s.selection = [unread[1]]; s.markSelectionRead()
+        let t = Date().timeIntervalSince(start)
+        print(String(format: "PERF open next unread, grouped, 210k %.3fs", t))
+        #expect(s.message(unread[1])?.isRead == true)
+        #expect(t < 0.05)
+    }
 }

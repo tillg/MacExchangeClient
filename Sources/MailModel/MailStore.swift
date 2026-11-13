@@ -364,6 +364,18 @@ public final class MailStore {
         return all
     }
 
+    /// `withConversations` for marking opened mail read: the grouping already built for this list is used when only
+    /// the opened messages changed since, instead of building the whole list again just to find the conversation
+    /// (BUG-222: with conversations on, opening the next unread message built the list twice).
+    private func conversationsOfOpened(_ ids: Set<Message.ID>) -> Set<Message.ID> {
+        guard groupsConversations, let t = threadCache, t.revision == revision, t.key.grouped,
+              t.key.mailbox == selectedMailbox, t.key.filterUnread == filterUnread, normalizedSearch.isEmpty
+        else { return withConversations(ids) }
+        var all = ids
+        for id in ids { if let ms = t.members[t.rowOf[id] ?? id] { all.formUnion(ms.map(\.id)) } }
+        return all
+    }
+
     /// The selection as rows of the list: a selected message that a newer one of its conversation now stands for
     /// (a reply arrived) is shown as that row. Setting it selects the rows.
     public var listSelection: Set<Message.ID> {
@@ -743,7 +755,7 @@ public final class MailStore {
 
     public func markSelectionRead() {
         var opened: [Message.ID] = []
-        update(withConversations(selection)) { m in
+        update(conversationsOfOpened(selection)) { m in
             if !m.isRead { opened.append(m.id) }
             m.isRead = true
         }
