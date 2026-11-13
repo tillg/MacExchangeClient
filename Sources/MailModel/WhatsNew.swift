@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Toggle Flag on many selected messages in a large mailbox is instant again.",
             "The message list shows a date, not a weekday, for mail from exactly a week ago or dated in the future.",
             "Background pictures in Outlook mail (such as logos in signature tables) now show.",
             "Deleted appointments and tasks in Trash no longer count as unread, and flagging them no longer springs back.",

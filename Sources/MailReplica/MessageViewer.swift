@@ -192,8 +192,7 @@ struct FlagMenu: View {
         } label: {
             Label("Flag", systemImage: "flag")
         } primaryAction: {
-            let flagged = store.withConversations(store.selection).contains { store.message($0)?.flag != nil }
-            store.setFlag(flagged ? nil : .red, for: store.withConversations(store.selection))
+            store.toggleFlag(store.withConversations(store.selection))
         }
         .help("Flag selected messages")
     }

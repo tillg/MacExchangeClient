@@ -208,4 +208,16 @@ struct MailStorePerformanceTests {
         print(String(format: "PERF conversation after change in 210k %.3fs each", total / 5))
         #expect(total / 5 < 0.1)
     }
+
+    /// BUG-221: Toggle Flag on a selection decides flag vs. unflag in one pass, not one scan of all mail per message.
+    @Test func toggleFlagOnManyStaysFastAt210kMessages() {
+        let s = bigStore(times: 3)
+        let ids = Set(s.messages.suffix(140).map(\.id))  // mail late in memory: the slowest for a scan per message
+        let start = Date()
+        s.toggleFlag(ids)
+        let t = Date().timeIntervalSince(start)
+        print(String(format: "PERF toggle flag 140 of 210k %.3fs", t))
+        #expect(s.messages.filter { ids.contains($0.id) }.allSatisfy { $0.flag == .red })
+        #expect(t < 0.1)
+    }
 }

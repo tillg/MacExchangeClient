@@ -1866,4 +1866,14 @@ struct MailStoreTests {
         #expect(d.to.contains("tickets@x.com"))
         #expect(!s.addsNewRecipient(d), "the untouched reply counts as adding a recipient: To = \(d.to)")
     }
+
+    /// BUG-221: Toggle Flag clears the flags if any selected message is flagged, else flags them red.
+    @Test func toggleFlagClearsIfAnyIsFlaggedElseFlagsRed() {
+        let a = msg(work, subject: "a"), b = msg(work, subject: "b", flag: .blue)
+        let s = store([a, b])
+        s.toggleFlag([a.id, b.id])
+        #expect(s.message(a.id)?.flag == nil && s.message(b.id)?.flag == nil)
+        s.toggleFlag([a.id, b.id])
+        #expect(s.message(a.id)?.flag == .red && s.message(b.id)?.flag == .red)
+    }
 }

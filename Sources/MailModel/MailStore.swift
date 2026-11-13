@@ -688,6 +688,13 @@ public final class MailStore {
         keepingSelectionVisible(ids, selectNext: false) { update(ids) { $0.flag = c } }
     }
 
+    /// Toggle Flag: clears the flags if any of `ids` is flagged, else flags them red. One pass over the messages
+    /// (BUG-221: one scan of all mail per selected message froze the window).
+    public func toggleFlag(_ ids: Set<Message.ID>) {
+        let anyFlagged = messages.contains { $0.flag != nil && ids.contains($0.id) }
+        setFlag(anyFlagged ? nil : .red, for: ids)
+    }
+
     public func toggleRead(_ ids: Set<Message.ID>) {
         let anyUnread = messages.contains { ids.contains($0.id) && !$0.isRead }
         keepingSelectionVisible(ids, selectNext: false) { update(ids) { $0.isRead = anyUnread } }

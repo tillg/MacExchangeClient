@@ -66,10 +66,7 @@ struct MailCommands: Commands {
             Divider()
             Button("Mark as Read/Unread") { store.toggleRead(store.withConversations(store.selection)) }
                 .keyboardShortcut("u", modifiers: [.command, .shift]).disabled(!hasSelection)
-            Button("Toggle Flag") {
-                let flagged = store.withConversations(store.selection).contains { store.message($0)?.flag != nil }
-                store.setFlag(flagged ? nil : .red, for: store.withConversations(store.selection))
-            }
+            Button("Toggle Flag") { store.toggleFlag(store.withConversations(store.selection)) }
             .keyboardShortcut("l", modifiers: [.command, .shift]).disabled(!hasSelection)
             Menu("Flag") {
                 ForEach(FlagColor.allCases, id: \.self) { c in Button(c.title) { store.setFlag(c, for: store.withConversations(store.selection)) } }
