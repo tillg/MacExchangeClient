@@ -392,8 +392,8 @@ struct MailStoreRaceTests {
 
     // MARK: A Quick Look that finishes after a newer one (BUG-147)
 
-    /// Quick Look on A, whose file is still downloading, then on B (already here): when A's file arrives, the panel
-    /// stays on B's.
+    /// Quick Look on A, whose file is still on its way, then on B (already here): when A's request ends, the panel
+    /// stays on B's file. (A's request fails here: one answer on the pipe, so no two answers can run together.)
     @Test func aLateQuickLookDoesNotReplaceANewerOne() async throws {
         let server = RaceServer([], hold: true)
         defer { server.stop() }
@@ -413,15 +413,11 @@ struct MailStoreRaceTests {
         try await Task.sleep(for: .milliseconds(300))  // A's GetItem is out
         await s.quickLookAttachments(of: b.id)
         #expect(s.previewItem?.lastPathComponent == "b.txt")
-        try await serve(server, [
-            RX.getItem("<t:Message><t:ItemId Id=\"R1\" ChangeKey=\"CK\"/><t:Attachments><t:FileAttachment>"
-                + "<t:AttachmentId Id=\"AT-PDF\"/><t:Name>a.pdf</t:Name><t:ContentType>application/pdf</t:ContentType>"
-                + "<t:Size>7</t:Size><t:IsInline>false</t:IsInline></t:FileAttachment></t:Attachments></t:Message>"),
-            RX.resp("GetAttachment", RX.ok("GetAttachment", "<m:Attachments><t:FileAttachment><t:AttachmentId Id=\"AT-PDF\"/>"
-                + "<t:Name>a.pdf</t:Name><t:Content>\(Data("PDFDATA".utf8).base64EncodedString())</t:Content></t:FileAttachment></m:Attachments>"))])
+        try await serve(server, [RX.fault("ErrorItemNotFound", "The item was deleted.")])
         await t.value
-        try #require(s.status == nil, "A's download failed: \(s.status ?? "")")
-        #expect(s.previewItem?.lastPathComponent == "b.txt", "previewItems \(s.previewItems.map(\.lastPathComponent))")
+        #expect(server.served == 1)
+        #expect(s.previewItem?.lastPathComponent == "b.txt" && s.previewItems.map(\.lastPathComponent) == ["b.txt"],
+                "previewItems \(s.previewItems.map(\.lastPathComponent))")
     }
 }
 }
