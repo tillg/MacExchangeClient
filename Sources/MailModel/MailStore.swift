@@ -107,6 +107,13 @@ public final class MailStore {
     /// Server deletions of messages whose move was still queued, by account. They are held, not applied, because the
     /// move itself makes the source folder report them; if the move then fails, the deletion was real and is applied.
     @ObservationIgnored private var deletedWhileMoving: [UUID: Set<String>] = [:]
+    /// Counts the changes written to the server. A server answer notes it when it is requested (`requestStamp`).
+    @ObservationIgnored private(set) var requestStamp = 0
+    /// When each property of a server message was last written (`requestStamp` after the write), by account and
+    /// server ID. An answer requested before that doesn't undo it; one requested before an erase or a move (whose
+    /// old ID is gone on the server) doesn't bring the old ID back. In memory only.
+    @ObservationIgnored private var written: [UUID: [String: Written]] = [:]
+    private struct Written { var read = 0, flag = 0, mailbox = 0 }
     /// Writes the changes to disk and returns once they are written; called before a send goes out, so its
     /// `inFlight` mark is saved first. Nil with sample data and in tests that don't save.
     @ObservationIgnored public var saveBeforeSending: (() async -> Void)?
@@ -637,9 +644,10 @@ public final class MailStore {
 
     /// Merges one page of a folder sync and moves that folder's sync position on.
     /// The last page (`more == false`) completes the folder: later checks then only fetch changes.
-    public func apply(_ r: SyncResult, account: UUID, mailbox: MailboxKind) {
+    /// `asked`: the `requestStamp` when the page was requested; changes written since then keep their value.
+    public func apply(_ r: SyncResult, account: UUID, mailbox: MailboxKind, asked: Int? = nil) {
         startPassIfFromScratch(account, mailbox)
-        merge(r.upserts, deleted: r.deletedRemoteIDs, reads: r.readChanges, account: account, mailbox: mailbox)
+        merge(r.upserts, deleted: r.deletedRemoteIDs, reads: r.readChanges, account: account, mailbox: mailbox, asked: asked)
         listed(r.upserts.compactMap(\.remoteID) + r.readChanges.keys, account, mailbox, complete: !r.more)
         syncTokens[key(account, mailbox)] = r.token
         if !r.more { complete.insert(key(account, mailbox)) }
@@ -647,7 +655,7 @@ public final class MailStore {
 
     /// Applies several pages of one folder in one merge, as if one after the other. Each merge goes over every
     /// message, so a batch of history pages costs one pass instead of one per page.
-    public func apply(_ pages: [SyncResult], account: UUID, mailbox: MailboxKind) {
+    public func apply(_ pages: [SyncResult], account: UUID, mailbox: MailboxKind, asked: Int? = nil) {
         guard let last = pages.last else { return }
         startPassIfFromScratch(account, mailbox)
         var upserts: [Message] = [], slot: [String: Int] = [:], deleted = Set<String>(), reads: [String: Bool] = [:]
@@ -667,7 +675,7 @@ public final class MailStore {
             }
         }
         merge(slot.sorted { $0.value < $1.value }.map { upserts[$0.value] }, deleted: Array(deleted), reads: reads,
-              account: account, mailbox: mailbox)
+              account: account, mailbox: mailbox, asked: asked)
         listed(pages.flatMap { $0.upserts.compactMap(\.remoteID) + $0.readChanges.keys }, account, mailbox,
                complete: !last.more)
         syncTokens[key(account, mailbox)] = last.token
@@ -733,20 +741,33 @@ public final class MailStore {
     /// waiting for the server keeps the property that change sets (read state, flag or mailbox), and takes the
     /// server's word for the others.
     public func merge(_ upserts: [Message], deleted: [String] = [], reads: [String: Bool] = [:],
-                      account: UUID, mailbox: MailboxKind) {
-        merge([(mailbox, upserts)], deleted: deleted, reads: reads, account: account)
+                      account: UUID, mailbox: MailboxKind, asked: Int? = nil) {
+        merge([(mailbox, upserts)], deleted: deleted, reads: reads, account: account, asked: asked)
     }
 
     /// The same for several mailboxes in one pass over all messages, e.g. the newest messages of each folder.
     /// When nothing changes, `messages` isn't touched: assigning it redraws every view.
     public func merge(_ groups: [(MailboxKind, [Message])], deleted: [String] = [], reads: [String: Bool] = [:],
-                      account: UUID) {
+                      account: UUID, asked: Int? = nil) {
         serverAccounts.insert(account)
         guard groups.contains(where: { !$0.1.isEmpty }) || !deleted.isEmpty || !reads.isEmpty else { return }
         let mine = outbox.lazy.filter { $0.account == account }
         // Each queued change keeps only the property it changes; the server's word stands for the others.
         var guarded: [String: Guarded] = [:]
         for p in mine { for rid in p.change.remoteIDs { guarded[rid, default: []].formUnion(Guarded(p.change)) } }
+        // So does a change written after this answer was requested: the answer is older than it.
+        if let asked, let w = written[account] {
+            var rids = Set(reads.keys)
+            for (_, ups) in groups { for m in ups { if let r = m.remoteID { rids.insert(r) } } }
+            for rid in rids {
+                guard let t = w[rid] else { continue }
+                var g: Guarded = []
+                if t.read > asked { g.insert(.read) }
+                if t.flag > asked { g.insert(.flag) }
+                if t.mailbox > asked { g.insert(.mailbox) }
+                if !g.isEmpty { guarded[rid, default: []].formUnion(g) }
+            }
+        }
         // A pending move makes the source folder report the message as deleted; that one stays.
         // Any other deletion (done elsewhere) wins over a pending read or flag change.
         let moving = Set<String>(mine.flatMap { (p: PendingChange) -> [String] in
@@ -798,8 +819,8 @@ public final class MailStore {
                     guard m != old else { continue }
                     ms[i] = m
                 } else if let rid = m.remoteID, guarded[rid] != nil {
-                    // Gone here with a change still queued (erased, or moved and erased): a page fetched before
-                    // that change reached the server doesn't bring it back.
+                    // Gone here with a change still queued, or written since this answer was requested (erased, or
+                    // moved: Exchange gave it a new ID): an answer from before that change doesn't bring it back.
                     continue
                 } else {
                     ms.append(m)
@@ -1114,6 +1135,7 @@ public final class MailStore {
                     throw e.error
                 }
                 outbox.removeAll { $0.id == p.id }
+                noteWritten(p.change, p.change.remoteIDs, account: p.account)
                 // The move went through: the deletions its source reported were its own.
                 if case let .move(ids, _) = p.change { deletedWhileMoving[p.account]?.subtract(ids) }
             } catch where pauseIfSignInFailed(error, account: p.account) {
@@ -1139,6 +1161,7 @@ public final class MailStore {
                 // The other items changed on the server: they keep the change (and moved ones their new IDs).
                 renameRemote(e.moved, account: p.account)
                 deletedWhileMoving[p.account]?.subtract(e.moved.keys)
+                noteWritten(p.change, p.change.remoteIDs.filter { e.refused[$0] == nil }, account: p.account)
                 var refused = p
                 // `previous` follows the change's IDs in order; matched by position, as an earlier move renames the IDs.
                 refused.previous = zip(p.change.remoteIDs, p.previous.filter { $0.remoteID != nil })
@@ -1149,6 +1172,22 @@ public final class MailStore {
             }
         }
         prune()
+    }
+
+    /// A change reached the server: answers requested before now don't undo it (`written`).
+    private func noteWritten(_ c: ServerChange, _ ids: [String], account: UUID) {
+        let g = Guarded(c)
+        guard !g.isEmpty, !ids.isEmpty else { return }
+        requestStamp += 1
+        var w = written[account] ?? [:]
+        for rid in ids {
+            var t = w[rid] ?? Written()
+            if g.contains(.read) { t.read = requestStamp }
+            if g.contains(.flag) { t.flag = requestStamp }
+            if g.contains(.mailbox) { t.mailbox = requestStamp }
+            w[rid] = t
+        }
+        written[account] = w
     }
 
     private func connectionNotice(_ text: String, account acct: UUID) {
@@ -1472,15 +1511,18 @@ public final class MailStore {
                         do {
                             var more = true
                             while more {
+                                let asked = requestStamp
                                 let r = try await backend.sync(folder, token: syncToken(acct, role))
-                                apply(r, account: acct, mailbox: role)
+                                apply(r, account: acct, mailbox: role, asked: asked)
                                 more = r.more
                             }
                         } catch is SyncTokenRejected {
                             resetSync(acct, role)
                         }
                     } else {
-                        merge(try await backend.newest(in: folder, limit: Self.firstScreen), account: acct, mailbox: role)
+                        let asked = requestStamp
+                        let newest = try await backend.newest(in: folder, limit: Self.firstScreen)
+                        merge(newest, account: acct, mailbox: role, asked: asked)
                     }
                 }
                 // Only this account's own connection notice goes; another account's or "Couldn't send" stays.
@@ -1548,10 +1590,11 @@ public final class MailStore {
         var unreachable = Set<UUID>()
         for (acct, backend) in backends where !paused.contains(acct) {
             var fetched: [(MailboxKind, [Message])] = [], since = ContinuousClock.now
+            var asked = requestStamp  // when the batch's first answer was requested
             func show() {
-                merge(fetched, account: acct)
+                merge(fetched, account: acct, asked: asked)
                 for (role, _) in fetched { newestLoaded.insert(key(acct, role)) }
-                fetched = []; since = .now
+                fetched = []; since = .now; asked = requestStamp
             }
             for role in historyOrder(acct, (remoteFolders[acct] ?? []).map(\.role))
             where !isComplete(acct, role) && !historyFailed.contains(key(acct, role)) && !newestLoaded.contains(key(acct, role)) {
@@ -1570,8 +1613,9 @@ public final class MailStore {
         while let (acct, backend, folder) = nextHistoryFolder(skipping: unreachable) {
             showHistoryProgress(acct)
             var pages: [SyncResult] = []
+            let asked = requestStamp
             // Whatever arrived is shown, also when a page fails; in one merge.
-            defer { apply(pages, account: acct, mailbox: folder.role) }
+            defer { apply(pages, account: acct, mailbox: folder.role, asked: asked) }
             do {
                 var token = syncToken(acct, folder.role)
                 let start = ContinuousClock.now
@@ -1602,8 +1646,9 @@ public final class MailStore {
                 do {
                     var more = true
                     while more {
+                        let asked = requestStamp
                         let r = try await backend.sync(folder, token: syncToken(acct, role))
-                        apply(r, account: acct, mailbox: role)
+                        apply(r, account: acct, mailbox: role, asked: asked)
                         more = r.more
                     }
                 } catch is SyncTokenRejected {

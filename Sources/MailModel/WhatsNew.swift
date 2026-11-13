@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "A check for new mail that crosses paths with your change no longer undoes it: a moved message doesn't come back to its old mailbox, a flag keeps its colour, and a message you read stays read.",
             "When the server refuses changes to many messages at once, the app no longer stops responding for a moment while it puts them back.",
             "Attachments that come without a name are listed as \"Attachment\", and an attached message without a subject saves as a file you can see in the Finder.",
             "When a folder is deleted on the server, its mail no longer lingers in Flagged and search results here, and a window showing that folder switches to the Inbox.",
