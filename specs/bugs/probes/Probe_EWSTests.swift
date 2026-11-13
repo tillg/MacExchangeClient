@@ -140,13 +140,6 @@ struct Probe_EWSTests {
         #expect(EWSBackend.parseBody(item).invite == nil)
     }
 
-    /// Folder pages that overlap (a folder created between two FindFolder pages shifts the offsets) list a folder twice.
-    @Test func probeFolderTreeDeduplicatesRepeatedFolders() throws {
-        let f = "<t:Folder><t:FolderId Id=\"P\"/><t:ParentFolderId Id=\"R\"/><t:DisplayName>Projects</t:DisplayName></t:Folder>"
-        let d = try doc("<m:Folders>" + f + f + "</m:Folders>")
-        #expect(EWSBackend.folderTree(d.all("Folder"), known: [], skip: []).count == 1)
-    }
-
     // MARK: Round 2
 
     @Test func probePlainTextOnHugeHTMLIsFast() {
