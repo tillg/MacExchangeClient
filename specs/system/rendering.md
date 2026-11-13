@@ -23,7 +23,9 @@ How message text is shown, and how the text of sent mail is built. Code: `Source
 
 ## The HTML page (`HTMLPage.document`)
 
-- The message's HTML is wrapped, not parsed: a `Content-Security-Policy` meta tag first, `color-scheme: light`, a
+- The message's HTML is wrapped, not parsed: the HTML 4.01 Transitional doctype with its URL (`HTMLPage.doctype`, almost-standards
+  mode: tables inherit the 14 px, a picture alone in a table cell gets no gap under it; the mail's own doctype lands
+  inside the page and is ignored), a `Content-Security-Policy` meta tag, `color-scheme: light`, a
   style block (`14px Helvetica`, margins 18/20/22 px, word breaking; no background or text colour, as in Mail's
   MUIWebDocument.css, so the mail's `<body bgcolor text>` apply, and otherwise the light colour scheme gives a white
   page with black text), then

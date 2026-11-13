@@ -126,24 +126,6 @@ struct Probe_Model2Tests {
         #expect(hits.isEmpty, "\(hits)")
     }
 
-    /// The sender's doctype is lost inside our wrapper, so every mail renders in quirks mode: tables then don't
-    /// inherit the 14 px default (WebKit's quirks sheet resets table font-size to medium = 16 px).
-    @Test func tableTextGetsTheDefaultFontSizeInAStandardsModeMail() async throws {
-        let mail = "<!DOCTYPE html><html><body><table><tr><td id=c>Kind regards</td></tr></table></body></html>"
-        let r = await Render.eval(HTMLPage.document(mail, allowRemote: false),
-                                  "document.compatMode + '|' + getComputedStyle(document.getElementById('c')).fontSize")
-        try #require(r != nil)
-        #expect(r as? String == "CSS1Compat|14px", "\(String(describing: r))")
-    }
-
-    @Test func tableTextGetsTheDefaultFontSizeInAnUnstyledMail() async throws {
-        let mail = "<p id=p>Hi,</p><table><tr><td id=c>Kind regards<br>Ann</td></tr></table>"
-        let r = await Render.eval(HTMLPage.document(mail, allowRemote: false),
-                                  "getComputedStyle(document.getElementById('p')).fontSize + '|' + getComputedStyle(document.getElementById('c')).fontSize")
-        try #require(r != nil)
-        #expect(r as? String == "14px|14px", "paragraph|table cell = \(String(describing: r))")
-    }
-
     // MARK: DayLayout properties
 
     struct SplitMix: RandomNumberGenerator {

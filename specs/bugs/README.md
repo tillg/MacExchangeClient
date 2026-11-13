@@ -29,7 +29,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [062](BUG-062-archive-role-given-to-nested-or-deleted-folder.md) | P3 | EWS | Without a top-level Archive, any folder named "Archive" becomes the Archive mailbox, even one inside Deleted Items or deep in Inbox |
 | [063](BUG-063-inline-flagged-attachment-without-reference-invisible.md) | P3 | EWS | An attachment Exchange flags IsInline that the body doesn't show (text mail, no cid: reference) is neither listed nor shown: it can't be seen or saved |
 | [064](BUG-064-stray-closing-div-cuts-off-html-mail.md) | P3 | HTMLPage | A stray </div> in an HTML mail closes the measured wrapper, so the rest of the message is cut off |
-| [066](BUG-066-quirks-mode-table-text-16px.md) | P3 | HTMLPage | Every HTML mail renders in quirks mode, so text in tables is 16 px instead of Mail's 14 px default |
 | [067](BUG-067-slash-o-local-part-counts-as-organisation.md) | P3 | HTMLPage | An outside sender whose address starts with "/o=" counts as "my organisation", so remote images load and tell the sender the mail was opened |
 | [068](BUG-068-reply-forward-of-unopened-exchange-message-uses-summary.md) | P3 | MailStore | Reply / Reply All / Forward on an Exchange message that hasn't been opened yet: empty To, 'Ann Lee <>' attribution, nothing quoted, wrong When-Adding-Recipients answer |
 | [069](BUG-069-invite-answer-for-vanished-invite-silently-dropped.md) | P3 | Invite | Respond with Comments: if the invite is gone by the time you press Send, the answer and comment vanish without a word |

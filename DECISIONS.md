@@ -443,3 +443,11 @@ edited: 2026-11-13
 - **Why:** README: offline, changes wait; refused changes are undone. Throttling and a gateway page are neither a refusal.
 - **Alternatives:** Requeue a send on a clean `ErrorServerBusy` fault (rejected for now: one rule is simpler, and Drafts keeps the message). Retry by itself after the back-off (rejected: the next refresh does it).
 - **Not covered:** An unreadable answer that keeps coming (a wrong server URL answering with a web page) keeps changes queued for every refresh, like an unreachable server.
+
+## 01:59 — Mail renders in almost-standards mode {#d-bug-066}
+
+- **Status:** decided
+- **Context:** BUG-066. The page had no doctype and the mail's own one lands inside our wrapper, where the parser ignores it, so every mail was in quirks mode: WebKit's quirks sheet resets tables to 16 px, so signatures and Outlook layouts showed larger than the text around them.
+- **Decision:** `HTMLPage.document` starts with `<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">`, which gives almost-standards (limited-quirks) mode for every mail (`compatMode` reports `CSS1Compat`).
+- **Why:** Tables inherit the 14 px default as in standards mode, while a picture alone in a table cell gets no baseline gap under it (checked: 12 px cell for a 10 px picture with `<!DOCTYPE html>`, 10 px with this one); newsletters built from sliced pictures in table cells rely on that. The sample newsletter looks the same before and after, except that its button text inherits the table's 14 px.
+- **Alternatives:** `<!DOCTYPE html>` (rejected: gaps under pictures in cells). Keep quirks mode and add `table { font-size: inherit }` (rejected: the other quirks, such as percentage heights against the window, stay; see BUG-110). Use the mail's own doctype (rejected: mail without one, most Outlook mail, would keep 16 px tables).
