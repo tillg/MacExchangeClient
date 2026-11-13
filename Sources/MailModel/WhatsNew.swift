@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "A conversation with a sender whose name is just a comma no longer makes the app quit; the sender's address is shown instead.",
             "The window responds faster in an account with many folders: the sidebar and the Move menu no longer slow down every click.",
             "A conversation is now one row in the message list, with a blue number showing how many messages it holds, as in Apple Mail. Deleting, moving or flagging the row does it to all of them.",
             "PDF attachments are now shown in the message, every page, as pictures already were. Control-click one to show it as an icon instead.",

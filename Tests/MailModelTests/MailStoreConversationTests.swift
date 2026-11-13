@@ -141,4 +141,13 @@ struct MailStoreConversationTests {
         #expect(ConversationRow.senders(names.prefix(3)) == "Jan & Sergio")
         #expect(ConversationRow.senders(names) == "Jan, Sergio, Till & bob@x.com")
     }
+
+    /// BUG-156: a display name made only of commas ("Last, First" with both empty) crashed the row; it shows the address.
+    @Test func commaOnlySenderNameShowsTheAddress() async {
+        await #expect(processExitsWith: .success) {
+            let names = [Contact(name: ", ", email: "a@x.com"), Contact(name: ",", email: "c@x.com"),
+                         Contact(name: "Bob Ray", email: "b@x.com")]
+            guard ConversationRow.senders(names) == "a@x.com, c@x.com & Bob" else { exit(1) }
+        }
+    }
 }

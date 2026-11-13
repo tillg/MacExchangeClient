@@ -510,7 +510,8 @@ public struct ConversationRow: Equatable, Sendable {
     static func senders<C: Collection>(_ contacts: C) -> String where C.Element == Contact {
         var names: [String] = [], fullName: String?
         for c in contacts {
-            let full = c.name.trimmingCharacters(in: .whitespaces)
+            // A name of only commas and blanks ("Last, First" with both empty) counts as no name (BUG-156).
+            let full = c.name.trimmingCharacters(in: .whitespaces.union(CharacterSet(charactersIn: ",")))
             let first = full.isEmpty ? c.email
                 : full.contains(",") ? String(full.split(separator: ",").last!).trimmingCharacters(in: .whitespaces)
                 : String(full.split(separator: " ").first!)
