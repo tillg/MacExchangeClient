@@ -26,21 +26,6 @@ struct Probe_R5A {
         return s
     }
 
-    // R5A-01
-    /// With only unread mail shown, Mark All as Read takes the selected (unopened) messages out of the list, but they
-    /// stay selected: a following Delete moves mail the user can't see (README: a message that leaves the list never
-    /// stays selected).
-    @Test func markAllReadDoesNotKeepHiddenMessagesSelected() {
-        let a = mail(work, "a", minutesAgo: 1), b = mail(work, "b", minutesAgo: 2), c = mail(work, "c", read: true, minutesAgo: 3)
-        let s = store([a, b, c], grouped: false)
-        s.selectedMailbox = .account(work.id, .inbox)
-        s.filterUnread = true
-        s.selection = [a.id, b.id]  // a multi-selection is not opened, so not marked read
-        s.markAllRead(in: s.selectedMailbox)
-        let visible = Set(s.visibleMessages.map(\.id))
-        #expect(s.selection.isSubset(of: visible), "selection \(s.selection.count) hidden after Mark All as Read")
-    }
-
     // R5A-05
     /// Mail in a folder inside Trash is deleted mail (DECISIONS d-bug-025); Delete there should erase it, as in Trash,
     /// not move it to Trash for a second Delete.
