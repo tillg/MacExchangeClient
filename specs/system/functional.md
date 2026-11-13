@@ -25,7 +25,7 @@ that change these rules: [../bugs/README.md](../bugs/README.md).
 - Smart mailbox rules (`contains`): All Inboxes = mailbox is `.inbox` (subfolders of Inbox don't count); VIPs = VIP
   and in Inbox; Flagged = any flag and not in `.trash` or a folder inside it (any depth: Exchange keeps deleted folders in Deleted Items); Unread = unread and in Inbox.
 - Selecting a mailbox clears the selection and runs a quick check. ⌘1–⌘9 go to All Inboxes, VIPs, Flagged, then each
-  account's Inbox. Right-click a mailbox: Mark All Messages as Read.
+  account's Inbox (`MailStore.favoriteMailboxes`; favourites after the ninth are listed without a key). Right-click a mailbox: Mark All Messages as Read.
 - While syncing, the sidebar bottom shows a progress bar with "Loading Mail…", "Updating Mail Storage…" or
   "Synchronizing “Exchange”".
 

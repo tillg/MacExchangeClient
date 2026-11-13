@@ -37,7 +37,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [180](BUG-180-header-date-wraps.md) | P4 | UI / MessageDetailView | Message header: the date breaks onto two lines in a narrow message pane |
 | [181](BUG-181-invite-text-squeezed.md) | P4 | UI / InviteView | Invite: the fixed 300 pt day column squeezes the message text to a few words per line |
 | [182](BUG-182-junk-button-label-in-junk.md) | P4 | UI / MessageViewer, MailCommands, MessageListView | Junk button, menu and context menu keep saying "Junk" / "Move to Junk" in the Junk mailbox, where they move mail to the Inbox |
-| [183](BUG-183-mailbox-menu-crash-7-accounts.md) | P2 | UI / MailCommands | With 7 or more accounts the app crashes building the Mailbox menu (⌘10 shortcut) |
 | [184](BUG-184-new-viewer-window-mirrors.md) | P3 | UI / MessageViewer | File ▸ New Viewer Window opens a second window that always shows the same mailbox and selection as the first |
 | [185](BUG-185-flagged-badge-unread.md) | P4 | UI / SidebarView | Flagged in the sidebar shows no count while flagged messages are read |
 | [186](BUG-186-reply-ignores-reply-to.md) | P2 | compose / EWS body | Reply and Reply All ignore the sender's Reply-To and go to From (e.g. noreply@) |
