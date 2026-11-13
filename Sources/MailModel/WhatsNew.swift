@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "Quoted text in replies from Apple Mail and iPhone shows with Mail's coloured bar on the left, so you can tell it from the new text.",
             "Senders outside your organisation can no longer pass as colleagues with a specially made address, so their pictures from the internet stay blocked until you allow them.",
             "When one account's server can't be reached, your other accounts still load all their older mail and stay up to date.",
             "When Exchange is busy or briefly unavailable, your changes (read, flags, moves, deletions) wait and go out later instead of being undone.",

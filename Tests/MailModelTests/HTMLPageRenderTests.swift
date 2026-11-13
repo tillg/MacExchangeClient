@@ -55,6 +55,21 @@ struct HTMLPageRenderTests {
         #expect(await eval(HTMLPage.document(mail, allowRemote: false), "document.getElementById('t').getBoundingClientRect().height") == "10")
     }
 
+    /// Apple Mail quotes as `<blockquote type="cite">`; Mail draws it with its quote bar (MUIWebDocument.css):
+    /// no margin, 8 px padding, a 2 px bar on the left, another colour for each of three levels.
+    @Test func appleMailQuoteHasMailsQuoteBar() async {
+        let mail = """
+            <div dir="ltr">Sounds good.</div><div><br><blockquote type="cite" id="q1"><div>On 12 Nov 2026, at 09:14, Ann Lee &lt;ann@example.com&gt; wrote:</div><br><div>Shall we meet at 10?</div>\
+            <blockquote type="cite" id="q2">Earlier<blockquote type="cite" id="q3">Even earlier</blockquote></blockquote></blockquote></div>
+            """
+        let r = await eval(HTMLPage.document(mail, allowRemote: false), """
+            ['q1','q2','q3'].map(id => (s => [s.borderLeftWidth, s.borderLeftStyle, s.marginLeft, s.marginRight, s.paddingLeft, s.borderLeftColor].join(' '))(getComputedStyle(document.getElementById(id)))).join('|')
+            """)
+        let levels = r.split(separator: "|").map { $0.split(separator: " ", maxSplits: 5).map(String.init) }
+        #expect(levels.count == 3 && levels.allSatisfy { Array($0.prefix(5)) == ["2px", "solid", "0px", "0px", "8px"] }, "\(r)")
+        #expect(Set(levels.compactMap { $0.last }).count == 3, "each level has its own colour: \(r)")
+    }
+
     nonisolated static let blockedVectors: [String] = [
         #"<link rel="preconnect" href="BASE/preconnect">"#,
         "<link/\u{301} rel=preconnect href=BASE/preconnect-mark>",

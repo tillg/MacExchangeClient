@@ -9,6 +9,10 @@ public enum HTMLPage {
     /// gap under it, which newsletters built from sliced pictures rely on.
     static let doctype = #"<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">"#
 
+    /// Bar and text colour of Apple Mail quotes (`<blockquote type="cite">`), levels 1 to 3. Mail fills these in at
+    /// run time; the values are recalled from Mail's "Color quoted text" defaults (blue, green, purple), not read.
+    static let quoteColours = ["rgb(0, 64, 214)", "rgb(0, 128, 64)", "rgb(128, 0, 160)"]
+
     /// The element whose height is the message's height.
     public static let bodyID = "mail-replica-body"
 
@@ -34,6 +38,9 @@ public enum HTMLPage {
             html { font: 14px Helvetica; }
             body { margin: 18px 20px 22px; padding: 0; word-wrap: break-word; word-break: break-word; }
             table { word-break: normal; }
+            blockquote[type=cite] { padding-left: 8px; margin: 0; border-left: 2px solid \(quoteColours[0]); color: \(quoteColours[0]); }
+            blockquote[type=cite] blockquote[type=cite] { border-left-color: \(quoteColours[1]); color: \(quoteColours[1]); }
+            blockquote[type=cite] blockquote[type=cite] blockquote[type=cite] { border-left-color: \(quoteColours[2]); color: \(quoteColours[2]); }
             img[src^="cid:"] { display: none; }
             \(blocked)
             #\(bodyID) { display: flow-root; }
