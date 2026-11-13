@@ -17,7 +17,8 @@ public struct ExchangeAccount: Codable, Hashable, Sendable {
 
     /// The server field as typed or pasted: a host (with port), or a URL. Blanks and line breaks around it, a
     /// trailing `/` and the standard `/EWS/Exchange.asmx` are dropped; `http://` is upgraded to https, since the
-    /// password must not travel in clear text. A path ending in `.asmx` is used as given. Nil for a blank field.
+    /// password must not travel in clear text. A path ending in `.asmx` is used as given. Nil for a blank field, and
+    /// for one with a user name or password in it.
     public var ewsURL: URL? {
         var s = server.trimmingCharacters(in: .whitespacesAndNewlines)
         for scheme in ["https://", "http://"] where s.lowercased().hasPrefix(scheme) { s.removeFirst(scheme.count) }
@@ -27,7 +28,9 @@ public struct ExchangeAccount: Codable, Hashable, Sendable {
         while s.hasSuffix("/") { s.removeLast() }
         guard !s.isEmpty, !s.hasPrefix("/"), s.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { return nil }
         let path = s.lowercased().hasSuffix(".asmx") && s.contains("/") ? "" : standard
-        guard let url = URL(string: "https://\(s)\(path)"), url.host?.isEmpty == false else { return nil }
+        // A user or password in the field ("me:pw@host") makes it invalid, so it is never saved (BUG-245).
+        guard let url = URL(string: "https://\(s)\(path)"), url.host?.isEmpty == false, url.user == nil,
+              url.password == nil else { return nil }
         return url
     }
 

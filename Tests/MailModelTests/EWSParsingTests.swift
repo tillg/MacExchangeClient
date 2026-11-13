@@ -774,4 +774,12 @@ struct EWSParsingTests {
         #expect(b.keychainAccounts == ["W\\me@mail.club.org", "W\\me"])
         #expect(ExchangeAccount(email: "", username: "u", server: "").keychainAccounts == ["u"])
     }
+
+    /// BUG-245: a password pasted in the server field ("https://me:pw@host") makes it invalid, so it is never saved
+    /// in the settings or shown in Settings ▸ Accounts.
+    @Test func serverWithCredentialsIsInvalid() {
+        #expect(ExchangeAccount(email: "", username: "", server: "https://me:Secret123@mail.example.com").ewsURL == nil)
+        #expect(ExchangeAccount(email: "", username: "", server: "me@mail.example.com").ewsURL == nil)
+        #expect(ExchangeAccount(email: "", username: "", server: "mail.example.com").ewsURL != nil)
+    }
 }

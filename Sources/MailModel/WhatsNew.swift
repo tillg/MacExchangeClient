@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "A server address with a user name or password in it is refused, so a password can't end up saved in plain text.",
             "Two accounts with the same user name on different servers now keep their own passwords.",
             "A recipient written with an empty address, like \"Bob <>\", is left out instead of making the whole message fail to send.",
             "After signing in again with the right password, the \"Sign-in failed\" notice goes away once mail has been checked.",
