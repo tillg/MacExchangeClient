@@ -279,6 +279,15 @@ struct MailStoreTests {
         #expect(s.messages.first { $0.mailbox == .sent }?.subject == "(No Subject)")
     }
 
+    @Test func replyAllSkipsRecipientsWithoutAddress() {
+        var m = msg(work, from: "Ann")
+        m.to = [Contact(name: "Me", email: work.address), Contact(name: "Undisclosed recipients", email: "")]
+        m.cc = [Contact(name: "Group", email: "")]
+        let s = store([m])
+        let d = s.draft(.replyAll, to: m.id)
+        #expect(d.to == "ann@x.com" && d.cc == "", "to: \(d.to.debugDescription), cc: \(d.cc.debugDescription)")
+    }
+
     @Test func replyDraftQuotesOriginal() {
         let m = msg(work, subject: "Plans", from: "Ann")
         let s = store([m])

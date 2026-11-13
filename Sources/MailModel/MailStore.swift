@@ -1747,10 +1747,11 @@ public final class MailStore {
         let header = kind == .forward
             ? "\n\nBegin forwarded message:\n\nFrom: \(sender)\nSubject: \(m.subject)\nDate: \(df.string(from: m.date))\n\n"
             : "\n\nOn \(df.string(from: m.date)), \(sender) wrote:\n\n"
-        // Each address once, whatever its case, and never my own; the first occurrence is kept.
+        // Each address once, whatever its case, and never my own; the first occurrence is kept. A recipient
+        // without an address ("Undisclosed recipients") is left out.
         var seen: Set<String> = me.map { [$0.lowercased()] } ?? []
         func addresses(_ cs: [Contact]) -> String {
-            cs.map(\.email).filter { seen.insert($0.lowercased()).inserted }.joined(separator: ", ")
+            cs.map(\.email).filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }.joined(separator: ", ")
         }
         var to = "", cc = ""
         switch kind {
