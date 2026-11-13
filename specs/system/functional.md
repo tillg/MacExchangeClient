@@ -119,7 +119,8 @@ Trash dropped on Flagged), are left out; when that leaves none, `drop` returns f
   while they load. All or none: if the original can't be loaded or one of its files can't be had, nothing is added,
   `loadingOriginal` stays set (Send and Save stay blocked), the status names the files, and the window shows "The
   original attachments couldn't be added." with Try Again and Continue Without Them.
-- Attaching: Attach button, File ▸ Attach Files… (⇧⌘A), dropping or pasting files. A folder is sent as "Name.zip".
+- Attaching: Attach button, File ▸ Attach Files… (⇧⌘A), dropping or pasting files. A folder is sent as "Name.zip"; a symbolic link
+  to a folder likewise, under the link's name.
   Files sit in the text at a U+FFFC mark ([domain-model.md](domain-model.md#draft)); JPEG, PNG and GIF placed in the
   text are sent inline in an HTML body ([rendering.md](rendering.md#html-of-sent-mail)).
 - Size: estimated size above the account's MailTips limit shows red "(maximum …)"; Send then asks first (Try
