@@ -86,7 +86,6 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [244](BUG-244-malformed-server-other-host.md) | P4 | Accounts / ExchangeAccount | A mistyped server (ftp://, https:/, https//, ?x, #x, port 99999) becomes a URL to another host or path instead of "Invalid server" |
 | [246](BUG-246-bare-ipv6-invalid.md) | P4 | Accounts / ExchangeAccount | An IPv6 address typed without brackets (2001:db8::1) is "Invalid server" |
 | [247](BUG-247-organisation-domain-spelling.md) | P4 | Privacy / RemoteImages | "My organisation" treats the same domain as foreign when it is spelled differently (bücher.de vs xn--bcher-kva.de, or work.com.) |
-| [248](BUG-248-search-notice-erases-other-notice.md) | P3 | MailStore / search | A search's notice ("Showing the newest 2,000 results", "Search failed") replaces a "Couldn't send" or sign-in notice, and clearing the search erases it for good |
 | [249](BUG-249-conversations-off-keeps-read-members.md) | P4 | MailStore / Viewing settings | Turning conversations off with the unread filter on keeps an opened conversation's other messages in the list, read and unselected |
 | [250](BUG-250-one-row-two-messages-nothing-open.md) | P4 | MailStore / search, conversations | Two results of one conversation selected in a search become one selected row after clearing it, but nothing opens ("2 messages selected", Reply disabled) |
 | [251](BUG-251-title-not-searching.md) | P4 | MailStore / MessageViewer | While searching, the window title and subtitle describe the mailbox, not the search results |

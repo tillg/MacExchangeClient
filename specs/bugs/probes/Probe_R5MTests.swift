@@ -78,24 +78,6 @@ struct Probe_R5MStore {
         return (db, url)
     }
 
-    /// R5M-07: a search's own notice (the 2,000 limit, "Search failed") replaces whatever the status said
-    /// ("Couldn't send …", a paused sign-in); clearing the search then clears the status, so that notice is gone.
-    @Test func searchNoticeDoesNotEraseAnotherNotice() async throws {
-        let msgs = (0..<2001).map { mk(work, "Report \($0)", minutesAgo: Double($0)) }
-        let (db, u) = try searchDB(msgs)
-        defer { try? FileManager.default.removeItem(at: u.deletingLastPathComponent()) }
-        let s = MailStore(accounts: [work], messages: msgs)
-        s.searchDebounce = .zero
-        s.searcher = { q, accounts in try db.search(q, accounts: accounts) }
-        let notice = "Couldn't send “Budget”: The server refused it"
-        s.status = notice
-        s.searchText = "report"
-        await s.searchTask?.value
-        let during = s.status
-        s.searchText = ""
-        #expect(s.status == notice, "during the search: \(during ?? "nil"); after clearing it: \(s.status ?? "nil")")
-    }
-
     /// R5M-08: with conversations and the unread filter on, open a conversation row (all its messages become read and
     /// count as opened), then turn conversations off in Settings ▸ Viewing: the row's other messages stay in the
     /// unread-filtered list though they are read and not selected.

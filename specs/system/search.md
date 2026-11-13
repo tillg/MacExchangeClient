@@ -40,7 +40,8 @@ query of the SQLite FTS5 index. Index schema: [storage.md](storage.md#search-ind
    scope changed meanwhile.
 3. On success: `searchHits = (query, ids)`; the list is cached for the current revision. If the index returned
    2,000 IDs, `status` becomes "Showing the newest 2,000 results"; otherwise that notice, or a "Search failed"
-   notice, is cleared.
+   notice, is cleared. A search notice keeps the notice it covered ("Couldn't send …") and puts it back when it is
+   cleared (BUG-248).
 4. On error: `fallbackQuery = query` (memory answers this query), `searchHits` is cleared and `status` is "Search failed: …".
 5. After every successful background save, `searchAgain()` runs the current query again without debounce, so mail
    written in the last ≤15 s becomes findable.
