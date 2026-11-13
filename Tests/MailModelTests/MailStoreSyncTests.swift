@@ -879,4 +879,65 @@ struct MailStoreSyncTests {
         s.finishLoading([moved])
         #expect(s.messages.filter { $0.remoteID == "A" }.map(\.mailbox) == [.archive])
     }
+
+    // MARK: A folder removed on the server (BUG-077)
+
+    /// Its mail goes with it: not in Flagged, not in search, not on disk; and its sync position is forgotten.
+    @Test func mailOfARemovedServerFolderIsDropped() throws {
+        let url = tempURL(); defer { cleanup(url) }
+        let d = try MailDatabase(url: url)
+        let s = MailStore(accounts: [work], messages: [])
+        let x = MailboxKind.folder("X")
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "i"), RemoteFolder(role: x, id: "X", name: "Projects")], account: work.id)
+        var a = remote("A"); a.subject = "Quarterly plan"; a.flag = .red
+        s.apply(SyncResult(upserts: [a], deletedRemoteIDs: [], token: "x1", more: false), account: work.id, mailbox: x)
+        s.apply(page(["B"], token: "i1"), account: work.id, mailbox: .inbox)
+        try d.write(s.takeChanges())
+        #expect(s.count(.smart(.flagged)) == 1)
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "i")], account: work.id)
+        #expect(s.children(of: nil, account: work.id).isEmpty)
+        #expect(s.count(.smart(.flagged)) == 0, "flagged mail of a deleted folder")
+        s.searchText = "quarterly"
+        #expect(s.visibleMessages.isEmpty, "search finds mail of a deleted folder")
+        #expect(s.syncToken(work.id, x) == nil && !s.isComplete(work.id, x))
+        try d.write(s.takeChanges())
+        #expect(try d.messages().compactMap(\.remoteID) == ["B"])
+        #expect(try d.meta().sync.map(\.mailbox) == [.inbox])
+    }
+
+    /// The selected folder is removed: the account's Inbox is selected instead of a mailbox without a name.
+    @Test func selectedRemovedFolderKeepsATitle() {
+        let s = MailStore(accounts: [work], messages: [])
+        let x = MailboxKind.folder("X")
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "i"), RemoteFolder(role: x, id: "X", name: "Projects")], account: work.id)
+        s.selectedMailbox = .account(work.id, x)
+        #expect(s.title == "Projects")
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "i")], account: work.id)  // next launch: folder gone
+        #expect(s.selectedMailbox == .account(work.id, .inbox))
+        #expect(s.title != "")
+    }
+
+    /// The folder list can arrive while launch is still loading: the removed folder's stored mail, loaded after it,
+    /// isn't shown and leaves the disk.
+    @Test func removedFolderSeenDuringLaunchDropsItsStoredMail() throws {
+        let url = tempURL(); defer { cleanup(url) }
+        let x = MailboxKind.folder("X")
+        do {
+            let s = MailStore(accounts: [work], messages: [])
+            s.setRemoteFolders([RemoteFolder(role: .inbox, id: "i"), RemoteFolder(role: x, id: "X", name: "Projects")], account: work.id)
+            s.apply(SyncResult(upserts: [remote("A")], deletedRemoteIDs: [], token: "x1", more: false), account: work.id, mailbox: x)
+            s.apply(page(["B"], token: "i1"), account: work.id, mailbox: .inbox)
+            try MailDatabase(url: url).write(s.takeChanges())
+        }
+        let d = try MailDatabase(url: url)
+        let s = MailStore(accounts: [work], messages: [])
+        let first = [MailboxKey(account: work.id, mailbox: .inbox)]
+        s.restore(try d.meta())
+        s.restore(try d.messages(in: first), boxes: first)
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "i")], account: work.id)  // the first check's folder list
+        s.finishLoading(try d.messages(notIn: first))
+        #expect(s.messages.compactMap(\.remoteID) == ["B"])
+        try d.write(s.takeChanges())
+        #expect(try d.messages().compactMap(\.remoteID) == ["B"])
+    }
 }

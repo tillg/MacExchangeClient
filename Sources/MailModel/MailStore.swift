@@ -138,10 +138,42 @@ public final class MailStore {
     /// Sets an account's folder tree (for local accounts; server accounts get theirs from the server).
     public func setFolders(_ f: [Folder], account: UUID) { folders[account] = f }
 
-    /// The server's folder list: the user's own folders become the account's tree.
+    /// The server's folder list: the user's own folders become the account's tree. A folder of the tree the list no
+    /// longer has was removed on the server: its mail and sync position go, and its selection moves to the Inbox.
     func setRemoteFolders(_ remote: [RemoteFolder], account: UUID) {
         remoteFolders[account] = remote
+        let gone = Set((folders[account] ?? []).map(\.box)).subtracting(remote.map(\.role))
         folders[account] = remote.filter { !$0.role.isStandard }.map { Folder(box: $0.role, name: $0.name, parent: $0.parent) }
+        guard !gone.isEmpty else { return }
+        for box in gone {
+            let k = key(account, box)
+            if syncTokens[k] != nil { syncTokens[k] = nil }
+            if complete.contains(k) { complete.remove(k) }
+            unlisted[k] = nil; newestLoaded.remove(k); historyFailed.remove(k); tokensReset.remove(k)
+        }
+        // While launch is loading, the folder's stored mail isn't in memory yet: `finishLoading` leaves it out.
+        if loadedBoxes != nil { removedFolders[account, default: []].formUnion(gone) }
+        let ids = Set(messages.lazy.filter { $0.accountID == account && gone.contains($0.mailbox) }.map(\.id))
+        if !ids.isEmpty {
+            messages.removeAll { ids.contains($0.id) }
+            selection.subtract(ids)
+            forget(ids)
+        }
+        if case let .account(a, box) = selectedMailbox, a == account, gone.contains(box) { selectedMailbox = .account(account, .inbox) }
+    }
+
+    /// Folders removed on the server while launch was still loading, by account.
+    @ObservationIgnored private var removedFolders: [UUID: Set<MailboxKind>] = [:]
+
+    /// Stored mail without the mail of folders removed on the server meanwhile; that mail is removed from disk.
+    private func withoutRemovedFolders(_ msgs: [Message]) -> [Message] {
+        guard !removedFolders.isEmpty else { return msgs }
+        var kept: [Message] = [], gone = Set<Message.ID>()
+        for m in msgs {
+            if removedFolders[m.accountID]?.contains(m.mailbox) == true { gone.insert(m.id) } else { kept.append(m) }
+        }
+        forget(gone)
+        return kept
     }
 
     nonisolated private static func foldersInTrash(_ folders: [UUID: [Folder]]) -> [UUID: Set<MailboxKind>] {
@@ -908,7 +940,7 @@ public final class MailStore {
     /// Launch, step 2: the mail of some mailboxes (the Inbox first), shown while the rest loads.
     public func restore(_ msgs: [Message], boxes: [MailboxKey]) {
         let known = Set(messages.map(\.id))
-        messages += msgs.filter { !known.contains($0.id) }
+        messages += withoutRemovedFolders(msgs).filter { !known.contains($0.id) }
         for b in boxes { loadedBoxes?.insert(key(b.account, b.mailbox)) }
     }
 
@@ -916,7 +948,8 @@ public final class MailStore {
     /// Then waiting changes go to the server and the history sync may start.
     public func finishLoading(_ rest: [Message]) {
         let known = Set(messages.map(\.id))
-        messages += rest.filter { !known.contains($0.id) }
+        messages += withoutRemovedFolders(rest).filter { !known.contains($0.id) }
+        removedFolders = [:]
         loadedBoxes = nil
         scheduleFlush()
         if !backends.isEmpty { startHistory() }

@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "When a folder is deleted on the server, its mail no longer lingers in Flagged and search results here, and a window showing that folder switches to the Inbox.",
             "Files that some mail apps, such as Apple Mail, send \"inline\" (a PDF in a plain-text email, for example) are now listed below the message, so you can open and save them.",
             "A folder named Archive inside another folder or in Deleted Items is no longer used as your Archive mailbox: it stays an ordinary folder in its place.",
             "A flag or read mark set on another device is no longer lost while a change you made here to the same message is still on its way to the server.",

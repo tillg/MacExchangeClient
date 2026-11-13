@@ -559,3 +559,11 @@ edited: 2026-11-13
 - **Context:** BUG-075. While any change of a message was queued, `merge` kept its read state, flag and mailbox together and skipped the server's read changes for it: a queued read dropped a flag set on the phone, a queued flag or move dropped a read change.
 - **Decision:** `merge` keeps per message only what its queued changes set: read state for `setRead`, flag for `setFlagged`, mailbox for a move or an invite answer, everything for an erase. The server's word stands for the rest. A page still doesn't bring back a message gone here with any change queued (d-bug-072).
 - **Why:** Exchange keeps the properties separately and the outbox writes them separately (README); the guard exists so the server doesn't undo the user's change, which only needs that one property.
+
+## 02:40 — A folder removed on the server takes its mail with it; the selection goes to the Inbox {#d-bug-077}
+
+- **Status:** decided
+- **Context:** BUG-077. `setRemoteFolders` replaced the tree only; the mail, sync position and selection of a folder deleted on the server stayed (in Flagged, search and on disk; a blank title when it was selected).
+- **Decision:** A folder of the account's tree (restored from disk or read earlier) that the new folder list doesn't have is gone: its messages are removed (memory and disk), its sync token, completion and history notes are dropped, and if it was the selected mailbox, the account's Inbox is selected. When the list arrives while launch is still loading, the folder's stored mail loaded afterwards is left out and removed from disk.
+- **Why:** README syncs "your own mail folders"; a folder that doesn't exist on the server has no mail. Folders moved into Deleted Items keep their ID and stay (BUG-025).
+- **Alternatives:** Select All Inboxes (rejected: the Inbox of the same account is closer to where the user was). Keep the mail until the user acts (rejected: it can't be reached in the sidebar).
