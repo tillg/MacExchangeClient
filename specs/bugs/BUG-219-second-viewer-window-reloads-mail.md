@@ -38,3 +38,6 @@ Test secondViewerWindowDoesNotDuplicateTheOutbox() recorded an issue: Expectatio
 
 ## Fix idea
 Both: start `loadMail` and the poll loop once per app (a static flag in `AppSetup`, or from `App.init`/the delegate), and make `MailStore.restore(_ meta:)` safe to call on a loaded store (skip outbox entries whose ID is already queued, don't treat a send still in memory as interrupted, OR the change marks instead of overwriting them). The probes call the load sequence twice themselves, so they pass only with the store-side part.
+
+## Second symptom (found separately as R5G-04)
+The reload also brings back mail erased in the last 15 s (not saved yet), and a send that already went out is kept in Drafts as "may already have been sent". Probe: `Probe_R5GLaunch/secondViewerWindowDoesNotBringBackErasedMail` in `probes/Probe_R5GTests.swift`.

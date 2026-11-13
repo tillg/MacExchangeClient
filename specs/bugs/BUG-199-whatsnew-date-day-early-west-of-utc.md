@@ -26,3 +26,6 @@ New York: first heading "Thursday, 12. November 2026" for the 2026-11-13 entry. 
 
 ## Fix idea
 Parse with the current zone (`Date.ISO8601FormatStyle(timeZone: .current)`), or format with `timeZone: .gmt`.
+
+## Store-level probe (found separately as R5G-08)
+`Probe_R5GWhatsNew/dayTitleIsTheSameDayInEveryTimeZone` in `probes/Probe_R5GTests.swift` mirrors the parsing line of `WhatsNewView.swift`.
