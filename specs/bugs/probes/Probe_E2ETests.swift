@@ -201,33 +201,6 @@ struct Probe_E2ETests {
         #expect(s.selection.isSubset(of: Set(s.visibleMessages.map(\.id))))
     }
 
-    /// A send queued while the request is on its way is written by the 15-second save (or the save on quit).
-    /// If the app quits before the next save, the next launch restores the send and sends the mail again.
-    @Test func sendInFlightWhenTheAppQuitsIsNotSentAgainAfterRelaunch() async throws {
-        let url = tempURL()
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let ok = try responseFile(success)  // file:// fixture
-        let s = MailStore(accounts: [], messages: [])
-        s.add(a, backend: backend(ok))
-        let db = try MailDatabase(url: url)
-        s.apply(page([server("A1")]), account: a.id, mailbox: .inbox)
-        s.send(Draft(accountID: a.id, to: "boss@x.com", subject: "Resignation", body: "Once only"))
-        await Task.yield()  // the drain has started: the request is on its way
-        try #require(s.outbox.contains(where: isSend))
-        try db.write(s.takeChanges())  // the save on quit (saveChanges(now: true)) while the request is on its way
-        await s.refresh(history: false)  // the server accepted it
-        try #require(!s.outbox.contains(where: isSend))
-        // The app quit (or crashed) before the next save. Next launch:
-        let s2 = MailStore(accounts: [], messages: [])
-        s2.add(a, backend: backend(ok))
-        let db2 = try MailDatabase(url: url)
-        s2.restore(try db2.meta())
-        s2.finishLoading(try db2.messages())
-        await s2.refresh(history: false)
-        #expect(s2.messages.contains { $0.mailbox == .drafts && $0.subject == "Resignation" },
-                "sent a second time without asking (outbox now \(s2.outbox.count)); not kept in Drafts")
-    }
-
     /// Mark All as Read while launch is still loading (Flagged spans every mailbox) leaves the mail that
     /// loads afterwards unread.
     @Test func markAllReadWhileLoadingCoversMailLoadedAfterwards() throws {

@@ -109,7 +109,10 @@ flowchart LR
   mailbox changes are grouped per account and kind, in a stable order, as `ServerChange`s of at most 100 IDs. Each
   `PendingChange` keeps the messages as they were, to undo.
 - Erasing from Trash, Send, Save Draft and invite answers append their own changes.
-- `drain` sends changes one at a time, oldest first, for accounts with a backend that are not paused:
+- `drain` sends changes one at a time, oldest first, for accounts with a backend that are not paused. Before a
+  `send` goes out it is marked `inFlight` and `saveBeforeSending` writes the changes to disk and is awaited
+  (`AppSetup.saveAndWait`). At launch `restore(meta)` keeps a send still marked in flight in Drafts on this Mac
+  instead of queueing it, with a status to check Sent.
   - `AuthenticationError`: the account is paused until relaunch; nothing more is sent or fetched for it.
   - `URLError` on `send`, `respond` or `reply`: treated as refused (`failed`), never retried, since it may have gone out.
   - Any other `URLError`: status "Offline – changes will be sent to Exchange later"; the change stays first in line.

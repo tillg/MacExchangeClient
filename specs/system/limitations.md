@@ -18,7 +18,7 @@ Known limits of the current design, one line each. Open bugs (with repro probes 
 | A wrong password pauses the account until relaunch; the password is fixed in the Keychain (`MailReplica-EWS`) | [ews.md](ews.md#transport-ewsclientcall) |
 | Exchange mail can't move to another account (drag, Move menu) | [functional.md](functional.md#drag-and-drop) |
 | Flag colours stay on this Mac; Exchange stores only flagged/not flagged, and a server flag shows as red | [domain-model.md](domain-model.md#account-and-mailboxes) |
-| A send that times out is never retried; the message is kept in Drafts on this Mac only | [architecture.md](architecture.md#writing-to-the-server-the-outbox) |
+| A send that times out, or was under way when the app quit, is never retried; the message is kept in Drafts on this Mac only. Invite answers under way at a crash are sent again | [architecture.md](architecture.md#writing-to-the-server-the-outbox) |
 | Replies and forwards are new messages without `In-Reply-To`/`References`; the server decides on their conversation | [ews.md](ews.md#write-operations) |
 | Compose is plain text; HTML is sent only to place JPEG/PNG/GIF pictures; other files are never placed in the sent mail | [rendering.md](rendering.md#html-of-sent-mail) |
 | Quoting uses the plain-text body; the HTML of the original isn't quoted or forwarded | `MailStore.draft` |

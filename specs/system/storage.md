@@ -56,7 +56,8 @@ One connection, `journal_mode=WAL`, `synchronous=NORMAL`.
 - **`sync`**: `(account, mailbox)` PK, `token` (EWS SyncState), `complete` 0/1.
 - **`folders`**: `account`, `box`, `name`, `parent`, `position` (the order to restore).
 - **`outbox`**: `position` PK, `change` BLOB = `PendingChange` as JSON. Rows that don't decode are skipped on read. Rows
-  whose `previous` messages hold attachments as plain names (older builds) decode.
+  whose `previous` messages hold attachments as plain names (older builds) decode. `inFlight` (optional, absent in
+  older rows) marks a send whose request may have gone out.
 - **`files`**: `(message, position)` PK, `data` BLOB: the file content of messages kept only on this Mac (a send or
   draft Exchange refused, kept in Drafts). Read by `meta()`; rows go with their message. Created with
   `CREATE TABLE IF NOT EXISTS`, so older databases get it on open.
