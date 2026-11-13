@@ -44,24 +44,6 @@ struct Probe_EWSTests {
 
     // MARK: Response sanitizing
 
-    // MARK: Plain text fallback
-
-    @Test func probePlainTextDecodesCommonEntities() {
-        #expect(EWSBackend.plainText("<p>Gr&uuml;&szlig;e &ndash; Till&#8217;s &euro;5 &#x27;x&#x27;</p>") == "Grüße – Till’s €5 'x'")
-    }
-
-    @Test func probePlainTextBreaksLinesAtBrWithAttributes() {
-        #expect(EWSBackend.plainText("Line1<br clear=\"all\">Line2") == "Line1\nLine2")
-    }
-
-    @Test func probePlainTextKeepsTableCellsApart() {
-        #expect(EWSBackend.plainText("<table><tr><td>Name</td><td>Value</td></tr></table>") != "NameValue")
-    }
-
-    @Test func probePlainTextDropsComments() {
-        #expect(EWSBackend.plainText("<!-- if a > b then --><p>Hi</p>") == "Hi")
-    }
-
     // MARK: Parsing shapes
 
     @Test func probeSummaryCDATASubject() throws {
@@ -179,13 +161,6 @@ struct Probe_EWSTests {
         let t = Date()
         let out = EWSBackend.plainText(html)
         #expect(out.hasPrefix("Hello world & more"))
-        #expect(Date().timeIntervalSince(t) < 5)
-    }
-
-    @Test func probePlainTextUnclosedStyleIsFast() {
-        let html = String(repeating: "<style>x", count: 5_000) + String(repeating: "a", count: 100_000)
-        let t = Date()
-        _ = EWSBackend.plainText(html)
         #expect(Date().timeIntervalSince(t) < 5)
     }
 

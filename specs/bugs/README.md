@@ -8,7 +8,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 |---|---|---|---|
 | [033](BUG-033-nul-character-truncates-text-and-breaks-search.md) | P4 | MailDatabase | Text with a NUL character is cut off when stored, and a search containing NUL throws |
 | [034](BUG-034-separator-characters-corrupt-contacts-and-attachments.md) | P4 | MailDatabase | Names containing U+001E/U+001F corrupt the stored To/Cc and attachment lists |
-| [035](BUG-035-plaintext-fallback-rough.md) | P4 | EWS | Plain-text fallback of HTML mail: entities left raw, words run together, comment tails leak, slow on unclosed <style> |
 | [036](BUG-036-empty-textbody-hides-html-text.md) | P4 | EWS | An empty `<t:TextBody/>` next to an HTML body gives the message empty text |
 | [037](BUG-037-folder-tree-duplicates-repeated-folders.md) | P4 | EWS | A folder returned twice by FindFolder paging appears twice in the sidebar |
 | [038](BUG-038-parse-invite-ignores-item-type.md) | P4 | EWS | parseBody builds an invite for any item with Start/End (e.g. a MeetingResponse), while message() limits invites to requests/cancellations |

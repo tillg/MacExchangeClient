@@ -95,8 +95,10 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
   `ErrorInvalidSyncStateData` for a request that carried a token is thrown as `SyncTokenRejected` (any other error,
   and that code without a token, as `EWSError`).
 - **Body** (`parseBody`): `html` = `Body` when `BodyType="HTML"`. `text` = `TextBody` if present (even empty), else a
-  rough plain text of the HTML (`plainText`: drop head/style/script, line breaks for `br` and closing block tags,
-  strip tags, decode six entities, trim lines, drop empty ones), else the body. From/To/Cc from the full `Mailbox`es.
+  rough plain text of the HTML (`plainText`, one linear pass: drop comments and head/style/script, an unclosed one
+  to the end; line breaks for `br` (with attributes too) and closing p/div/tr/li/h1–h6, a space for closing td/th,
+  strip other tags; decode `&#n;`, `&#xh;` and named references (Latin-1 and common punctuation, no-break space as
+  a space; unknown ones stay); trim lines, drop empty ones), else the body. From/To/Cc from the full `Mailbox`es.
 - **Attachments** (`listedAttachments`): every child of `Attachments` with a non-blank `Name` and `IsInline` not
   "true", then (in server order) the rest that aren't inline pictures: unnamed ones, and those with `IsInline` "true"
   that aren't pictures (a `FileAttachment` whose `ContentType` starts `image/`, or is
