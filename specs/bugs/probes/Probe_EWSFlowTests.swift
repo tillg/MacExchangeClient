@@ -538,51 +538,6 @@ struct Probe_EWSFlowTests {
     }
 
     // file:// fixture (FIFO)
-    /// Sending with files: the message is created in Exchange's Drafts, then adding the files fails (throttling,
-    /// a dropped connection) and so does the clean-up delete. The copy without its files stays in Exchange's Drafts,
-    /// and the next Drafts sync shows it next to the copy kept on this Mac. Nothing ever removes it.
-    // file:// fixture
-    @Test func probeFailedSendWithFilesLeavesNoHalfDraft() async throws {
-        let busy = FX.fault("ErrorServerBusy", "The server cannot service this request right now. Try again later.")
-        let server = FlowServer([FX.created("D1"), busy, busy,
-                                     FX.sync("", token: "T1", last: true),   // Inbox
-                                     FX.sync(FX.create(FX.summary("D1", subject: "Contract", read: true, preview: "Signed copy attached")), token: "T1", last: true)])
-        defer { server.stop() }
-        let s = store(server)
-        complete(s, .inbox); complete(s, .drafts)
-        var d = Draft(accountID: acct.id, to: "bob@x.com", subject: "Contract", body: "Signed copy attached")
-        d.attachments = [DraftAttachment(name: "contract.pdf", contentType: "application/pdf", data: Data(repeating: 1, count: 500))]
-        s.send(d)
-        try await waitFor { s.outbox.isEmpty }
-        let status = s.status
-        s.selectedMailbox = .account(acct.id, .drafts)
-        await s.refresh(history: false)
-        let drafts = s.messages.filter { $0.mailbox == .drafts }
-        #expect(drafts.count == 1, "Drafts: \(drafts.map { "\($0.subject) remote=\($0.remoteID ?? "-") files=\($0.attachments.count)" }); requests \(server.served); status after send: \(String(describing: status))")
-    }
-
-    // file:// fixture (FIFO)
-    /// The same for Save Draft with files.
-    // file:// fixture
-    @Test func probeFailedSaveDraftWithFilesLeavesNoHalfDraft() async throws {
-        let busy = FX.fault("ErrorServerBusy", "The server cannot service this request right now. Try again later.")
-        let server = FlowServer([FX.created("D1"), busy, busy,
-                                     FX.sync("", token: "T1", last: true),
-                                     FX.sync(FX.create(FX.summary("D1", subject: "Contract", read: true)), token: "T1", last: true)])
-        defer { server.stop() }
-        let s = store(server)
-        complete(s, .inbox); complete(s, .drafts)
-        var d = Draft(accountID: acct.id, to: "bob@x.com", subject: "Contract", body: "Draft")
-        d.attachments = [DraftAttachment(name: "contract.pdf", contentType: "application/pdf", data: Data(repeating: 1, count: 500))]
-        s.saveDraft(d)
-        try await waitFor { s.outbox.isEmpty }
-        s.selectedMailbox = .account(acct.id, .drafts)
-        await s.refresh(history: false)
-        let drafts = s.messages.filter { $0.mailbox == .drafts }
-        #expect(drafts.count == 1, "Drafts: \(drafts.map { "remote=\($0.remoteID ?? "-") files=\($0.attachments.count)" }); requests \(server.served)")
-    }
-
-    // file:// fixture (FIFO)
     /// README: the quick check runs "at once when you select a mailbox". Selecting one while a check is running
     /// (every 15 s, so often) does nothing: the running check doesn't include it and the new one returns at once.
     // file:// fixture

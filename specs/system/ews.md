@@ -72,7 +72,7 @@ Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`,
   For `delete`, `ErrorItemNotFound` counts as erased.
 | `send` without files | `CreateItem SendAndSaveCopy`, saved to `sentitems` |
 | `saveDraft` without files | `CreateItem SaveOnly` into `drafts` |
-| with files | `CreateItem SaveOnly` into `drafts` → `CreateAttachment` (all files in one call) → for send, `SendItem` with the root item's last change key, saving to `sentitems`. A failed step deletes the half-made draft item |
+| with files | `CreateItem SaveOnly` into `drafts` → `CreateAttachment` (all files in one call) → for send, `SendItem` with the root item's last change key, saving to `sentitems`. A failed step deletes the half-made draft item; if that delete fails too, it throws `LeftOnServer` (item ID + the first error) and the store queues `.delete([id])` for that account and sets the account aside for the rest of the drain (the queued change keeps the item out of Drafts syncs until erased), then handles the first error as usual |
 | `respond` | `CreateItem` with `AcceptItem` / `TentativelyAcceptItem` / `DeclineItem`: optional text `Body` (comment), `ReferenceItemId`, `ProposedStart`/`ProposedEnd`; `SendAndSaveCopy`, or `SaveOnly` for "Do Not Send a Response" |
 | `removeFromCalendar` | `CreateItem SaveOnly` with `RemoveItem` / `ReferenceItemId` |
 

@@ -51,7 +51,6 @@ Limits: results are store-level only, and the app wasn't run. Mail.app expectati
 | [102](BUG-102-invite-answer-comment-lost-on-network-error.md) | P3 | MailStore | Respond with Comments that fails with a network error is undone and the typed comment is lost |
 | [103](BUG-103-message-changed-on-server-keeps-old-body.md) | P3 | MailStore | A draft changed on the server keeps its old loaded body: new subject, old text and files |
 | [104](BUG-104-answered-invite-shows-unanswered-after-sync.md) | P3 | Invite | An invite answered here shows "Please respond" again once Exchange has moved it to Deleted Items |
-| [105](BUG-105-failed-send-with-files-leaves-half-draft-in-exchange.md) | P3 | EWS | A send or Save Draft with files that fails after the message was created leaves a copy without its files in Exchange's Drafts |
 | [113](BUG-113-combining-character-after-file-mark-breaks-placement.md) | P4 | Models | A combining character right after a placed file breaks the file marks: pictures change place, a stray U+FFFC is sent, Exclude removes the wrong file |
 | [114](BUG-114-rtl-lines-sent-left-to-right-in-html.md) | P4 | Models | Hebrew/Arabic lines turn left-to-right (left-aligned, punctuation on the wrong side) once a placed picture makes the mail HTML |
 | [115](BUG-115-address-shown-twice-when-no-display-name.md) | P4 | MailStore | Senders without a display name appear as "a@x.com <a@x.com>" in the forward header, the reply attribution and an invite answer's To |
