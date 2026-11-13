@@ -47,7 +47,6 @@ folders, accounts and settings, fidelity with Mail.app's bundle). Fixed bugs are
 | [196](BUG-196-content-id-not-a-msg-id.md) | P4 | compose / sent HTML | Placed pictures are sent with a Content-ID without "@" (bare UUID) |
 | [197](BUG-197-blocked-picture-source-broken-box.md) | P4 | rendering | With remote content blocked, <picture> with a web <source> and <input type=image> show WebKit's broken-image box |
 | [199](BUG-199-whatsnew-date-day-early-west-of-utc.md) | P4 | UI / WhatsNewView | Help ▸ What's New dates each day one day early on a Mac west of UTC (2026-11-13 shown as Thursday, 12 November) |
-| [200](BUG-200-all-day-invite-other-zone-two-days.md) | P3 | invites / EWS | An all-day invite from a colleague in another time zone (London, New York, Tokyo) is shown as two days, or the wrong day |
 | [201](BUG-201-when-line-runs-backwards-on-clock-change.md) | P4 | invites | On the night the clocks go back, an invite's when line reads "at 2:30 – 2:15", as if it ended before it starts |
 | [202](BUG-202-recurring-invite-shown-as-one-off.md) | P3 | invites / EWS | A recurring meeting's invite is shown as a one-off meeting: nothing says it repeats (deferred) |
 | [203](BUG-203-reply-stacks-numbered-or-indented-prefix.md) | P4 | compose | Reply to "Re[2]: …" or to a subject with a leading blank (" Re: …") stacks a second "Re:" |

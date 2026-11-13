@@ -27,21 +27,6 @@ struct Probe_R5H_Dates {
         return MailStore(accounts: [work], messages: [m]).draft(.reply, to: m.id).subject
     }
 
-    /// R5H-02: a one-day all-day invite from a colleague in London (or New York, Tokyo) is named as two days
-    /// ("Friday, 20 November – Saturday, 21 November, all day") on a Mac in Berlin.
-    @Test func allDayInviteFromAnotherZoneIsOneDay() throws {
-        // As Exchange sends it: the organizer's midnights, in UTC. London organizer, all day Friday 20 November.
-        let d = try doc("""
-            <t:MeetingRequest><t:ItemId Id="M1"/><t:Body BodyType="Text">x</t:Body>
-            <t:Start>2026-11-20T00:00:00Z</t:Start><t:End>2026-11-21T00:00:00Z</t:End>
-            <t:IsAllDayEvent>true</t:IsAllDayEvent></t:MeetingRequest>
-            """)
-        let item = try #require(d.first("MeetingRequest"))
-        let invite = try #require(EWSBackend.parseBody(item).invite)
-        let when = invite.when(calendar: berlin, locale: en)
-        #expect(when == "Friday, 20 November 2026, all day", "when line: \(when)")
-    }
-
     /// R5H-03: on the night the clocks go back, a meeting 02:30 CEST – 02:15 CET (45 minutes) reads "at 2:30 – 2:15",
     /// as if it ended before it starts.
     @Test func whenLineAcrossClockChangeDoesNotRunBackwards() throws {

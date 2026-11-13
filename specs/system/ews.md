@@ -52,7 +52,7 @@ is made, retries, undo): [architecture.md](architecture.md). Types: [domain-mode
 | `body(remoteID:)` | `GetItem`, `BodyType Best`, `item:Body`, `item:TextBody`, attachments, From/To/Cc, ReplyTo, invite fields |
 | `inlineImages` | `GetItem` attachments; then `GetAttachment` (not strict) for image attachments whose `ContentId` is wanted |
 | `attachment(remoteID:index:)` | `GetItem` attachments (IDs looked up each time; moves change them), then `GetAttachment` with `IncludeMimeContent` |
-| `events(from:to:)` | `FindItem` with `CalendarView` on the `calendar` folder; for an invite, its day and on to its end when it runs past midnight (`MailStore.calendarRange`, BUG-192) |
+| `events(from:to:)` | `FindItem` with `CalendarView` on the `calendar` folder; for an invite, its day and on to its end when it runs past midnight (`MailStore.calendarRange`, BUG-192); an all-day invite's days come from `Invite.allDayDays`: start snapped to the nearest local midnight, length rounded to whole days, since Exchange sends the organizer's midnights in UTC (BUG-200) |
 | `maxMessageSize(from:)` | `GetMailTips` for the own address, `MaxMessageSize` |
 
 Summary fields for `newest` and `sync`: `Subject`, `DateTimeReceived`, `IsRead`, `From`, `HasAttachments`, `Flag`,
