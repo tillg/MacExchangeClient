@@ -276,6 +276,31 @@ struct EWSParsingTests {
         #expect(EWSBackend.archiveFolder(d.all("Folder"))?.id == "TOP")
     }
 
+    /// No top-level Archive: a folder named Archive in Deleted Items is not the account's Archive.
+    @Test func archiveInsideDeletedItemsIsNotTheArchive() throws {
+        let d = try doc("""
+            <m:FindFolderResponse><m:RootFolder><t:Folders>
+            <t:Folder><t:FolderId Id="INBOX"/><t:ParentFolderId Id="ROOT"/><t:DisplayName>Inbox</t:DisplayName><t:FolderClass>IPF.Note</t:FolderClass></t:Folder>
+            <t:Folder><t:FolderId Id="DEL"/><t:ParentFolderId Id="ROOT"/><t:DisplayName>Deleted Items</t:DisplayName><t:FolderClass>IPF.Note</t:FolderClass></t:Folder>
+            <t:Folder><t:FolderId Id="OLDARCH"/><t:ParentFolderId Id="DEL"/><t:DisplayName>Archive</t:DisplayName><t:FolderClass>IPF.Note</t:FolderClass></t:Folder>
+            </t:Folders></m:RootFolder></m:FindFolderResponse>
+            """)
+        let a = EWSBackend.archiveFolder(d.all("Folder"))
+        #expect(a == nil, "Archive role given to \(a?.id ?? "")")
+    }
+
+    @Test func archiveNestedInInboxProjectIsNotTheArchive() throws {
+        let d = try doc("""
+            <m:FindFolderResponse><m:RootFolder><t:Folders>
+            <t:Folder><t:FolderId Id="INBOX"/><t:ParentFolderId Id="ROOT"/><t:DisplayName>Inbox</t:DisplayName></t:Folder>
+            <t:Folder><t:FolderId Id="P"/><t:ParentFolderId Id="INBOX"/><t:DisplayName>Project X</t:DisplayName></t:Folder>
+            <t:Folder><t:FolderId Id="PA"/><t:ParentFolderId Id="P"/><t:DisplayName>Archive</t:DisplayName></t:Folder>
+            </t:Folders></m:RootFolder></m:FindFolderResponse>
+            """)
+        let a = EWSBackend.archiveFolder(d.all("Folder"))
+        #expect(a == nil, "Archive role given to \(a?.id ?? "")")
+    }
+
     @Test func getFolderSkipsMissingFolders() throws {
         let ok = #"<m:GetFolderResponseMessage ResponseClass="Success"><m:Folders><t:Folder><t:FolderId Id="X"/><t:TotalCount>7</t:TotalCount></t:Folder></m:Folders></m:GetFolderResponseMessage>"#
         let bad = #"<m:GetFolderResponseMessage ResponseClass="Error"><m:ResponseCode>ErrorFolderNotFound</m:ResponseCode></m:GetFolderResponseMessage>"#

@@ -472,13 +472,14 @@ public struct EWSBackend: MailBackend {
         return Int(root.attr("IndexedPagingOffset") ?? "")
     }
 
-    /// A top-level folder named Archive; Outlook creates it under the mailbox root, not in the Inbox.
+    /// A top-level folder named Archive; Outlook creates it under the mailbox root, not in the Inbox. A nested
+    /// one (in a project folder, or a deleted one in Deleted Items) is an ordinary folder.
     static func archiveFolder(_ folders: [XMLNode]) -> RemoteFolder? {
         let names: Set<String> = ["archive", "archiv"]
         let ids = Set(folders.compactMap { $0.child("FolderId")?.attr("Id") })
         let matches = folders.filter { names.contains(($0.text("DisplayName") ?? "").lowercased()) }
         let topLevel = matches.first { !ids.contains($0.child("ParentFolderId")?.attr("Id") ?? "") }
-        guard let f = topLevel ?? matches.first, let id = f.child("FolderId")?.attr("Id") else { return nil }
+        guard let f = topLevel, let id = f.child("FolderId")?.attr("Id") else { return nil }
         return RemoteFolder(role: .archive, id: id, totalCount: Int(f.text("TotalCount") ?? "") ?? 0)
     }
 

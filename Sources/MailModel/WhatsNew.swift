@@ -12,6 +12,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-13", features: [
+            "A folder named Archive inside another folder or in Deleted Items is no longer used as your Archive mailbox: it stays an ordinary folder in its place.",
             "An email that grows after it opens, as pictures load or when you open a \"show more\" section, now grows with it instead of being cut off.",
             "Newsletters that fill the window no longer leave a large empty area below them after you widen the window, and their last lines are no longer hidden.",
             "A message deleted on another device while you were moving it no longer stays behind in its old mailbox.",
