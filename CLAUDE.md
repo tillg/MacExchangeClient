@@ -27,7 +27,7 @@ tools/snapshot.sh $PWD/tmp/snap.png
 tools/snapshot.sh $PWD/tmp/snap-dark.png MAIL_SNAPSHOT_DARK=1
 ```
 
-Never run `.build/debug/MailReplica` directly to take a snapshot. The app's defaults hold a real Exchange account, so it would connect to it. `tools/snapshot.sh` runs a copy of the binary under its own empty defaults domain, with `MAIL_SAMPLE_DATA=1`. Read the PNG before you say a visual change works. Artifacts go in `tmp/`, which is gitignored.
+Never run `.build/debug/MailReplica` directly to take a snapshot. The app's defaults hold a real Exchange account, so it would connect to it. `tools/snapshot.sh` runs a copy of the binary under its own empty defaults domain, with `MAIL_SAMPLE_DATA=1`. Menus can't be captured: `tools/snapshot.sh $PWD/tmp/m.png MAIL_SNAPSHOT_MENUS=1 | grep '^MENU'` prints the menu bar (titles, shortcuts, order, disabled items); check menu changes against that. Read the PNG before you say a visual change works. Artifacts go in `tmp/`, which is gitignored.
 
 ## Layout
 

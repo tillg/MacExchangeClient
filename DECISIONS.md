@@ -1107,3 +1107,4 @@ edited: 2026-11-16
 - **Why:** rebuilding twice per bug to watch each probe fail again would have doubled the build time for a state already recorded; the timing suite fails at random under load when run with the rest.
 - **Alternatives:** strict red-green per bug (about 1.5 min more per bug); one commit per small bug (six more build-and-test rounds).
 - **Consequences:** reverting one of the six small fixes means reverting part of 98f9d09 by hand. A fix whose test never failed could be testing nothing: the review (step 3) is asked to look at those.
+- 20:25: checked after the fact: with `MailStore.swift` and `Models.swift` put back to their state before the run, all ten tests I wrote fail (BUG-225, 255, 104, 168, 211, 250, 240, 159, 241, 226) and pass again with the fixes.
