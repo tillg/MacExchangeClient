@@ -39,6 +39,7 @@ struct ComposeView: View {
                     }
                     .labelsHidden()
                     .fixedSize()
+                    Spacer()
                 }
             }
             if !draft.attachments.isEmpty { messageSize }
