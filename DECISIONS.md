@@ -27,6 +27,8 @@ edited: 2026-11-16
   - [19:45 — Bugs deferred by the last run are fixed now when their rank says so, on marked assumptions](#run-2026-11-16-1935-3)
   - [20:15 — Three ranked bugs stay open: BUG-237, BUG-184, BUG-084](#run-2026-11-16-1935-4)
   - [20:15 — Shortcuts taken: red state from the issue's probe, timing suite run on its own, six small fixes in one commit](#run-2026-11-16-1935-5)
+  - [20:40 — After the review: give up a change at its third internal fault; the poll doesn't wait for a silent account; the Edit menu's group is written out](#run-2026-11-16-1935-6)
+  - [20:40 — Retro: menus and Edit actions are checked with two snapshot hooks, named in CLAUDE.md](#run-2026-11-16-1935-7)
 
 # 2026-11-12 23:16 — Unattended bug-fix run {#run-2026-11-12-2316}
 
@@ -1087,6 +1089,7 @@ edited: 2026-11-16
 - **Alternatives:** leave all `deferred` issues (the top three would stay open).
 - **Consequences:** fixes resting on assumed response shapes need a look against the live server; the report lists them.
 - 20:15: fixed on assumptions (⚠️, to check live): BUG-202 (`calendar:IsRecurring`/`calendar:Recurrence` asked with every body; if the server rejected them, bodies would fail to load: revert 07b76e7), BUG-210 (shape of `[cid:…]`), BUG-165 (a fault without a ResponseCode is retried, not undone; one that fails every time would hold that account's queue), BUG-104 (a server-side move keeps subject and received date). BUG-225 changes the scheduler: each account sends and is checked in its own task.
+- 20:40: two of these notes are superseded. BUG-202: a refused body request is sent again without the two properties (2c1511b), so bodies load either way. BUG-165: the change is given up at its third fault (e0ccf58), so it can't hold the queue for good.
 
 ## 20:15 — Three ranked bugs stay open: BUG-237, BUG-184, BUG-084 {#run-2026-11-16-1935-4}
 
@@ -1108,3 +1111,22 @@ edited: 2026-11-16
 - **Alternatives:** strict red-green per bug (about 1.5 min more per bug); one commit per small bug (six more build-and-test rounds).
 - **Consequences:** reverting one of the six small fixes means reverting part of 98f9d09 by hand. A fix whose test never failed could be testing nothing: the review (step 3) is asked to look at those.
 - 20:25: checked after the fact: with `MailStore.swift` and `Models.swift` put back to their state before the run, all ten tests I wrote fail (BUG-225, 255, 104, 168, 211, 250, 240, 159, 241, 226) and pass again with the fixes.
+
+## 20:40 — After the review: give up a change at its third internal fault; the poll doesn't wait for a silent account; the Edit menu's group is written out {#run-2026-11-16-1935-6}
+
+- **Status:** open
+- **Context:** an independent review of the run's diff (step 3) and the closing check found: an answered invite restored under its new ID was deleted from the database at the next save; the match could hit a wrong copy; a change the server always faults on would block its account's queue (BUG-165); the 15 s poll still waited 60 s for a silent account (BUG-225); Edit showed two Delete items, ours after Select All (BUG-228); the Mark as Read title cost one scan per selected message.
+- **Question:** how to settle the three that are behaviour choices?
+- **Decision:** (1) a queued change answered with an internal fault (no Exchange code) is retried at the next two sends and given up at the third fault: undone, with the server's text as status. (2) The poll loop starts each check without awaiting it; an account still being checked is left out of the next check. (3) Edit's Cut, Copy, Paste, Delete, Select All group is written out in `MailCommands` (SwiftUI can only add items after Select All, and the system group has its own Delete); the items send the standard actions to the first responder. The other findings were plain fixes (e0ccf58).
+- **Why:** (1) keeps the "nothing was refused" reading for a passing server error but ends it for a change the server can never take; three matches the retry the user would do by hand. (2) Otherwise a healthy account was still checked only every 75 s. (3) It is the only way to get Mail's order with one Delete.
+- **Alternatives:** (1) retry forever (blocks the account), or undo at once (the bug); (2) return from `refresh` when the first account is done (changes what callers can await); (3) Delete back in the Message menu (not Mail's place), or two Delete items.
+- **Consequences:** (3) Cut, Copy and Paste are always enabled now (the system greys them out without a selection); choosing one with nothing to act on does nothing. Checked with `MAIL_SNAPSHOT_EDITMENU=1`: Select All, Copy, Paste in a compose window ("hello" → "hellohello") and Select All, Copy in the HTML body (221 characters on the pasteboard). Not checked by hand with the keyboard in the frontmost app.
+
+## 20:40 — Retro: menus and Edit actions are checked with two snapshot hooks, named in CLAUDE.md {#run-2026-11-16-1935-7}
+
+- **Status:** open
+- **Context:** retro of this run (step 4). What went wrong: (a) menu changes could only be checked by reading code, and the reading missed the double Delete; (b) the worktree was briefly left with pre-fix sources staged while a reviewer read it (it noticed and read from a `git archive` instead); (c) the first three decisions were appended by shell; (d) a worker took the nib's item order from the issue text because `nibdump.py` printed ids only.
+- **Decision:** project-level fixes applied: `MAIL_SNAPSHOT_MENUS=1` prints the app's menu bar and `MAIL_SNAPSHOT_EDITMENU=1` chooses the real Edit items; CLAUDE.md › Verifying the UI names the menu dump. (b) and (c) are my own slips, no tooling. Nothing drafted for the plugins.
+- **Why:** the dump found the defect within a minute; a pointer in CLAUDE.md is what makes the next session use it.
+- **Alternatives:** a unit test of the menu tree (needs the app target under test, which the package doesn't have).
+- **Consequences:** (d) stays: a nib dump that prints titles and order would let menu bugs be checked against Mail itself rather than against the issue's description.
