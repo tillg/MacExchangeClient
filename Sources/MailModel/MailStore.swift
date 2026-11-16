@@ -116,6 +116,8 @@ public final class MailStore {
     @ObservationIgnored private var loadedBoxes: Set<String>?
     /// One per account with changes going out: accounts send side by side, each in its own order (BUG-225).
     private var flushTasks: [UUID: Task<Void, Never>] = [:]
+    /// How often the server answered a queued change with an internal fault (no Exchange code).
+    @ObservationIgnored private var faultTries: [UUID: Int] = [:]
     /// Accounts whose server asked to wait (throttling): their changes aren't sent before then.
     @ObservationIgnored private var busyUntil: [UUID: Date] = [:]
     /// Notices about an account's connection (its failed check, offline, busy), by account. Only that account's next
@@ -700,6 +702,9 @@ public final class MailStore {
     /// Answered invites the server reported deleted, until Trash reports them under their new ID (BUG-104). Not
     /// saved: Trash is checked moments after the Inbox.
     private var answeredGone: [UUID: [Message]] = [:]
+    /// Invites answered here in this session whose move by the server hasn't been seen yet: only these are matched
+    /// to a new item in Trash, each once.
+    private var awaitingServerMove = Set<Message.ID>()
 
     private static func isAnsweredInTrash(_ m: Message) -> Bool {
         m.mailbox == .trash && (m.invite?.response != nil || m.invite?.reply != nil)
@@ -1103,7 +1108,10 @@ public final class MailStore {
             if !ids.isEmpty {
                 // An answered invite in Trash whose ID the server deleted: Exchange moved it there itself under a
                 // new ID. Kept aside, so the item Trash reports gets its answer and text back (BUG-104).
-                answeredGone[account, default: []] += ms.filter { ids.contains($0.id) && Self.isAnsweredInTrash($0) }
+                if !awaitingServerMove.isEmpty {
+                    let kept = ms.filter { ids.contains($0.id) && awaitingServerMove.contains($0.id) && Self.isAnsweredInTrash($0) }
+                    answeredGone[account] = Array(((answeredGone[account] ?? []) + kept).suffix(20))
+                }
                 ms.removeAll { ids.contains($0.id) }
                 selection.subtract(ids)
                 forget(ids)
@@ -1145,11 +1153,12 @@ public final class MailStore {
                     // Gone here with a change still queued, or written since this answer was requested (erased, or
                     // moved: Exchange gave it a new ID): an answer from before that change doesn't bring it back.
                     continue
-                } else if mailbox == .trash, m.isInvite == true, !m.bodyLoaded, let rid = m.remoteID,
-                          let i = ms.firstIndex(where: { $0.accountID == account && Self.isAnsweredInTrash($0) && Self.sameInvite($0, m) }),
-                          ms[i].remoteID.map({ index[$0] == i }) != false {
+                } else if mailbox == .trash, m.isInvite == true, !m.bodyLoaded, !awaitingServerMove.isEmpty, let rid = m.remoteID,
+                          let i = ms.firstIndex(where: { awaitingServerMove.contains($0.id) && $0.accountID == account
+                              && Self.isAnsweredInTrash($0) && Self.sameInvite($0, m) }) {
                     // The invite answered here, as Exchange moved it to Deleted Items: the local copy takes the new
-                    // ID and keeps its answer (BUG-104).
+                    // ID and keeps its answer (BUG-104). Only once: it no longer waits for the server's move.
+                    awaitingServerMove.remove(ms[i].id)
                     if let was = ms[i].remoteID { index[was] = nil }
                     m = Self.movedByServer(ms[i], as: m)
                     ms[i] = m
@@ -1159,6 +1168,8 @@ public final class MailStore {
                        let j = answeredGone[account]?.firstIndex(where: { Self.sameInvite($0, m) }),
                        let old = answeredGone[account]?.remove(at: j) {
                         m = Self.movedByServer(old, as: m)
+                        awaitingServerMove.remove(m.id)
+                        removedIDs.remove(m.id)  // it is back under its old identity: not deleted from the database
                     }
                     ms.append(m)
                     if let rid = m.remoteID { index[rid] = ms.count - 1 }
@@ -1627,7 +1638,16 @@ public final class MailStore {
                 // Not refused, just not now. A send or an answer may still have gone out; never repeat it. The
                 // account's other changes wait for the back-off too (BUG-164).
                 if p.change.mayHaveGoneOut { failed(p, e.localizedDescription) }
-                else { connectionNotice("Exchange is busy – changes will be sent later", account: p.account) }
+                else if e.isFault, faultTries[p.id, default: 0] >= 2 {
+                    // The server failed on this very change three times: it is given up (undone, with the reason),
+                    // so it can't hold the account's later changes for good (BUG-165 follow-up).
+                    faultTries[p.id] = nil
+                    failed(p, e.localizedDescription)
+                    continue
+                } else {
+                    if e.isFault { faultTries[p.id, default: 0] += 1 }
+                    connectionNotice("Exchange is busy – changes will be sent later", account: p.account)
+                }
                 unreachable.insert(p.account)
                 if let wait = e.retryAfter { busyUntil[p.account] = Date.now.addingTimeInterval(wait) }
             } catch let e as PartlyRefused {
@@ -1844,6 +1864,7 @@ public final class MailStore {
         if selection == [id], listSelection != [id] { selection = listSelection }
         if selection == [id] { actOnSelection(apply) } else { keepingSelectionVisible([id]) { apply([id]) } }
         guard let rid = old.remoteID else { return }
+        if response != nil { awaitingServerMove.insert(id) }
         outbox.append(PendingChange(account: old.accountID, change: change(rid), previous: [old]))
         scheduleFlush()
     }
@@ -2078,10 +2099,7 @@ public final class MailStore {
         scheduleFlush()
         await withTaskGroup(of: Void.self) { group in
             for acct in accts {
-                group.addTask {
-                    await self.quickCheck(acct)
-                    await MainActor.run { _ = self.refreshing.remove(acct) }
-                }
+                group.addTask { await self.quickCheck(acct) }
             }
         }
         if history { startHistory() }
@@ -2090,6 +2108,7 @@ public final class MailStore {
     /// One account's quick check. The roles are read again after each folder: a mailbox selected while the check
     /// runs is checked by it, before it ends (a second check asked for meanwhile leaves this account out).
     private func quickCheck(_ acct: UUID) async {
+        defer { refreshing.remove(acct) }
         // Write first, so the check doesn't briefly bring back the old state.
         await flushTasks[acct]?.value
         func next() -> MailboxKind? { quickCheckRoles(acct).first { !quickChecked[acct, default: []].contains($0) } }
@@ -2294,7 +2313,7 @@ public final class MailStore {
     // MARK: Compose
 
     public func draft(_ kind: ReplyKind, to id: Message.ID, includeAttachments: IncludeAttachments = .never) -> Draft {
-        guard let m = message(id) ?? vanished.flatMap({ $0.id == id ? $0 : nil }) else { return Draft(accountID: accounts[0].id) }
+        guard let m = message(id) ?? vanished[id] else { return Draft(accountID: accounts[0].id) }
         let me = account(m.accountID)?.address
         // A prefix of the same kind already there (any case, with or without a space; AW:/WG: from German
         // Outlook) is replaced by the standard one rather than stacked.
@@ -2352,12 +2371,11 @@ public final class MailStore {
     /// A reply or forward of a message whose body was never loaded (only the list summary: names without
     /// addresses, no text): the body is fetched first, so the draft has the addresses and the quote.
     public func loadedDraft(_ kind: ReplyKind, to id: Message.ID, includeAttachments: IncludeAttachments = .never) async -> Draft {
-        let chosen = message(id)
-        defer { vanished = nil }
-        if chosen?.needsBody == true { await loadBody(id) }
-        // Deleted on the server while its body loaded: the reply is still to the message the user chose, from its
-        // account, with what was known of it (BUG-226).
-        if message(id) == nil { vanished = chosen }
+        // Deleted on the server while its body (or Reply-To) loads: the reply is still to the message the user chose,
+        // from its account, with what was known of it (BUG-226).
+        vanished[id] = message(id)
+        defer { vanished[id] = nil }
+        if message(id)?.needsBody == true { await loadBody(id) }
         // A body loaded before Reply-To was asked for: fetched once now, quietly, for at most 3 s and not while the
         // account has a connection problem; otherwise the reply uses what's stored. A rejected password pauses the
         // account, as everywhere (BUG-170).
@@ -2377,7 +2395,7 @@ public final class MailStore {
     }
 
     /// The message `loadedDraft` is answering, when a sync removed it while its body loaded (BUG-226).
-    @ObservationIgnored private var vanished: Message?
+    @ObservationIgnored private var vanished: [Message.ID: Message] = [:]
 
     /// Include Attachments With Replies ▸ When Adding Recipients: the reply now goes to someone who
     /// wasn't on the original message.

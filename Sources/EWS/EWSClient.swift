@@ -46,7 +46,7 @@ public final class EWSClient: Sendable {
             let message = fault.text("faultstring") ?? "Server error"
             // ⚠️ Hand-written from the standard WCF dispatcher fault (`a:InternalServiceFault`), not captured from the
             // live server: a Fault without any Exchange ResponseCode failed before Exchange handled the request.
-            guard let code = fault.text("ResponseCode") else { throw ServerBusy("\(message) (SOAP fault)") }
+            guard let code = fault.text("ResponseCode") else { throw ServerBusy("\(message) (SOAP fault)", isFault: true) }
             if code == "ErrorServerBusy" {
                 let ms = doc.all("Value").first { $0.attr("Name") == "BackOffMilliseconds" }?.stringValue.flatMap { Double($0) }
                 throw ServerBusy("\(message) (\(code))", retryAfter: ms.map { $0 / 1000 })

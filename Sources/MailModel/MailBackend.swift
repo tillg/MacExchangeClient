@@ -185,7 +185,12 @@ public struct ServerBusy: Error, LocalizedError {
     public var message: String
     /// How long the server asked to wait, if it said.
     public var retryAfter: TimeInterval?
-    public init(_ message: String, retryAfter: TimeInterval? = nil) { self.message = message; self.retryAfter = retryAfter }
+    /// The server itself failed on this request (an internal fault without an Exchange code), rather than being
+    /// unreachable or throttled: tried again a few times, then given up.
+    public var isFault = false
+    public init(_ message: String, retryAfter: TimeInterval? = nil, isFault: Bool = false) {
+        self.message = message; self.retryAfter = retryAfter; self.isFault = isFault
+    }
     public var errorDescription: String? { message }
 }
 

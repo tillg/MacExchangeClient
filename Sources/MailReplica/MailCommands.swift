@@ -99,7 +99,7 @@ struct MailCommands: Commands {
             Divider()
             // Mail's order: Mark as Read, Move to Junk, Flag ▸ (… Clear Flag, Toggle Flag), —, Archive (BUG-228).
             let ids = store.withConversations(store.selection)
-            Button(ids.contains { store.message($0)?.isRead == false } || !hasSelection ? "Mark as Read" : "Mark as Unread") {
+            Button(store.messages.contains { !$0.isRead && ids.contains($0.id) } || !hasSelection ? "Mark as Read" : "Mark as Unread") {
                 store.toggleRead(ids)
             }
                 .keyboardShortcut("u", modifiers: [.command, .shift]).disabled(!hasSelection)

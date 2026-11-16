@@ -66,8 +66,12 @@ struct MailReplicaApp: App {
         defer { AppSetup.isPolling = false }
         await AppSetup.loadMail(into: store)  // before the first check, so it only fetches what changed; once per launch
         while !Task.isCancelled {
-            await store.refresh()
-            AppSetup.saveChanges(store)
+            // Not awaited: a check waiting on an account whose server doesn't answer (up to 60 s) doesn't delay the
+            // next check of the others; an account still being checked is left out of it (BUG-225).
+            Task {
+                await store.refresh()
+                AppSetup.saveChanges(store)
+            }
             try? await Task.sleep(for: .seconds(15))
         }
     }

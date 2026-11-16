@@ -536,6 +536,36 @@ struct MailStoreRaceTests {
         #expect(m.mailbox == .trash && m.invite?.response == .accept && m.bodyLoaded && m.body == "Let's meet",
                 "response \(String(describing: m.invite?.response)), loaded \(m.bodyLoaded)")
         #expect(s.messages.first { $0.remoteID == "X" }?.invite == nil)
+        // It is saved, not deleted from the database, though its old ID was reported gone (review of BUG-104).
+        #expect(!s.takeChanges().removed.contains(m.id))
+        // Matched once: a second new invite in Trash with the same subject and time is a message of its own.
+        var twin = summary("M3", subject: "Sync"); twin.isInvite = true
+        s.apply(SyncResult(upserts: [twin], deletedRemoteIDs: [], token: "T2", more: false), account: acct.id, mailbox: .trash)
+        #expect(s.messages.count == 3 && s.messages.first { $0.remoteID == "M2" }?.invite?.response == .accept
+                && s.messages.first { $0.remoteID == "M3" }?.invite == nil)
+    }
+
+    /// BUG-165 follow-up: a change the server fails on with an internal fault every time is given up after three
+    /// tries (undone, with the reason), so the account's later changes go out.
+    @Test func aChangeTheServerAlwaysFaultsOnIsGivenUp() async throws {
+        let fault = RX.env("<s:Fault><faultcode>a:InternalServiceFault</faultcode><faultstring>Internal error</faultstring></s:Fault>")
+        let server = RaceServer([fault, fault, fault, RX.updated(["A2"]), RX.updated(["A2"])])
+        defer { server.stop() }
+        let s = store(server)
+        s.merge([summary("A1"), summary("A2")], account: acct.id, mailbox: .inbox)
+        let a1 = try #require(s.messages.first { $0.remoteID == "A1" }?.id), a2 = try #require(s.messages.first { $0.remoteID == "A2" }?.id)
+        s.setFlag(.red, for: [a1])  // first fault: kept
+        try await waitFor { server.served == 1 }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(s.message(a1)?.flag == .red && s.outbox.count == 1, "kept after the first fault")
+        s.setFlag(.red, for: [a2])  // sends again: second fault, still kept; A2 waits behind it
+        try await waitFor { server.served == 2 }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(s.message(a1)?.flag == .red && s.outbox.count == 2)
+        s.toggleRead([a2])          // third fault: A1's change is given up, A2's two changes go out
+        try await waitFor { s.outbox.isEmpty }
+        #expect(server.served == 5 && s.message(a1)?.flag == nil && s.message(a2)?.flag == .red && s.message(a2)?.isRead == true,
+                "served \(server.served), A1 \(String(describing: s.message(a1)?.flag)), outbox \(s.outbox.count)")
     }
 
     /// BUG-226: Reply to a message whose body is still loading; a sync deletes the message meanwhile. The reply is
