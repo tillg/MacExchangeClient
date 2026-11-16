@@ -194,7 +194,7 @@ struct MessageHeader: View {
             Avatar(contact: message.from, size: 40)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(message.from.name).font(.system(size: 14, weight: .bold))
+                    Text(message.from.name).font(.system(size: 14, weight: .bold)).lineLimit(1)
                     Spacer()
                     if !message.attachments.isEmpty { AttachmentButton(message: message) }
                     if let f = message.flag {
@@ -202,6 +202,7 @@ struct MessageHeader: View {
                     }
                     Text(message.date.formatted(date: .abbreviated, time: .shortened))
                         .font(.system(size: 12)).foregroundStyle(.secondary)
+                        .lineLimit(1).fixedSize()  // the sender's name gives way first (BUG-180)
                 }
                 Text(message.subject).font(.system(size: 13, weight: .semibold))
                 recipients("To:", message.to)
