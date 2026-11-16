@@ -100,7 +100,8 @@ enum SampleData {
                            organizer: c("Priya Raman", "priya@northwind.example"),
                            required: [c("Alex Morgan", work.address), c("Jonas Weber", "jonas@northwind.example"),
                                       c("Elena Petrova", "elena@northwind.example"), c("Sam Okafor", "sam@northwind.example")],
-                           optional: [c("Mia Chen", "mia@northwind.example")]))
+                           optional: [c("Mia Chen", "mia@northwind.example")],
+                           recurrence: "Repeats every 3 months on the first Tuesday"))
         // A cancelled meeting: Outlook offers only Remove from Calendar.
         let cancelled = Message(
             accountID: work.id, from: c("Priya Raman", "priya@northwind.example"), to: meWork,

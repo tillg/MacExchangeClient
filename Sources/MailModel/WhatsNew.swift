@@ -23,6 +23,9 @@ public struct ChangeLogDay: Identifiable, Sendable {
 /// add a day (or extend today's) whenever a change is something a user would notice.
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
+        ChangeLogDay(date: "2026-11-16", features: [
+            "An invite to a meeting that repeats now says so, and how often (for example \"Repeats every week on Monday\").",
+        ]),
         ChangeLogDay(date: "2026-11-13", features: [
             "When a password is rejected, the notice now says to sign in again under Settings ▸ Accounts, which is what fixes it.",
             "While searching, the window title says what is searched and how many results were found, as in Mail.",

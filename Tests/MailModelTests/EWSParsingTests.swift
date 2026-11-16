@@ -476,6 +476,66 @@ struct EWSParsingTests {
         #expect(EWSBackend.parseBody(item).invite == nil)
     }
 
+    /// BUG-202: a recurring meeting's invite says that it repeats and how.
+    @Test func recurringInviteKnowsItRepeats() throws {
+        let asked = EWSBackend.inviteProps
+        #expect(asked.contains("calendar:Recurrence") && asked.contains("calendar:IsRecurring"))
+        func invite(_ recurrence: String) throws -> Invite {
+            let d = try doc("""
+                <t:MeetingRequest><t:ItemId Id="M1"/><t:Body BodyType="Text">x</t:Body>
+                <t:Start>2026-11-23T09:00:00Z</t:Start><t:End>2026-11-23T10:00:00Z</t:End>\(recurrence)</t:MeetingRequest>
+                """)
+            let item = try #require(d.first("MeetingRequest"))
+            return try #require(EWSBackend.parseBody(item).invite)
+        }
+        #expect(try invite("").recurrence == nil)
+        #expect(try invite("<t:IsRecurring>false</t:IsRecurring>").recurrence == nil)
+        #expect(try invite("<t:IsRecurring>true</t:IsRecurring>").recurrence == "Repeats")
+        #expect(try invite("""
+            <t:IsRecurring>true</t:IsRecurring><t:Recurrence><t:WeeklyRecurrence><t:Interval>1</t:Interval>
+            <t:DaysOfWeek>Monday Wednesday</t:DaysOfWeek></t:WeeklyRecurrence>
+            <t:NoEndRecurrence><t:StartDate>2026-11-23+01:00</t:StartDate></t:NoEndRecurrence></t:Recurrence>
+            """).recurrence == "Repeats every week on Monday and Wednesday")
+        #expect(try invite("""
+            <t:Recurrence><t:WeeklyRecurrence><t:Interval>2</t:Interval><t:DaysOfWeek>Friday</t:DaysOfWeek></t:WeeklyRecurrence>
+            <t:NumberedRecurrence><t:StartDate>2026-11-23Z</t:StartDate><t:NumberOfOccurrences>10</t:NumberOfOccurrences></t:NumberedRecurrence></t:Recurrence>
+            """).recurrence == "Repeats every 2 weeks on Friday, 10 times")
+        #expect(try invite("""
+            <t:Recurrence><t:DailyRecurrence><t:Interval>1</t:Interval></t:DailyRecurrence>
+            <t:EndDateRecurrence><t:StartDate>2026-11-23+01:00</t:StartDate><t:EndDate>2026-12-31+01:00</t:EndDate></t:EndDateRecurrence></t:Recurrence>
+            """).recurrence == "Repeats every day until 2026-12-31")
+        #expect(try invite("""
+            <t:Recurrence><t:AbsoluteMonthlyRecurrence><t:Interval>1</t:Interval><t:DayOfMonth>15</t:DayOfMonth></t:AbsoluteMonthlyRecurrence>
+            <t:NoEndRecurrence><t:StartDate>2026-11-15Z</t:StartDate></t:NoEndRecurrence></t:Recurrence>
+            """).recurrence == "Repeats every month on day 15")
+        #expect(try invite("""
+            <t:Recurrence><t:RelativeMonthlyRecurrence><t:Interval>3</t:Interval><t:DaysOfWeek>Tuesday</t:DaysOfWeek>
+            <t:DayOfWeekIndex>First</t:DayOfWeekIndex></t:RelativeMonthlyRecurrence>
+            <t:NoEndRecurrence><t:StartDate>2026-11-03Z</t:StartDate></t:NoEndRecurrence></t:Recurrence>
+            """).recurrence == "Repeats every 3 months on the first Tuesday")
+        #expect(try invite("""
+            <t:Recurrence><t:AbsoluteYearlyRecurrence><t:DayOfMonth>24</t:DayOfMonth><t:Month>December</t:Month></t:AbsoluteYearlyRecurrence>
+            <t:NoEndRecurrence><t:StartDate>2026-12-24Z</t:StartDate></t:NoEndRecurrence></t:Recurrence>
+            """).recurrence == "Repeats every year on 24 December")
+        #expect(try invite("""
+            <t:Recurrence><t:RelativeYearlyRecurrence><t:DaysOfWeek>Sunday</t:DaysOfWeek><t:DayOfWeekIndex>Last</t:DayOfWeekIndex>
+            <t:Month>October</t:Month></t:RelativeYearlyRecurrence>
+            <t:NoEndRecurrence><t:StartDate>2026-10-25Z</t:StartDate></t:NoEndRecurrence></t:Recurrence>
+            """).recurrence == "Repeats every year on the last Sunday of October")
+        // A pattern this version doesn't know still says that the meeting repeats.
+        #expect(try invite("<t:Recurrence><t:FutureRecurrence/></t:Recurrence>").recurrence == "Repeats")
+    }
+
+    /// BUG-202: an invite stored before recurrence existed still loads (no "recurrence" key).
+    @Test func inviteWithoutRecurrenceKeyDecodes() throws {
+        var data = try JSONEncoder().encode(Invite(start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 60)))
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        var obj = try #require(json)
+        obj["recurrence"] = nil
+        data = try JSONSerialization.data(withJSONObject: obj)
+        #expect(try JSONDecoder().decode(Invite.self, from: data).recurrence == nil)
+    }
+
     @Test func meetingRequestBodyCarriesTheInvite() throws {
         let d = try doc("""
             <t:MeetingRequest><t:ItemId Id="M1"/><t:Body BodyType="Text">Agenda</t:Body>

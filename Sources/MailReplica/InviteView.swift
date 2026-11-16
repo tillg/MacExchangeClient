@@ -18,6 +18,10 @@ struct InviteCard: View {
                     Image(systemName: "calendar").foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(invite.when()).font(.system(size: 13, weight: .semibold))
+                        if let recurrence = invite.recurrence {
+                            Label(recurrence, systemImage: "repeat").font(.system(size: 12)).foregroundStyle(.secondary)
+                                .help("Your answer is for the whole series")
+                        }
                         if !invite.location.isEmpty { Text(invite.location).font(.system(size: 13, weight: .semibold)) }
                     }
                 }

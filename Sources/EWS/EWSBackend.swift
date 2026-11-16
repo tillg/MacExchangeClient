@@ -230,7 +230,9 @@ public struct EWSBackend: MailBackend {
 
     /// Asked of every item when its body loads; only meeting requests return them (checked on the real server).
     static let inviteProps = ["calendar:Start", "calendar:End", "calendar:Location", "calendar:IsAllDayEvent",
-                              "calendar:Organizer", "calendar:RequiredAttendees", "calendar:OptionalAttendees"]
+                              "calendar:Organizer", "calendar:RequiredAttendees", "calendar:OptionalAttendees",
+                              // ⚠️ BUG-202: not yet seen from the live server; same property family as the ones above.
+                              "calendar:IsRecurring", "calendar:Recurrence"]
         .map { "<t:FieldURI FieldURI=\"\($0)\"/>" }.joined()
 
     public func events(from: Date, to: Date) async throws -> [CalendarEvent] {
@@ -268,11 +270,45 @@ public struct EWSBackend: MailBackend {
               let start = item.child("Start")?.stringValue.flatMap(isoDate),
               let end = item.child("End")?.stringValue.flatMap(isoDate) else { return nil }
         let attendees = { (tag: String) in (item.child(tag)?.children("Attendee") ?? []).compactMap { $0.child("Mailbox").map(contact) } }
-        return Invite(start: start, end: end, location: item.child("Location")?.stringValue ?? "",
-                      isAllDay: item.child("IsAllDayEvent")?.stringValue == "true",
-                      organizer: item.child("Organizer")?.child("Mailbox").map(contact),
-                      required: attendees("RequiredAttendees"), optional: attendees("OptionalAttendees"),
-                      isCancellation: item.localName == "MeetingCancellation")
+        var invite = Invite(start: start, end: end, location: item.child("Location")?.stringValue ?? "",
+                            isAllDay: item.child("IsAllDayEvent")?.stringValue == "true",
+                            organizer: item.child("Organizer")?.child("Mailbox").map(contact),
+                            required: attendees("RequiredAttendees"), optional: attendees("OptionalAttendees"),
+                            isCancellation: item.localName == "MeetingCancellation")
+        invite.recurrence = recurrence(item)
+        return invite
+    }
+
+    /// How a meeting repeats, in words, from `IsRecurring` and `Recurrence` (BUG-202); nil for a single meeting.
+    /// A pattern not known here is just "Repeats".
+    static func recurrence(_ item: XMLNode) -> String? {
+        guard let r = item.child("Recurrence") else {
+            return item.child("IsRecurring")?.stringValue == "true" ? "Repeats" : nil
+        }
+        func every(_ p: XMLNode, _ unit: String) -> String {
+            let n = p.child("Interval")?.stringValue.flatMap(Int.init) ?? 1
+            return n > 1 ? "every \(n) \(unit)s" : "every \(unit)"
+        }
+        func days(_ p: XMLNode) -> String {
+            let d = (p.child("DaysOfWeek")?.stringValue ?? "").split(separator: " ").map(String.init)
+            return d.count > 1 ? d.dropLast().joined(separator: ", ") + " and " + d[d.count - 1] : d.first ?? ""
+        }
+        func nth(_ p: XMLNode) -> String { "the \((p.child("DayOfWeekIndex")?.stringValue ?? "").lowercased()) \(days(p))" }
+        func text(_ p: XMLNode, _ tag: String) -> String { p.child(tag)?.stringValue ?? "" }
+        var s: String
+        if let p = r.child("DailyRecurrence") { s = "Repeats \(every(p, "day"))" }
+        else if let p = r.child("WeeklyRecurrence") { s = "Repeats \(every(p, "week")) on \(days(p))" }
+        else if let p = r.child("AbsoluteMonthlyRecurrence") { s = "Repeats \(every(p, "month")) on day \(text(p, "DayOfMonth"))" }
+        else if let p = r.child("RelativeMonthlyRecurrence") { s = "Repeats \(every(p, "month")) on \(nth(p))" }
+        else if let p = r.child("AbsoluteYearlyRecurrence") { s = "Repeats every year on \(text(p, "DayOfMonth")) \(text(p, "Month"))" }
+        else if let p = r.child("RelativeYearlyRecurrence") { s = "Repeats every year on \(nth(p)) of \(text(p, "Month"))" }
+        else { return "Repeats" }
+        if let until = r.child("EndDateRecurrence")?.child("EndDate")?.stringValue, until.count >= 10 {
+            s += " until \(until.prefix(10))"
+        } else if let n = r.child("NumberedRecurrence")?.child("NumberOfOccurrences")?.stringValue {
+            s += ", \(n) times"
+        }
+        return s
     }
 
     // MARK: Write-back

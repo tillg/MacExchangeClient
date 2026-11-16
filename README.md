@@ -16,7 +16,7 @@ A native macOS mail client in SwiftUI. It starts as a faithful replica of the Ap
 - **Exchange accounts over EWS:** sign in under Settings ▸ Accounts with email, `DOMAIN\user`, password and server, as in iOS Mail. Inbox, Drafts, Sent, Junk, Deleted Items and Archive are synced, and so are your own mail folders and subfolders. What you look at drives the order, as described under [How mail is fetched](#how-mail-is-fetched). The password is kept in the Keychain, per user and server. If it is missing there, the account and its mail stay, the status says the password is needed, and changes wait; signing in again with the same email, username and server connects the same account.
 
 - **Meeting invites, as in Outlook:** for each invite you see:
-  - when and where, with the required and optional attendees;
+  - when and where, with the required and optional attendees, and for a meeting that repeats, how ("Repeats every week on Monday"; ⚠️ the recurrence fields are not yet checked against the live server);
   - Accept, Tentative and Decline menus, as in Outlook: Respond with Comments, Respond without Comments, or Do Not Send a Response (only the calendar changes). With Comments opens a message window to the organizer, with the subject Exchange will use ("Declined: …"); its text becomes the comment;
   - Propose New Time, together with Tentative or Decline, in the same message window with a new start and end;
   - an answered invite moves to Trash right away, as Exchange will do, and the next message is selected;

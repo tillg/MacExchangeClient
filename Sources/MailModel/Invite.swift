@@ -15,11 +15,14 @@ public struct Invite: Hashable, Codable, Sendable {
     public var reply: InviteReply?
     /// A cancellation (EWS MeetingCancellation): it can only be removed from the calendar. Nil in older caches.
     public var isCancellation: Bool?
+    /// For a meeting that repeats, how, in words ("Repeats every week on Monday"); an answer is for the whole
+    /// series (BUG-202). Nil for a single meeting and in older caches.
+    public var recurrence: String?
 
     public init(start: Date, end: Date, location: String = "", isAllDay: Bool = false, organizer: Contact? = nil,
                 required: [Contact] = [], optional: [Contact] = [], response: InviteResponse? = nil,
-                isCancellation: Bool? = nil) {
-        self.isCancellation = isCancellation
+                isCancellation: Bool? = nil, recurrence: String? = nil) {
+        self.isCancellation = isCancellation; self.recurrence = recurrence
         self.start = start; self.end = end; self.location = location; self.isAllDay = isAllDay
         self.organizer = organizer; self.required = required; self.optional = optional; self.response = response
     }
