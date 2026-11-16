@@ -430,6 +430,19 @@ struct EWSParsingTests {
         #expect(d.text("s") == "x\u{FFFD}y\u{FFFD}z\u{FFFD}\t\n\r &#8;")
     }
 
+    /// BUG-208: the same characters written raw (a Latin-1 "é" byte that isn't UTF-8, a vertical tab) fail the page too.
+    @Test func rawInvalidBytesAndControlsDontBreakParsing() throws {
+        var latin1 = Data("<a><s>Caf</s></a>".utf8)
+        latin1.insert(0xE9, at: 9)
+        #expect((try? XMLDocument(data: latin1)) == nil)
+        #expect(try XMLDocument(data: EWSClient.sanitize(latin1)).text("s") == "Caf\u{FFFD}")
+        let raw = Data("<a><s>Tab\u{0B}stop\u{08}\t\n\r&#8;&amp;</s></a>".utf8)
+        #expect((try? XMLDocument(data: raw)) == nil)
+        #expect(try XMLDocument(data: EWSClient.sanitize(raw)).text("s") == "Tab\u{FFFD}stop\u{FFFD}\t\n\n\u{FFFD}&")
+        let fine = Data("<a><s>Café 😀\t</s></a>".utf8)
+        #expect(EWSClient.sanitize(fine) == fine)
+    }
+
     /// U+FFFE, U+FFFF and surrogates are just as illegal in XML 1.0 as C0 controls, in hex or decimal form.
     @Test func nonCharacterReferencesDontBreakParsing() throws {
         for ref in ["&#xFFFE;", "&#xFFFF;", "&#65534;", "&#65535;", "&#xD800;", "&#xdfff;", "&#55296;", "&#57343;",

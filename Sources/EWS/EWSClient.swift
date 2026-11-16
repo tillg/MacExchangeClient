@@ -67,7 +67,14 @@ public final class EWSClient: Sendable {
     /// Exchange writes control characters from old mails as references like `&#8;`, which XML 1.0 forbids
     /// and `XMLDocument` rejects, failing the whole page. So are references to U+FFFE, U+FFFF, surrogates and
     /// numbers past U+10FFFF. They all become U+FFFD instead.
-    static func sanitize(_ data: Data) -> Data {
+    /// Raw forms of the same trouble, a byte that isn't UTF-8 or a raw control character, become U+FFFD too.
+    static func sanitize(_ raw: Data) -> Data {
+        var data = raw
+        if data.contains(where: { $0 < 0x20 && $0 != 0x9 && $0 != 0xA && $0 != 0xD }) || String(data: data, encoding: .utf8) == nil {
+            var fixed = String.UnicodeScalarView()
+            for c in String(decoding: data, as: UTF8.self).unicodeScalars { fixed.append(isXMLChar(c.value) ? c : "\u{FFFD}") }
+            data = Data(String(fixed).utf8)
+        }
         guard data.range(of: Data("&#".utf8)) != nil else { return data }
         let s = String(decoding: data, as: UTF8.self) as NSString
         var out = "", last = 0
