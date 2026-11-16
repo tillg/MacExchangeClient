@@ -459,5 +459,35 @@ struct MailStoreRaceTests {
         try #require(!s.isPaused(acct.id) && server.served == 1, "check didn't run: \(server.served)")
         #expect(s.status != notice, "after signing in again and a successful check the status still says: \(s.status ?? "nil")")
     }
+
+    /// BUG-225: two accounts; A's server doesn't answer (an on-prem server off the VPN: each request waits for the
+    /// 60 s timeout) and A has a flag change queued. B's new mail and B's own change don't wait for A.
+    @Test func aServerThatDoesntAnswerDoesNotHoldUpTheOtherAccount() async throws {
+        let a = RaceServer([], hold: true)
+        let b = RaceServer([RX.updated(["B0"]), RX.sync(RX.create(RX.summary("B1")), token: "TB1")])
+        defer { a.stop(); b.stop() }
+        let other = Account(name: "Home", address: "me@home.com", isServer: true)
+        let s = store(a)
+        s.add(other, backend: EWSBackend(client: EWSClient(url: b.url, username: "u", password: "p")))
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "BINBOX")], account: other.id)
+        for x in [acct.id, other.id] {
+            s.apply(SyncResult(upserts: [], deletedRemoteIDs: [], token: "T0", more: false), account: x, mailbox: .inbox)
+        }
+        s.merge([summary("A1")], account: acct.id, mailbox: .inbox)
+        var b0 = summary("B0"); b0.accountID = other.id
+        s.merge([b0], account: other.id, mailbox: .inbox)
+        let ida = try #require(s.messages.first { $0.remoteID == "A1" }?.id)
+        let idb = try #require(s.messages.first { $0.remoteID == "B0" }?.id)
+        s.setFlag(.red, for: [ida])  // queued for A first; waits on A's silent server
+        s.setFlag(.red, for: [idb])  // B's change, queued behind it
+        let check = Task { await s.refresh(history: false) }
+        try await waitFor(.seconds(5)) { s.messages.contains { $0.remoteID == "B1" } }
+        let arrived = s.messages.contains { $0.remoteID == "B1" }, served = b.served
+        a.push(RX.updated(["A1"])); a.push(RX.sync("", token: "T1"))  // let A answer, so the check ends
+        await check.value
+        #expect(arrived, "B's new mail didn't arrive within 5 s while A's server was silent (B served \(served))")
+        #expect(served == 2, "B's own change and check went out while A was silent: served \(served)")
+        #expect(a.served == 2, "A's change and check still went out once it answered: \(a.served)")
+    }
 }
 }

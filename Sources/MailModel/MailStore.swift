@@ -59,7 +59,12 @@ public final class MailStore {
     @ObservationIgnored var searchDebounce: Duration = .milliseconds(150)
     /// Last sync problem or notice, shown under the window title.
     public var status: String?
-    public private(set) var isRefreshing = false
+    public var isRefreshing: Bool { !refreshing.isEmpty }
+    /// Accounts whose quick check is running. Each account is checked on its own, so one whose server doesn't
+    /// answer doesn't hold up the others (BUG-225).
+    private var refreshing = Set<UUID>()
+    /// Mailboxes the running quick checks have covered, per account.
+    private var quickChecked: [UUID: Set<MailboxKind>] = [:]
     /// Shown at the bottom of the sidebar while checking for mail, like Mail's activity view.
     public var progress: SyncProgress?
 
@@ -109,7 +114,8 @@ public final class MailStore {
     @ObservationIgnored private var filesChanged = Set<Message.ID>()
     /// Mailboxes whose stored mail is in memory while launch is still loading; nil once everything is.
     @ObservationIgnored private var loadedBoxes: Set<String>?
-    private var flushTask: Task<Void, Never>?
+    /// One per account with changes going out: accounts send side by side, each in its own order (BUG-225).
+    private var flushTasks: [UUID: Task<Void, Never>] = [:]
     /// Accounts whose server asked to wait (throttling): their changes aren't sent before then.
     @ObservationIgnored private var busyUntil: [UUID: Date] = [:]
     /// Notices about an account's connection (its failed check, offline, busy), by account. Only that account's next
@@ -1490,10 +1496,12 @@ public final class MailStore {
 
     private func scheduleFlush() {
         // Not while loading: the server renames moved messages, and those not in memory yet would keep old IDs.
-        guard flushTask == nil, loadedBoxes == nil, !holdingSends, outbox.contains(where: canSend) else { return }
-        flushTask = Task {
-            await drain()
-            flushTask = nil
+        guard loadedBoxes == nil, !holdingSends else { return }
+        for acct in Set(outbox.filter(canSend).map(\.account)) where flushTasks[acct] == nil {
+            flushTasks[acct] = Task {
+                await drain(acct)
+                flushTasks[acct] = nil
+            }
         }
     }
 
@@ -1521,13 +1529,14 @@ public final class MailStore {
         if touched { outbox = box }
     }
 
-    /// Writes queued changes in order. When an account's server can't be reached, its changes stay queued for the
-    /// next refresh while other accounts' changes go out; a send is never retried, because a timed-out send may have
-    /// gone out.
-    private func drain() async {
-        // Accounts whose server couldn't be reached this time: their changes wait, in order; the others go on.
+    /// Writes one account's queued changes in order. When its server can't be reached, its changes stay queued for
+    /// the next refresh; other accounts' changes go out in their own `drain`, at the same time, so a server that
+    /// doesn't answer holds up only its own account (BUG-225). A send is never retried, because a timed-out send
+    /// may have gone out.
+    private func drain(_ acct: UUID) async {
+        // Set when the server couldn't be reached this time: the account's changes wait, in order.
         var unreachable = Set<UUID>()
-        while let p = outbox.first(where: { canSend($0) && !unreachable.contains($0.account) }),
+        while let p = outbox.first(where: { $0.account == acct && canSend($0) && !unreachable.contains($0.account) }),
               let backend = backends[p.account] {
             if case .send = p.change, let i = outbox.firstIndex(where: { $0.id == p.id }) {
                 // Marked and saved before the request goes out: a quit or crash meanwhile can't send it twice.
@@ -1991,53 +2000,63 @@ public final class MailStore {
     /// A fully synced folder asks for changes (one small request); one still syncing gets its newest
     /// messages. Never waits for the history sync, which it starts afterwards.
     public func refresh(history: Bool = true) async {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-        defer { isRefreshing = false }
-        // Write first, so the check doesn't briefly bring back the old state.
+        // An account whose check is still running (its server may not be answering) is left to that check.
+        let accts = backends.keys.filter { !refreshing.contains($0) }
+        guard !accts.isEmpty || backends.isEmpty else { return }
+        refreshing.formUnion(accts)
+        for acct in accts { quickChecked[acct] = [] }
         scheduleFlush()
-        await flushTask?.value
-        // The roles are read again after each folder: a mailbox selected while the check runs is checked by it,
-        // before it ends (a second check asked for meanwhile returns at once).
-        var checked: [UUID: Set<MailboxKind>] = [:]
-        func next(_ acct: UUID) -> MailboxKind? { quickCheckRoles(acct).first { !checked[acct, default: []].contains($0) } }
-        repeat {
-            for (acct, backend) in backends where !paused.contains(acct) && next(acct) != nil {
-                do {
-                    if remoteFolders[acct] == nil { setRemoteFolders(try await backend.folders(), account: acct) }
-                    while let role = next(acct) {
-                        checked[acct, default: []].insert(role)
-                        guard let folder = remoteFolders[acct]?.first(where: { $0.role == role }) else { continue }
-                        if isComplete(acct, role) {
-                            do {
-                                var more = true
-                                while more {
-                                    let asked = requestStamp, sent = syncToken(acct, role)
-                                    let r = try await backend.sync(folder, token: sent)
-                                    apply(r, account: acct, mailbox: role, asked: asked)
-                                    more = r.more
-                                    if more && r.token == sent { throw SamePageAgain() }
-                                }
-                            } catch is SyncTokenRejected {
-                                resetSync(acct, role)
-                            }
-                        } else {
-                            let asked = requestStamp
-                            let newest = try await backend.newest(in: folder, limit: Self.firstScreen)
-                            merge(newest, account: acct, mailbox: role, asked: asked)
-                        }
-                    }
-                    // Only this account's own connection notice goes; another account's or "Couldn't send" stays.
-                    if let notice = connectionNotices.removeValue(forKey: acct), status == notice { status = historyError }
-                } catch where pauseIfSignInFailed(error, account: acct) {
-                    checked[acct, default: []].formUnion(quickCheckRoles(acct))
-                } catch {
-                    checked[acct, default: []].formUnion(quickCheckRoles(acct))
-                    connectionNotice("\(account(acct)?.name ?? "Account"): \(error.localizedDescription)", account: acct)
+        await withTaskGroup(of: Void.self) { group in
+            for acct in accts {
+                group.addTask {
+                    await self.quickCheck(acct)
+                    await MainActor.run { _ = self.refreshing.remove(acct) }
                 }
             }
-        } while backends.keys.contains { !paused.contains($0) && next($0) != nil }
+        }
         if history { startHistory() }
+    }
+
+    /// One account's quick check. The roles are read again after each folder: a mailbox selected while the check
+    /// runs is checked by it, before it ends (a second check asked for meanwhile leaves this account out).
+    private func quickCheck(_ acct: UUID) async {
+        // Write first, so the check doesn't briefly bring back the old state.
+        await flushTasks[acct]?.value
+        func next() -> MailboxKind? { quickCheckRoles(acct).first { !quickChecked[acct, default: []].contains($0) } }
+        while !paused.contains(acct), next() != nil, let backend = backends[acct] {
+            do {
+                if remoteFolders[acct] == nil { setRemoteFolders(try await backend.folders(), account: acct) }
+                while let role = next() {
+                    quickChecked[acct, default: []].insert(role)
+                    guard let folder = remoteFolders[acct]?.first(where: { $0.role == role }) else { continue }
+                    if isComplete(acct, role) {
+                        do {
+                            var more = true
+                            while more {
+                                let asked = requestStamp, sent = syncToken(acct, role)
+                                let r = try await backend.sync(folder, token: sent)
+                                apply(r, account: acct, mailbox: role, asked: asked)
+                                more = r.more
+                                if more && r.token == sent { throw SamePageAgain() }
+                            }
+                        } catch is SyncTokenRejected {
+                            resetSync(acct, role)
+                        }
+                    } else {
+                        let asked = requestStamp
+                        let newest = try await backend.newest(in: folder, limit: Self.firstScreen)
+                        merge(newest, account: acct, mailbox: role, asked: asked)
+                    }
+                }
+                // Only this account's own connection notice goes; another account's or "Couldn't send" stays.
+                if let notice = connectionNotices.removeValue(forKey: acct), status == notice { status = historyError }
+            } catch where pauseIfSignInFailed(error, account: acct) {
+                quickChecked[acct, default: []].formUnion(quickCheckRoles(acct))
+            } catch {
+                quickChecked[acct, default: []].formUnion(quickCheckRoles(acct))
+                connectionNotice("\(account(acct)?.name ?? "Account"): \(error.localizedDescription)", account: acct)
+            }
+        }
     }
 
     /// A server that answers "more" without moving its sync position on would be asked for the same page forever.
