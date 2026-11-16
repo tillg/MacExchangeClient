@@ -94,7 +94,7 @@ struct MessageContent: View {
                     Divider()
                     DayColumn(invite: invite, subject: message.subject, events: store.dayEvents[message.id],
                               unavailable: store.unavailableDays.contains(message.id))
-                        .frame(width: 300)
+                        .frame(minWidth: 180, idealWidth: 300, maxWidth: 300)  // narrows in a narrow pane (BUG-181)
                 }
             } else {
                 Divider()
