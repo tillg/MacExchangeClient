@@ -126,6 +126,16 @@ struct EWSParsingTests {
         #expect(Date().timeIntervalSince(t) < 5)
     }
 
+    /// ⚠️ Exchange's text version of an HTML mail is recalled to write each inline picture as "[cid:image001.png@…]";
+    /// that is no text the sender wrote, so it is left out of the text (list preview, search, reply quote).
+    @Test func cidPlaceholdersOfTextBodyAreDropped() throws {
+        let d = try doc("""
+            <t:Message><t:ItemId Id="M1"/><t:Body BodyType="HTML">&lt;p&gt;Hi Ann&lt;/p&gt;</t:Body>\
+            <t:TextBody BodyType="Text">[cid:image001.png@01DA1B2C.3D4E5F60]\r\nHi Ann [cid:image002.png@01DA1B2C.3D4E5F60] ok\r\n\r\nRegards [x]\r\n</t:TextBody></t:Message>
+            """)
+        #expect(EWSBackend.parseBody(try #require(d.first("Message"))).text == "Hi Ann ok\n\nRegards [x]\n")
+    }
+
     @Test func emptyTextBodyFallsBackToHTML() throws {
         let d = try doc("""
             <t:Message><t:ItemId Id="A"/><t:Body BodyType="HTML">&lt;p&gt;Hello&lt;/p&gt;</t:Body><t:TextBody BodyType="Text"/></t:Message>

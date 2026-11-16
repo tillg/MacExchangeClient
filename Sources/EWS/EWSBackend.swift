@@ -664,7 +664,7 @@ public struct EWSBackend: MailBackend {
         let body = item.child("Body")
         let html = body?.attr("BodyType") == "HTML" ? body?.stringValue : nil
         // An empty TextBody next to an HTML body says nothing: the text comes from the HTML then.
-        let textBody = item.child("TextBody")?.stringValue.flatMap { $0.allSatisfy(\.isWhitespace) && html != nil ? nil : $0 }
+        let textBody = item.child("TextBody")?.stringValue.flatMap { $0.allSatisfy(\.isWhitespace) && html != nil ? nil : withoutCIDMarks($0) }
         let text = textBody ?? html.map(plainText) ?? body?.stringValue ?? ""
         return MessageBody(text: text, attachments: attachments,
                            from: item.child("From").map(contact),
@@ -672,6 +672,20 @@ public struct EWSBackend: MailBackend {
                            cc: item.child("CcRecipients").map(mailboxes) ?? [], invite: parseInvite(item), html: html,
                            replyTo: item.child("ReplyTo").map(mailboxes) ?? [])
     }
+
+    /// ⚠️ Recalled, not captured from the live server: Exchange's text version of an HTML mail writes each inline
+    /// picture as `[cid:image001.png@01DA…]`. Such a mark isn't text the sender wrote: it is dropped, and a line
+    /// that held nothing else goes with it.
+    static func withoutCIDMarks(_ text: String) -> String {
+        guard text.contains("[cid:") else { return text }
+        let all = NSRange(location: 0, length: (text as NSString).length)
+        let alone = cidMarkLine.stringByReplacingMatches(in: text, range: all, withTemplate: "")
+        return cidMark.stringByReplacingMatches(in: alone, range: NSRange(location: 0, length: (alone as NSString).length),
+                                                withTemplate: "")
+    }
+    private static let cidMarkLine = try! NSRegularExpression(
+        pattern: #"^[ \t]*(?:\[cid:[^\]\s]+\][ \t]*)+(?:\r?\n|\z)"#, options: .anchorsMatchLines)
+    private static let cidMark = try! NSRegularExpression(pattern: #"\[cid:[^\]\s]+\] ?"#)
 
     /// Rough text of an HTML body, used only if the server sends no `TextBody`. One pass, so an unclosed tag or
     /// comment can't make it slow: comments, head, style and script are dropped (an unclosed one to the end),
