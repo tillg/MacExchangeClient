@@ -104,6 +104,17 @@ struct EWSParsingTests {
         #expect(EWSBackend.plainText("Line1<br clear=\"all\">Line2") == "Line1\nLine2")
     }
 
+    /// BUG-205: blocks other than p/div/tr/li/h1-h6 start and end a line, and a `<p>` without the previous one closed
+    /// starts a new line (HTML Living Standard §15.3.3, §13.1.2.4).
+    @Test func plainTextBreaksLinesAtOtherBlockElements() {
+        #expect(EWSBackend.plainText("<blockquote>Original text</blockquote>My answer") == "Original text\nMy answer")
+        #expect(EWSBackend.plainText("<p>First<p>Second") == "First\nSecond")
+        #expect(EWSBackend.plainText("Above<hr>Below") == "Above\nBelow")
+        #expect(EWSBackend.plainText("Intro<ul><li>One<li>Two</ul>Outro") == "Intro\nOne\nTwo\nOutro")
+        #expect(EWSBackend.plainText("Before<pre>code</pre>After<table><tr><td>A</td></tr></table>End") == "Before\ncode\nAfter\nA\nEnd")
+        #expect(EWSBackend.plainText("a<span>b</span><b>c</b>") == "abc")
+    }
+
     @Test func plainTextKeepsTableCellsApart() {
         #expect(EWSBackend.plainText("<table><tr><td>Name</td><td>Value</td></tr></table>") == "Name Value")
     }

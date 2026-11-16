@@ -687,9 +687,15 @@ public struct EWSBackend: MailBackend {
         pattern: #"^[ \t]*(?:\[cid:[^\]\s]+\][ \t]*)+(?:\r?\n|\z)"#, options: .anchorsMatchLines)
     private static let cidMark = try! NSRegularExpression(pattern: #"\[cid:[^\]\s]+\] ?"#)
 
+    /// Block elements: both their start and end tag break the line (a `<p>` may be left unclosed).
+    private static let lineBreakingTags: Set<String> = [
+        "p", "div", "blockquote", "pre", "hr", "ul", "ol", "dl", "dt", "dd", "table", "tr", "li", "section", "article",
+        "h1", "h2", "h3", "h4", "h5", "h6",
+    ]
+
     /// Rough text of an HTML body, used only if the server sends no `TextBody`. One pass, so an unclosed tag or
     /// comment can't make it slow: comments, head, style and script are dropped (an unclosed one to the end),
-    /// `<br>` and the end of a block are line breaks, the end of a table cell a space, other tags go, and
+    /// `<br>` and the start and end of a block are line breaks, the end of a table cell a space, other tags go, and
     /// character references are decoded.
     static func plainText(_ html: String) -> String {
         let s = html as NSString, n = s.length
@@ -719,7 +725,7 @@ public struct EWSBackend: MailBackend {
             if !closing, ["head", "style", "script"].contains(name) {
                 i = find("</" + name, from: i, .caseInsensitive).map { find(">", from: $0).map { $0 + 1 } ?? n } ?? n
                 textStart = i
-            } else if name == "br" || closing && ["p", "div", "tr", "li", "h1", "h2", "h3", "h4", "h5", "h6"].contains(name) {
+            } else if name == "br" || lineBreakingTags.contains(name) {
                 out += "\n"
             } else if closing && (name == "td" || name == "th") {
                 out += " "
