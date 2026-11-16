@@ -24,6 +24,16 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-16", features: [
+            "The Control-click menu on a message now has Move to and lists Move to Junk and Delete before Flag, as in Mail.",
+            "Send in the new message window is now an up arrow at the right end of the toolbar, as in Mail.",
+            "Flagged in the sidebar now shows how many messages are flagged.",
+            "In a narrow window, an invite's day calendar gets slimmer so the message text stays easy to read.",
+            "The From line in a new message now lines up with To and Subject.",
+            "The View menu now has Back and Forward (⇧⌘[ and ⇧⌘]) and a Filter submenu.",
+            "The Message menu now follows Mail: Move to Junk sits before Flag, Toggle Flag is inside Flag, and Delete is in the Edit menu.",
+            "In a narrow window, the date in a message's header no longer breaks onto two lines.",
+            "The Mailbox menu now has Go to Favorite Mailbox with the ⌘1 to ⌘9 shortcuts.",
+            "Mail with blocked pictures no longer shows empty outlined boxes where web pictures and image buttons would be.",
             "When the server refuses one folder, the newest mail of your other folders still arrives right away.",
             "An invite you answered still shows your answer in Trash, instead of asking you to respond again.",
             "Archive in an account that has no Archive mailbox now leaves the message where it is and says so, instead of moving it away and back.",

@@ -33,8 +33,13 @@ struct MailCommands: Commands {
             }
             .keyboardShortcut("y").disabled(store.selectedMessage?.attachments.isEmpty ?? true)
         }
-        // Delete is in Mail's Edit menu, after Paste (BUG-228).
-        CommandGroup(after: .pasteboard) {
+        // Delete is in Mail's Edit menu, after Paste and before Select All (BUG-228). The system's group has its own
+        // Delete (no shortcut), and added items can only follow Select All, so the group is written out here: Cut,
+        // Copy, Paste and Select All go to the first responder, as the system's items do.
+        CommandGroup(replacing: .pasteboard) {
+            Button("Cut") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }.keyboardShortcut("x")
+            Button("Copy") { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }.keyboardShortcut("c")
+            Button("Paste") { NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil) }.keyboardShortcut("v")
             Button("Delete") {
                 // ⌘⌫ is also the text system's "delete to the start of the line". In Mail, Delete goes to the first
                 // responder, so typing in a compose window or the search field never deletes mail (BUG-218).
@@ -48,6 +53,7 @@ struct MailCommands: Commands {
                 }
             }
                 .keyboardShortcut(.delete).disabled(!hasSelection)
+            Button("Select All") { NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: nil, from: nil) }.keyboardShortcut("a")
         }
         CommandGroup(after: .textEditing) {
             Picker("Include Attachments With Replies", selection: $includeMode) {

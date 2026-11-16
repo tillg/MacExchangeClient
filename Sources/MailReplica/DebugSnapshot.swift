@@ -116,6 +116,26 @@ struct DebugSnapshot: ViewModifier {
                 }
                 if !win.isVisible { exit(0) }
             }
+            // MAIL_SNAPSHOT_MENUS=1 prints the menu bar (titles, shortcuts, "(off)" for disabled items), to check the
+            // menus against Mail's without a screen.
+            if ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_MENUS"] != nil, let main = NSApp.mainMenu {
+                func dump(_ menu: NSMenu, _ depth: Int) {
+                    menu.update()
+                    for item in menu.items {
+                        let pad = String(repeating: "  ", count: depth)
+                        if item.isSeparatorItem { print("MENU \(pad)—"); continue }
+                        var keys = ""
+                        if !item.keyEquivalent.isEmpty {
+                            let m = item.keyEquivalentModifierMask
+                            keys = "  [" + (m.contains(.control) ? "⌃" : "") + (m.contains(.option) ? "⌥" : "")
+                                + (m.contains(.shift) ? "⇧" : "") + (m.contains(.command) ? "⌘" : "") + item.keyEquivalent + "]"
+                        }
+                        print("MENU \(pad)\(item.title)\(keys)\(item.isEnabled || item.hasSubmenu ? "" : " (off)")")
+                        if let sub = item.submenu { dump(sub, depth + 1) }
+                    }
+                }
+                dump(main, 0)
+            }
             guard let win = NSApp.windows.first(where: { $0.isVisible && (windowTitle.map($0.title.hasPrefix) ?? ($0.title != "New Message")) }),
                   let view = win.contentView?.superview else { exit(2) }
             // MAIL_SNAPSHOT_SIZE=1280x800 sets the window's size in points first (the README screenshots).
