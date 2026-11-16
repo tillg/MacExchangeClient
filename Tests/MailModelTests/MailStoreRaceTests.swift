@@ -537,5 +537,25 @@ struct MailStoreRaceTests {
                 "response \(String(describing: m.invite?.response)), loaded \(m.bodyLoaded)")
         #expect(s.messages.first { $0.remoteID == "X" }?.invite == nil)
     }
+
+    /// BUG-226: Reply to a message whose body is still loading; a sync deletes the message meanwhile. The reply is
+    /// still to that message, from its account, not an empty one from the first account.
+    @Test func replyToAMessageDeletedWhileItsBodyLoads() async throws {
+        let server = RaceServer([], hold: true)
+        defer { server.stop() }
+        let other = Account(name: "Other", address: "me@other.com")
+        let s = store(server)
+        s.accounts.insert(other, at: 0)
+        s.merge([summary("R1", subject: "Budget")], account: acct.id, mailbox: .inbox)
+        let id = s.messages[0].id
+        let t = Task { await s.loadedDraft(.reply, to: id) }
+        try await Task.sleep(for: .milliseconds(300))  // GetItem is out
+        s.apply(SyncResult(upserts: [], deletedRemoteIDs: ["R1"], token: "T1", more: false), account: acct.id, mailbox: .inbox)
+        server.push(RX.fault("ErrorItemNotFound", "The specified object was not found in the store."))
+        let d = await t.value
+        #expect(d.accountID == acct.id && d.subject == "Re: Budget", "draft from \(d.accountID == other.id ? "the other account" : "?"), subject '\(d.subject)'")
+        // Afterwards a draft for a message that is gone is empty again: nothing is kept around.
+        #expect(s.draft(.reply, to: id).subject.isEmpty)
+    }
 }
 }

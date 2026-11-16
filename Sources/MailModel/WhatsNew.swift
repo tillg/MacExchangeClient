@@ -24,6 +24,12 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-16", features: [
+            "An attached message like \"Re: Budget\" is saved as \"Re- Budget\", not as \"Re/ Budget\".",
+            "After a message was changed on the server, Open and Save give its current files, not ones opened earlier.",
+            "Attaching a link that points to a Finder alias attaches the original file.",
+            "Reply to a message that is deleted elsewhere at that very moment still opens a reply to that message, from its account.",
+            "Answering an invite inside a conversation keeps that conversation selected.",
+            "Messages of one conversation selected while searching open as that conversation once the search is cleared.",
             "Mail with a signature logo no longer shows a stray picture code at the start of its preview or in your reply.",
             "If the Exchange server hits an internal error, your change (such as marking as read) now waits and is retried instead of being undone.",
             "A mistyped server address (for example ftp://… or a port that is too large) now says Invalid server instead of contacting another address.",

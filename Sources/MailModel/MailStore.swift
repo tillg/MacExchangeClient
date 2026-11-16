@@ -508,6 +508,10 @@ public final class MailStore {
         let q = normalizedSearch
         guard !q.isEmpty else {
             searchTask = nil; searchHits = nil; fallbackQuery = nil; memoryQuery = nil
+            // Results aren't grouped; back in the grouped list, several selected messages of one conversation are
+            // one row, and one selected row is open (BUG-250).
+            let rows = listSelection
+            if rows.count < selection.count { selection = rows }
             if statusIsAboutSearch { clearSearchNotice() }
             return
         }
@@ -1736,6 +1740,15 @@ public final class MailStore {
     public func setBody(_ b: MessageBody, for id: Message.ID) {
         guard let i = messages.firstIndex(where: { $0.id == id }) else { return }
         changedIDs.insert(id)
+        // Loaded again after the message changed on the server (`merge` dropped the old body): files opened from
+        // the old version aren't reused for the new one (BUG-240).
+        if !messages[i].bodyLoaded {
+            let folder = downloadsFolder.appendingPathComponent(id.uuidString)
+            if FileManager.default.fileExists(atPath: folder.path) {
+                try? FileManager.default.removeItem(at: folder)
+                writtenFiles = writtenFiles.filter { !$0.key.path.hasPrefix(folder.path + "/") }
+            }
+        }
         messages[i].body = b.text
         messages[i].attachments = b.attachments
         messages[i].hasAttachments = !b.attachments.isEmpty
@@ -1826,6 +1839,9 @@ public final class MailStore {
             self.messages[i].mailbox = .trash
         }
         // One of several selected: it leaves the selection with its move, so Delete can't erase it from Trash unseen.
+        // Selected, but shown as its conversation's row (a newer message stands for it): the row stays in the list,
+        // so it stays selected, as when the row itself was clicked (BUG-159).
+        if selection == [id], listSelection != [id] { selection = listSelection }
         if selection == [id] { actOnSelection(apply) } else { keepingSelectionVisible([id]) { apply([id]) } }
         guard let rid = old.remoteID else { return }
         outbox.append(PendingChange(account: old.accountID, change: change(rid), previous: [old]))
@@ -2278,7 +2294,7 @@ public final class MailStore {
     // MARK: Compose
 
     public func draft(_ kind: ReplyKind, to id: Message.ID, includeAttachments: IncludeAttachments = .never) -> Draft {
-        guard let m = message(id) else { return Draft(accountID: accounts[0].id) }
+        guard let m = message(id) ?? vanished.flatMap({ $0.id == id ? $0 : nil }) else { return Draft(accountID: accounts[0].id) }
         let me = account(m.accountID)?.address
         // A prefix of the same kind already there (any case, with or without a space; AW:/WG: from German
         // Outlook) is replaced by the standard one rather than stacked.
@@ -2336,7 +2352,12 @@ public final class MailStore {
     /// A reply or forward of a message whose body was never loaded (only the list summary: names without
     /// addresses, no text): the body is fetched first, so the draft has the addresses and the quote.
     public func loadedDraft(_ kind: ReplyKind, to id: Message.ID, includeAttachments: IncludeAttachments = .never) async -> Draft {
-        if message(id)?.needsBody == true { await loadBody(id) }
+        let chosen = message(id)
+        defer { vanished = nil }
+        if chosen?.needsBody == true { await loadBody(id) }
+        // Deleted on the server while its body loaded: the reply is still to the message the user chose, from its
+        // account, with what was known of it (BUG-226).
+        if message(id) == nil { vanished = chosen }
         // A body loaded before Reply-To was asked for: fetched once now, quietly, for at most 3 s and not while the
         // account has a connection problem; otherwise the reply uses what's stored. A rejected password pauses the
         // account, as everywhere (BUG-170).
@@ -2354,6 +2375,9 @@ public final class MailStore {
         }
         return draft(kind, to: id, includeAttachments: includeAttachments)
     }
+
+    /// The message `loadedDraft` is answering, when a sync removed it while its body loaded (BUG-226).
+    @ObservationIgnored private var vanished: Message?
 
     /// Include Attachments With Replies ▸ When Adding Recipients: the reply now goes to someone who
     /// wasn't on the original message.
@@ -2379,7 +2403,14 @@ public final class MailStore {
         for var url in urls {
             // A Finder alias (bookmark data, not a symbolic link) stands for its original: that file or folder is
             // attached, under its own name.
-            let kind = try? url.resourceValues(forKeys: [.isAliasFileKey, .isSymbolicLinkKey])
+            var kind = try? url.resourceValues(forKeys: [.isAliasFileKey, .isSymbolicLinkKey])
+            // A symbolic link to an alias: the link is followed first, as the Finder does (BUG-241).
+            if kind?.isSymbolicLink == true {
+                let target = url.resolvingSymlinksInPath()
+                if let k = try? target.resourceValues(forKeys: [.isAliasFileKey, .isSymbolicLinkKey]), k.isAliasFile == true {
+                    url = target; kind = k
+                }
+            }
             if kind?.isAliasFile == true, kind?.isSymbolicLink != true {
                 // One whose original is gone can't be attached: its bytes mean nothing to the recipient.
                 guard let original = try? URL(resolvingAliasFileAt: url) else { skipped.append(url.lastPathComponent); continue }

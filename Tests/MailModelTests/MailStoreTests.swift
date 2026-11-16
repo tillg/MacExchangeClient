@@ -1998,4 +1998,50 @@ struct MailStoreTests {
         _ = s.pauseIfSignInFailed(AuthenticationError(), account: work.id)
         #expect(s.status == "Sign-in to “Work” failed. Sign in again with the right password under Settings ▸ Accounts. Nothing is sent until then.")
     }
+
+    /// BUG-211: a ":" in an attachment's name would show as "/" in the Finder; it is saved as "-". A "/" still
+    /// becomes ":" (shown as "/").
+    @Test func colonInAttachmentNameIsNotShownAsSlash() {
+        #expect(MailModel.Attachment(name: "Re: Budget 10:30.eml", contentType: "message/rfc822").fileName == "Re- Budget 10-30.eml")
+        #expect(MailModel.Attachment(name: "a/b.txt").fileName == "a:b.txt")
+    }
+
+    /// BUG-241: a symbolic link to a Finder alias is attached as the alias's original, not as its bookmark bytes.
+    @Test func symlinkToAliasAttachesTheOriginal() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("alias-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let original = dir.appendingPathComponent("report.pdf"), content = Data("%PDF-1.4 report".utf8)
+        try content.write(to: original)
+        let alias = dir.appendingPathComponent("report alias")
+        try URL.writeBookmarkData(try original.bookmarkData(options: .suitableForBookmarkFile), to: alias)
+        let link = dir.appendingPathComponent("report link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: alias)
+        let s = store([])
+        let files = s.files([link])
+        #expect(files.map(\.data) == [content] && files.map(\.name) == ["report.pdf"],
+                "attached \(files.map(\.name)) with \(files.first?.data.count ?? 0) bytes")
+    }
+
+    /// BUG-240: when a message's body is loaded again after it changed on the server, files opened from the old
+    /// version are gone, so Open and Save fetch the new one. Loading the same body again keeps them.
+    @Test func openedFilesOfAnOldVersionAreNotReused() throws {
+        let file = MailModel.Attachment(name: "contract.pdf", size: 2)
+        let m = Message(accountID: work.id, from: Contact(name: "Ann", email: "ann@x.com"), to: [], subject: "S", body: "First",
+                        date: .now, attachments: [file], remoteID: "D", serverPreview: "First")
+        let s = store([m])
+        s.downloadsFolder = FileManager.default.temporaryDirectory.appendingPathComponent("dl-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: s.downloadsFolder) }
+        let opened = s.downloadsFolder.appendingPathComponent(m.id.uuidString).appendingPathComponent("0/contract.pdf")
+        try FileManager.default.createDirectory(at: opened.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("v1".utf8).write(to: opened)
+        s.setBody(MessageBody(text: "First", attachments: [file]), for: m.id)  // e.g. fetched again for Reply-To
+        #expect(FileManager.default.fileExists(atPath: opened.path))
+        var changed = m
+        changed.body = ""; changed.attachments = []; changed.bodyLoaded = false; changed.serverPreview = "Second"
+        s.merge([changed], account: work.id, mailbox: .inbox)
+        try #require(s.message(m.id)?.bodyLoaded == false)
+        s.setBody(MessageBody(text: "Second", attachments: [file]), for: m.id)
+        #expect(!FileManager.default.fileExists(atPath: opened.path), "the old version's file is still there")
+    }
 }

@@ -494,10 +494,12 @@ public struct Attachment: Hashable, Codable, Sendable, ExpressibleByStringLitera
     }
 
     /// The name as a file name: the sender's name can't point into another folder.
-    /// A "/" becomes ":", which the Finder shows as "/" again. A name over 255 bytes is shortened, keeping its extension.
+    /// A ":" becomes "-"; a "/" becomes ":", which the Finder shows as "/" again. A name over 255 bytes is shortened, keeping its extension.
     /// Built on `displayName` (BUG-193).
     public var fileName: String {
-        let n = displayName.replacingOccurrences(of: "/", with: ":")
+        // The sender's own ":" would show as "/" in the Finder ("Re: Budget" → "Re/ Budget"): it becomes "-"
+        // (BUG-211; ⚠️ what Mail writes instead isn't checked).
+        let n = displayName.replacingOccurrences(of: ":", with: "-").replacingOccurrences(of: "/", with: ":")
         guard !(n.isEmpty || n == "." || n == "..") else { return "Attachment" }
         let ext = (n as NSString).pathExtension
         guard !ext.isEmpty, ext.utf8.count <= 32 else { return Self.fileName(n, ending: "") }

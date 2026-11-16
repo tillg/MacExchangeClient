@@ -208,4 +208,36 @@ struct MailStoreConversationTests {
         let visible = Set(s.visibleMessages.map(\.id))
         #expect(s.selection.isSubset(of: visible), "selection \(s.selection.count) hidden after Mark All as Read")
     }
+
+    /// BUG-159: the selection holds an older invite whose conversation row now stands for a newer message. Answering
+    /// the invite takes only the invite out; the row stays in the list and stays selected.
+    @Test func answeringTheShownInviteKeepsItsConversationRowSelected() {
+        let s = store([])
+        var inv = mail(work, "Planning", from: "Org Person", conv: "M", read: true, minutesAgo: 30, rid: "I1")
+        inv.invite = Invite(start: Date(timeIntervalSince1970: 2_000_000), end: Date(timeIntervalSince1970: 2_003_600))
+        s.merge([inv, mail(work, "Other", from: "Bob Ray", minutesAgo: 60, rid: "O1")], account: work.id, mailbox: .inbox)
+        let invID = s.messages.first { $0.remoteID == "I1" }!.id
+        s.selection = [invID]
+        s.merge([mail(work, "Re: Planning", from: "Cy Doe", conv: "M", read: true, minutesAgo: 1, rid: "R2")], account: work.id, mailbox: .inbox)
+        let row = s.visibleMessages[0].id
+        #expect(s.listSelection == [row])
+        s.respond(.accept, to: invID)
+        #expect(s.visibleMessages.map(\.id).contains(row))
+        #expect(s.listSelection == [row], "selection moved to \(s.selection.compactMap { s.message($0)?.subject })")
+        #expect(s.message(invID)?.mailbox == .trash && s.message(invID)?.invite?.response == .accept)
+    }
+
+    /// BUG-250: two results of one conversation selected in a search are one row once the search is cleared, and
+    /// that row is open.
+    @Test func oneSelectedRowAfterClearingTheSearchOpensIt() {
+        let a = mail(work, "Report", conv: "C1", read: true, minutesAgo: 1), b = mail(work, "Re: Report", conv: "C1", read: true, minutesAgo: 2)
+        let s = store([a, b, mail(work, "Other", read: true, minutesAgo: 4)])
+        s.selectedMailbox = .account(work.id, .inbox)
+        s.searchText = "report"
+        s.listSelection = [a.id, b.id]
+        #expect(s.selection.count == 2)
+        s.searchText = ""
+        #expect(s.listSelection == [a.id] && s.selection == [a.id])
+        #expect(s.selectedMessage?.subject == "Report")
+    }
 }
