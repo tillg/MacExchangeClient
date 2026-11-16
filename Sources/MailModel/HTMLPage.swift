@@ -47,7 +47,10 @@ public enum HTMLPage {
             : "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:"
         // WebKit draws a blocked image as an outlined box with its alt text. Mail shows nothing but keeps the space.
         // Pictures embedded in the mail (`data:`) need no permission, also when they come from `srcset` or `<picture>`.
+        // A `<picture>` with a web `<source>` draws that source, not its embedded fallback, and `<input type=image>` is a picture too.
         let blocked = allowRemote ? "" : #"img:not([src^="data:" i]) { visibility: hidden; }"#
+            + #" input[type=image]:not([src^="data:" i]) { visibility: hidden; }"#
+            + #" picture:has(source:not([srcset^="data:" i])) img { visibility: hidden; }"#
             + #" img[srcset^="data:" i], picture:has(source[srcset^="data:" i]) img { visibility: visible; }"#
         // Like Mail's MUIWebDocument.css (never editable; Apple Mail's dash lists; nested numbered lists 1. a. i., at
         // zero specificity and not for an `<ol type>`, as the mail's own list styles and `type` win over Mail's user

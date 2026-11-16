@@ -125,6 +125,17 @@ struct HTMLPageRenderTests {
         #expect(r == "a:visible:true b:visible:true c:visible:true d:hidden:false", "\(r)")
     }
 
+    /// With remote content blocked, a picture whose web source wins (`<picture><source srcset=https://…>`) or an
+    /// `<input type=image>` is not drawn as WebKit's outlined broken-image box: nothing shows, the space stays (BUG-197).
+    @Test func blockedWebPictureSourceAndImageInputAreNotBrokenBoxes() async {
+        let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        let mail = #"<picture><source srcset="https://t.example/a.png"><img id=p alt="Logo" width=50 height=50 src="data:image/png;base64,\#(png)"></picture>"#
+            + #"<input id=i type=image alt="Buy now" width=50 height=50 src="https://t.example/b.png">"#
+        let r = await eval(HTMLPage.document(mail, allowRemote: false),
+                           "['p','i'].map(i => { const e = document.getElementById(i); return i + ':' + getComputedStyle(e).visibility }).join(' ')")
+        #expect(r == "p:hidden i:hidden", "\(r)")
+    }
+
     /// A Hebrew line of a mail sent as HTML (a picture is placed) stays right to left, as in plain text: aligned
     /// right, its "!" at the left end. A Latin line next to it stays left to right.
     @Test func rtlLineStaysRightToLeftInDraftHTML() async {
