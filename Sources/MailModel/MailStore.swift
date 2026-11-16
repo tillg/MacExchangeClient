@@ -693,6 +693,30 @@ public final class MailStore {
         }
     }
 
+    /// Answered invites the server reported deleted, until Trash reports them under their new ID (BUG-104). Not
+    /// saved: Trash is checked moments after the Inbox.
+    private var answeredGone: [UUID: [Message]] = [:]
+
+    private static func isAnsweredInTrash(_ m: Message) -> Bool {
+        m.mailbox == .trash && (m.invite?.response != nil || m.invite?.reply != nil)
+    }
+
+    /// ⚠️ A move keeps the subject and the received date (not checked on the live server); an updated invite for
+    /// the same meeting was received at another time.
+    private static func sameInvite(_ old: Message, _ new: Message) -> Bool {
+        old.remoteID != new.remoteID && old.subject == new.subject && old.date == new.date
+    }
+
+    /// The summary of an answered invite under its new ID, with what the local copy knows: identity, text, answer.
+    private static func movedByServer(_ old: Message, as summary: Message) -> Message {
+        var m = summary
+        m.id = old.id
+        m.body = old.body; m.attachments = old.attachments; m.bodyLoaded = old.bodyLoaded; m.invite = old.invite
+        m.html = old.html; m.htmlChecked = old.htmlChecked; m.replyTo = old.replyTo
+        m.from = old.from; m.to = old.to; m.cc = old.cc; m.hasAttachments = old.hasAttachments
+        return m
+    }
+
     /// What a queued read, flag or move change keeps to undo itself: the message without its content. The undo
     /// only puts back read state, flag and mailbox, and the outbox is saved whole on every change.
     private static func undoCopy(_ m: Message) -> Message {
@@ -1073,6 +1097,9 @@ public final class MailStore {
                 if let r = ms[i].remoteID, gone.contains(r) { ids.insert(ms[i].id) }
             }
             if !ids.isEmpty {
+                // An answered invite in Trash whose ID the server deleted: Exchange moved it there itself under a
+                // new ID. Kept aside, so the item Trash reports gets its answer and text back (BUG-104).
+                answeredGone[account, default: []] += ms.filter { ids.contains($0.id) && Self.isAnsweredInTrash($0) }
                 ms.removeAll { ids.contains($0.id) }
                 selection.subtract(ids)
                 forget(ids)
@@ -1114,7 +1141,21 @@ public final class MailStore {
                     // Gone here with a change still queued, or written since this answer was requested (erased, or
                     // moved: Exchange gave it a new ID): an answer from before that change doesn't bring it back.
                     continue
+                } else if mailbox == .trash, m.isInvite == true, !m.bodyLoaded, let rid = m.remoteID,
+                          let i = ms.firstIndex(where: { $0.accountID == account && Self.isAnsweredInTrash($0) && Self.sameInvite($0, m) }),
+                          ms[i].remoteID.map({ index[$0] == i }) != false {
+                    // The invite answered here, as Exchange moved it to Deleted Items: the local copy takes the new
+                    // ID and keeps its answer (BUG-104).
+                    if let was = ms[i].remoteID { index[was] = nil }
+                    m = Self.movedByServer(ms[i], as: m)
+                    ms[i] = m
+                    index[rid] = i
                 } else {
+                    if mailbox == .trash, m.isInvite == true, !m.bodyLoaded,
+                       let j = answeredGone[account]?.firstIndex(where: { Self.sameInvite($0, m) }),
+                       let old = answeredGone[account]?.remove(at: j) {
+                        m = Self.movedByServer(old, as: m)
+                    }
                     ms.append(m)
                     if let rid = m.remoteID { index[rid] = ms.count - 1 }
                 }

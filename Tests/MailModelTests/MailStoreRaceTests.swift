@@ -507,5 +507,35 @@ struct MailStoreRaceTests {
         #expect(s.outbox.isEmpty && server.served == 0)
         #expect(s.status == "“Exchange” has no Archive mailbox", "status: \(s.status ?? "-")")
     }
+
+    /// BUG-104: after a sent answer Exchange moves the invite to Deleted Items itself, under a new ID: the Inbox
+    /// reports the old ID deleted and Trash a new item. The answer given here stays with it, whichever comes first;
+    /// another invite in Trash doesn't get it.
+    @Test(arguments: [true, false]) func answeredInviteKeepsItsAnswerAfterExchangeMovesIt(inboxFirst: Bool) async throws {
+        let server = RaceServer([RX.resp("CreateItem", RX.ok("CreateItem"))])
+        defer { server.stop() }
+        let s = store(server)
+        var invite = summary("M", subject: "Sync")
+        invite.body = "Let's meet"; invite.bodyLoaded = true; invite.isInvite = true
+        invite.invite = Invite(start: Date(timeIntervalSince1970: 1_795_428_000), end: Date(timeIntervalSince1970: 1_795_431_600),
+                               organizer: Contact(name: "Org", email: "org@work.com"), isCancellation: false)
+        s.merge([invite], account: acct.id, mailbox: .inbox)
+        let id = try #require(s.messages.first?.id)
+        s.respond(.accept, to: id)
+        try await waitFor { s.outbox.isEmpty }
+        try #require(server.served == 1 && s.messages.first?.invite?.response == .accept)
+        var moved = summary("M2", subject: "Sync"); moved.isInvite = true
+        var other = summary("X", subject: "Other meeting"); other.isInvite = true
+        let gone = SyncResult(upserts: [], deletedRemoteIDs: ["M"], token: "T1", more: false)
+        let arrived = SyncResult(upserts: [other, moved], deletedRemoteIDs: [], token: "T1", more: false)
+        if inboxFirst { s.apply(gone, account: acct.id, mailbox: .inbox) }
+        s.apply(arrived, account: acct.id, mailbox: .trash)
+        if !inboxFirst { s.apply(gone, account: acct.id, mailbox: .inbox) }
+        #expect(s.messages.count == 2, "messages: \(s.messages.map { $0.remoteID ?? "-" })")
+        let m = try #require(s.messages.first { $0.remoteID == "M2" })
+        #expect(m.mailbox == .trash && m.invite?.response == .accept && m.bodyLoaded && m.body == "Let's meet",
+                "response \(String(describing: m.invite?.response)), loaded \(m.bodyLoaded)")
+        #expect(s.messages.first { $0.remoteID == "X" }?.invite == nil)
+    }
 }
 }
