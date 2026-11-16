@@ -199,7 +199,11 @@ struct MessageContextMenu: View {
             Button("Forward") { Task { openWindow(id: "compose", value: ComposeWindow(await store.loadedDraft(.forward, to: id))) } }
             Divider()
         }
+        // Mail's MessageViewerContextMenu: Mark as Read, Move to Junk, Delete, —, Flag, —, Archive, Move to (BUG-235).
         Button(unread ? "Mark as Read" : "Mark as Unread") { store.toggleRead(ids) }
+        Button(store.isAllJunk(ids) ? "Not Junk" : "Move to Junk") { store.toggleJunk(ids) }
+        Button("Delete", role: .destructive) { store.delete(ids) }
+        Divider()
         Menu("Flag") {
             ForEach(FlagColor.allCases, id: \.self) { c in Button(c.title) { store.setFlag(c, for: ids) } }
             Divider()
@@ -207,8 +211,7 @@ struct MessageContextMenu: View {
         }
         Divider()
         Button("Archive") { store.archive(ids) }
-        Button(store.isAllJunk(ids) ? "Not Junk" : "Move to Junk") { store.toggleJunk(ids) }
-        Button("Delete", role: .destructive) { store.delete(ids) }
+        MoveMenu(title: "Move to", ids: ids)
     }
 }
 

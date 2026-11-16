@@ -143,6 +143,9 @@ struct ViewOptionsMenu: View {
 
 struct MoveMenu: View {
     @Environment(MailStore.self) private var store
+    var title = "Move"
+    /// The messages to move; the toolbar's menu moves the selection.
+    var ids: Set<Message.ID>?
 
     var body: some View {
         Menu {
@@ -158,7 +161,7 @@ struct MoveMenu: View {
                 }
             }
         } label: {
-            Label("Move", systemImage: "folder")
+            Label(title, systemImage: "folder")
         }
         .help("Move selected messages")
     }
@@ -173,7 +176,7 @@ struct MoveMenu: View {
 
     /// Into that account's mailbox; `drop` refuses to move server mail to another account.
     private func move(_ acct: UUID, _ kind: MailboxKind) {
-        store.drop(store.withConversations(store.selection), on: .account(acct, kind))
+        store.drop(ids ?? store.withConversations(store.selection), on: .account(acct, kind))
     }
 
 }
