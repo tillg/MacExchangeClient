@@ -109,7 +109,7 @@ struct SidebarView: View {
     private func row(_ ref: MailboxRef, _ title: String, _ symbol: String, favorite: Bool = false) -> some View {
         // Mail shows unread counts on inboxes / smart boxes; Drafts shows total, Sent/Trash/Archive none.
         let badge: Int = switch ref {
-        case .account(_, .drafts): store.count(ref)
+        case .account(_, .drafts), .smart(.flagged): store.count(ref)  // flagged mail is mostly read (BUG-185)
         case .account(_, .sent), .account(_, .trash), .account(_, .archive): 0
         default: store.unreadCount(ref)
         }
