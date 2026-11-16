@@ -13,6 +13,14 @@ struct MailCommands: Commands {
 
     private var hasSelection: Bool { !store.selection.isEmpty }
 
+    /// Sends an Edit menu action to the first responder, as the system's items do; without a key window (the app
+    /// isn't frontmost) to the frontmost window's.
+    private static func edit(_ action: Selector) {
+        if !NSApp.sendAction(action, to: nil, from: nil) {
+            _ = NSApp.orderedWindows.first?.firstResponder?.tryToPerform(action, with: nil)
+        }
+    }
+
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Message") { openWindow(id: "compose", value: ComposeWindow(Draft(accountID: store.accounts[0].id))) }
@@ -37,9 +45,9 @@ struct MailCommands: Commands {
         // Delete (no shortcut), and added items can only follow Select All, so the group is written out here: Cut,
         // Copy, Paste and Select All go to the first responder, as the system's items do.
         CommandGroup(replacing: .pasteboard) {
-            Button("Cut") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }.keyboardShortcut("x")
-            Button("Copy") { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }.keyboardShortcut("c")
-            Button("Paste") { NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil) }.keyboardShortcut("v")
+            Button("Cut") { Self.edit(#selector(NSText.cut(_:))) }.keyboardShortcut("x")
+            Button("Copy") { Self.edit(#selector(NSText.copy(_:))) }.keyboardShortcut("c")
+            Button("Paste") { Self.edit(#selector(NSText.paste(_:))) }.keyboardShortcut("v")
             Button("Delete") {
                 // ⌘⌫ is also the text system's "delete to the start of the line". In Mail, Delete goes to the first
                 // responder, so typing in a compose window or the search field never deletes mail (BUG-218).
@@ -53,7 +61,7 @@ struct MailCommands: Commands {
                 }
             }
                 .keyboardShortcut(.delete).disabled(!hasSelection)
-            Button("Select All") { NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: nil, from: nil) }.keyboardShortcut("a")
+            Button("Select All") { Self.edit(#selector(NSResponder.selectAll(_:))) }.keyboardShortcut("a")
         }
         CommandGroup(after: .textEditing) {
             Picker("Include Attachments With Replies", selection: $includeMode) {

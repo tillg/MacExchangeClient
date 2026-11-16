@@ -116,6 +116,40 @@ struct DebugSnapshot: ViewModifier {
                 }
                 if !win.isVisible { exit(0) }
             }
+            // MAIL_SNAPSHOT_EDITMENU=1 chooses the real Edit menu items (Select All, Copy, Paste) in the frontmost
+            // editable text (a compose window, with MAIL_SNAPSHOT_ANSWER) or else in the message's web view, and
+            // prints what happened ("EDITMENU …"): the items are written out in MailCommands (BUG-228).
+            if ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_EDITMENU"] != nil,
+               let edit = NSApp.mainMenu?.items.first(where: { $0.title == "Edit" })?.submenu {
+                func views<V: NSView>(_ v: NSView, _: V.Type) -> [V] { ((v as? V).map { [$0] } ?? []) + v.subviews.flatMap { views($0, V.self) } }
+                func choose(_ title: String) -> Bool {
+                    edit.update()
+                    guard let i = edit.items.firstIndex(where: { $0.title == title }), edit.items[i].isEnabled else { return false }
+                    edit.performActionForItem(at: i)
+                    return true
+                }
+                let clipboard = NSPasteboard.general.string(forType: .string)  // put back afterwards
+                defer { NSPasteboard.general.clearContents(); if let clipboard { NSPasteboard.general.setString(clipboard, forType: .string) } }
+                NSPasteboard.general.clearContents()
+                let wins = NSApp.windows.filter(\.isVisible)
+                if let (win, text) = wins.lazy.compactMap({ w in w.contentView.flatMap { views($0, NSTextView.self).first(where: \.isEditable) }.map { (w, $0) } }).first {
+                    win.makeKeyAndOrderFront(nil); win.makeFirstResponder(text)
+                    text.string = "hello"
+                    let all = choose("Select All"), copy = choose("Copy")
+                    try? await Task.sleep(for: .milliseconds(200))
+                    text.setSelectedRange(NSRange(location: text.string.utf16.count, length: 0))
+                    let paste = choose("Paste")
+                    try? await Task.sleep(for: .milliseconds(200))
+                    print("EDITMENU text: chosen \(all) \(copy) \(paste), pasteboard '\(NSPasteboard.general.string(forType: .string) ?? "")', text '\(text.string)'")
+                } else if let (win, web) = wins.lazy.compactMap({ w in w.contentView.flatMap { views($0, WKWebView.self).first }.map { (w, $0) } }).first {
+                    win.makeKeyAndOrderFront(nil); win.makeFirstResponder(web)
+                    let all = choose("Select All")
+                    try? await Task.sleep(for: .milliseconds(300))
+                    let copy = choose("Copy")
+                    try? await Task.sleep(for: .milliseconds(500))
+                    print("EDITMENU web: chosen \(all) \(copy), pasteboard \(NSPasteboard.general.string(forType: .string)?.count ?? 0) characters")
+                } else { print("EDITMENU: no text or web view found") }
+            }
             // MAIL_SNAPSHOT_MENUS=1 prints the menu bar (titles, shortcuts, "(off)" for disabled items), to check the
             // menus against Mail's without a screen.
             if ProcessInfo.processInfo.environment["MAIL_SNAPSHOT_MENUS"] != nil, let main = NSApp.mainMenu {

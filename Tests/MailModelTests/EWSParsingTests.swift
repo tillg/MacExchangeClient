@@ -578,6 +578,14 @@ struct EWSParsingTests {
         #expect(try invite("<t:Recurrence><t:FutureRecurrence/></t:Recurrence>").recurrence == "Repeats")
     }
 
+    /// BUG-202: the request without the recurrence properties is the one from before they were added.
+    @Test func bodyRequestWithoutRecurrenceLeavesOnlyThoseOut() {
+        let full = EWSBackend.bodyRequest("M1"), plain = EWSBackend.bodyRequest("M1", recurrence: false)
+        #expect(full.contains("calendar:Recurrence") && full.contains("calendar:IsRecurring"))
+        #expect(!plain.contains("Recurr") && plain.contains("calendar:OptionalAttendees") && plain.contains("message:ReplyTo"))
+        #expect(full.replacingOccurrences(of: EWSBackend.recurrenceProps, with: "") == plain)
+    }
+
     /// BUG-202: an invite stored before recurrence existed still loads (no "recurrence" key).
     @Test func inviteWithoutRecurrenceKeyDecodes() throws {
         var data = try JSONEncoder().encode(Invite(start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 60)))

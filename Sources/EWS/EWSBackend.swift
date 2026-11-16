@@ -74,7 +74,14 @@ public struct EWSBackend: MailBackend {
     }
 
     public func body(remoteID: String) async throws -> MessageBody {
-        let doc = try await client.call(Self.bodyRequest(remoteID))
+        let doc: XMLDocument
+        do {
+            doc = try await client.call(Self.bodyRequest(remoteID))
+        } catch let e as EWSError where e.code != "ErrorItemNotFound" {
+            // ⚠️ The recurrence properties (BUG-202) haven't been seen from the live server. Should Exchange refuse
+            // the request because of them, the message is asked for once more without them, so it still opens.
+            doc = try await client.call(Self.bodyRequest(remoteID, recurrence: false))
+        }
         guard let item = doc.first("Items")?.elementChildren.first else {
             throw EWSError(code: "ErrorItemNotFound", message: "Message not found")
         }
@@ -82,8 +89,9 @@ public struct EWSBackend: MailBackend {
     }
 
     /// `Best` returns HTML when the message has it. `TextBody` (Exchange 2013) adds the plain text for the list and replies.
-    static func bodyRequest(_ remoteID: String) -> String {
-        """
+    static func bodyRequest(_ remoteID: String, recurrence: Bool = true) -> String {
+        let inviteProps = recurrence ? inviteProps : inviteProps.replacingOccurrences(of: recurrenceProps, with: "")
+        return """
         <m:GetItem><m:ItemShape><t:BaseShape>IdOnly</t:BaseShape><t:BodyType>Best</t:BodyType>\
         <t:AdditionalProperties><t:FieldURI FieldURI="item:Body"/><t:FieldURI FieldURI="item:TextBody"/>\
         <t:FieldURI FieldURI="item:Attachments"/>\
@@ -234,6 +242,7 @@ public struct EWSBackend: MailBackend {
                               // ⚠️ BUG-202: not yet seen from the live server; same property family as the ones above.
                               "calendar:IsRecurring", "calendar:Recurrence"]
         .map { "<t:FieldURI FieldURI=\"\($0)\"/>" }.joined()
+    static let recurrenceProps = "<t:FieldURI FieldURI=\"calendar:IsRecurring\"/><t:FieldURI FieldURI=\"calendar:Recurrence\"/>"
 
     public func events(from: Date, to: Date) async throws -> [CalendarEvent] {
         Self.parseEvents(try await client.call(Self.calendarViewRequest(from: from, to: to)))

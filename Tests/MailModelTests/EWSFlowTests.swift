@@ -686,6 +686,24 @@ struct EWSFlowTests {
         #expect(!s.isLoading)
     }
 
+    /// BUG-202: should Exchange refuse the body request (the recurrence properties aren't checked on a live server),
+    /// the message is asked for once more without them and opens.
+    @Test func bodyStillLoadsWhenTheServerRefusesTheRecurrenceProperties() async throws {
+        let refused = EWSReply.resp("GetItem", EWSReply.err("GetItem", "ErrorInvalidPropertyRequest", "Property is not valid for this object type."))
+        let body = EWSReply.resp("GetItem", EWSReply.ok("GetItem", "<m:Items><t:Message><t:ItemId Id=\"M1\"/>"
+            + "<t:Body BodyType=\"Text\">Hello there</t:Body></t:Message></m:Items>"))
+        let server = ScriptedServer([refused, body])
+        defer { server.stop() }
+        let s = store(server)
+        var m = Message(accountID: acct.id, from: Contact(name: "Ann", email: ""), to: [], subject: "S", body: "", date: .now,
+                        remoteID: "M1", serverPreview: "Hello", bodyLoaded: false)
+        m.mailbox = .inbox
+        s.merge([m], account: acct.id, mailbox: .inbox)
+        let id = try #require(s.messages.first?.id)
+        await s.loadBody(id)
+        #expect(s.message(id)?.body == "Hello there" && server.served == 2, "served \(server.served), status \(s.status ?? "-")")
+    }
+
     /// BUG-168: the history's first step fetches the newest 200 of every folder. One folder Exchange refuses (here
     /// the Inbox: access denied) doesn't stop the folders after it, and it isn't asked first again on the next run.
     @Test func oneRefusedFolderDoesNotStopTheNewestOfTheOthers() async throws {
