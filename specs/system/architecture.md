@@ -1,7 +1,7 @@
 ---
 title: "Architecture"
 created: 2026-11-12
-edited: 2026-11-13
+edited: 2026-11-16
 ---
 
 # Architecture
@@ -77,7 +77,9 @@ flowchart LR
 ## Reading from the server
 
 - **Quick check** (`refresh`): every 15 s, on Get New Mail, on pull to refresh and when the selected mailbox changes.
-  It first flushes the outbox and waits for it. Then, per account not paused: read the folder list once per session
+  Each account is checked in its own task (BUG-225): it first waits for that account's outbox, then checks; an account
+  whose check is still running (its server doesn't answer) is left out of the next check, which covers the others, and
+  the 15 s poll doesn't wait for it. Per account not paused: read the folder list once per session
   (`setRemoteFolders`; a folder of the stored tree the list no longer has was removed on the server: its mail leaves
   memory and disk, also mail loaded later during launch, its sync position goes, and if it was selected, the
   account's Inbox is selected), and for the Inbox plus the selected mailbox of that account either sync changes (folder complete) or merge the
@@ -136,7 +138,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     U["user action"] --> UP["update(): change in memory"] --> Q["queue(): group by account + kind,<br/>batches of 100"] --> O[("outbox<br/>[PendingChange]")]
-    O --> F["scheduleFlush → drain()"] --> P["perform(): backend call"]
+    O --> F["scheduleFlush → drain(account),<br/>one task per account"] --> P["perform(): backend call"]
     P -->|ok| R["remove from outbox"]
     P -->|refused| FL["failed(): undo locally, status"]
     P -->|offline| W["that account's changes stay queued<br/>until next refresh; others go on"]
@@ -146,7 +148,10 @@ flowchart LR
   mailbox changes are grouped per account and kind, in a stable order, as `ServerChange`s of at most 100 IDs. Each
   `PendingChange` keeps the messages as they were, to undo.
 - Erasing from Trash, Send, Save Draft and invite answers append their own changes.
-- `drain` sends changes one at a time, oldest first, for accounts with a backend that are not paused. Before a
+- `drain(account)` sends one account's changes one at a time, oldest first; accounts with a backend that are not
+  paused drain side by side, so a server that doesn't answer holds up only its own account (BUG-225). A change the
+  server answers with an internal fault (no Exchange code) stays queued and is given up, undone with the reason, at
+  the third such answer (BUG-165). Before a
   `send` goes out it is marked `inFlight` and `saveBeforeSending` writes the changes to disk and is awaited
   (`AppSetup.saveAndWait`). At launch `restore(meta)` keeps a send still marked in flight in Drafts on this Mac
   instead of queueing it, with a status to check Sent.
