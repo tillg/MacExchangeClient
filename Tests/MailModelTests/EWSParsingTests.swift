@@ -115,6 +115,16 @@ struct EWSParsingTests {
         #expect(EWSBackend.plainText("a<span>b</span><b>c</b>") == "abc")
     }
 
+    /// BUG-204: line breaks and runs of spaces in the HTML source are one space (CSS Text 3 §4.1); only markup breaks
+    /// lines. A `<pre>` keeps its own, and a no-break space written as a reference is not collapsed.
+    @Test func plainTextCollapsesWhiteSpaceOfTheSource() {
+        #expect(EWSBackend.plainText("<p class=MsoNormal>Thanks for the\r\nquick reply,   Ann</p>") == "Thanks for the quick reply, Ann")
+        #expect(EWSBackend.plainText("Line one<br>\r\nLine two") == "Line one\nLine two")
+        #expect(EWSBackend.plainText("a <b>b</b>\n<i>c</i>\t d") == "a b c d")
+        #expect(EWSBackend.plainText("x<pre>one\r\n  two\n\nthree</pre>y") == "x\none\ntwo\nthree\ny")
+        #expect(EWSBackend.plainText("a&nbsp;&nbsp; b") == "a   b")
+    }
+
     @Test func plainTextKeepsTableCellsApart() {
         #expect(EWSBackend.plainText("<table><tr><td>Name</td><td>Value</td></tr></table>") == "Name Value")
     }

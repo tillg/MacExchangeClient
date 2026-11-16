@@ -687,6 +687,17 @@ public struct EWSBackend: MailBackend {
         pattern: #"^[ \t]*(?:\[cid:[^\]\s]+\][ \t]*)+(?:\r?\n|\z)"#, options: .anchorsMatchLines)
     private static let cidMark = try! NSRegularExpression(pattern: #"\[cid:[^\]\s]+\] ?"#)
 
+    /// Every run of white space (line breaks of the HTML source too) as one space; a no-break space isn't one.
+    private static func collapsedWhiteSpace(_ text: String) -> String {
+        var out = String.UnicodeScalarView(), afterSpace = false
+        for u in text.unicodeScalars {
+            let space = u == " " || u == "\t" || u == "\n" || u == "\r" || u == "\u{0C}"
+            if !space || !afterSpace { out.append(space ? " " : u) }
+            afterSpace = space
+        }
+        return String(out)
+    }
+
     /// Block elements: both their start and end tag break the line (a `<p>` may be left unclosed).
     private static let lineBreakingTags: Set<String> = [
         "p", "div", "blockquote", "pre", "hr", "ul", "ol", "dl", "dt", "dd", "table", "tr", "li", "section", "article",
@@ -696,17 +707,19 @@ public struct EWSBackend: MailBackend {
     /// Rough text of an HTML body, used only if the server sends no `TextBody`. One pass, so an unclosed tag or
     /// comment can't make it slow: comments, head, style and script are dropped (an unclosed one to the end),
     /// `<br>` and the start and end of a block are line breaks, the end of a table cell a space, other tags go, and
-    /// character references are decoded.
+    /// character references are decoded. White space in the source collapses to one space, except in `<pre>`.
     static func plainText(_ html: String) -> String {
         let s = html as NSString, n = s.length
-        var out = "", i = 0, textStart = 0
+        var out = "", i = 0, textStart = 0, inPre = false
         func find(_ x: String, from: Int, _ options: NSString.CompareOptions = []) -> Int? {
             guard from <= n else { return nil }
             let r = s.range(of: x, options: options, range: NSRange(location: from, length: n - from))
             return r.location == NSNotFound ? nil : r.location
         }
         func flush(_ end: Int) {
-            if end > textStart { out += decodeEntities(s.substring(with: NSRange(location: textStart, length: end - textStart))) }
+            guard end > textStart else { return }
+            let text = s.substring(with: NSRange(location: textStart, length: end - textStart))
+            out += decodeEntities(inPre ? text.replacingOccurrences(of: "\r\n", with: "\n") : collapsedWhiteSpace(text))
         }
         while i < n {
             guard s.character(at: i) == 0x3C else { i += 1; continue }  // <
@@ -727,6 +740,7 @@ public struct EWSBackend: MailBackend {
                 textStart = i
             } else if name == "br" || lineBreakingTags.contains(name) {
                 out += "\n"
+                if name == "pre" { inPre = !closing }
             } else if closing && (name == "td" || name == "th") {
                 out += " "
             }
