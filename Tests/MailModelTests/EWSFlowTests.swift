@@ -623,6 +623,26 @@ struct EWSFlowTests {
         #expect(s.message(a)?.isRead == false, "status: \(s.status ?? "")")
     }
 
+    /// BUG-165 ⚠️ (WCF fault shape hand-written from the standard dispatcher fault, not captured from the live server):
+    /// a SOAP fault without any Exchange ResponseCode (`a:InternalServiceFault`, the EWS host failing before Exchange
+    /// handled the request) refuses nothing, so the change stays queued instead of being undone.
+    @Test func faultWithoutExchangeCodeKeepsTheChangeQueued() async throws {
+        let wcf = """
+            <?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault>\
+            <faultcode xmlns:a="http://schemas.microsoft.com/net/2005/12/windowscommunicationfoundation/dispatcher">a:InternalServiceFault</faultcode>\
+            <faultstring xml:lang="en-US">The server was unable to process the request due to an internal error.</faultstring>\
+            </s:Fault></s:Body></s:Envelope>
+            """
+        let server = ScriptedServer([wcf])
+        defer { server.stop() }
+        let (s, a) = storeWithA(server)
+        s.toggleRead([a])
+        try await waitFor { server.served == 1 }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(s.message(a)?.isRead == true, "status: \(s.status ?? "")")
+        #expect(s.outbox.map(\.change) == [.setRead(["A"], true)])
+    }
+
     /// BUG-161: the background check of complete folders off screen stops for the account when Exchange throttles it,
     /// instead of asking every other folder too.
     @Test func backgroundCheckStopsAtThrottling() async throws {
