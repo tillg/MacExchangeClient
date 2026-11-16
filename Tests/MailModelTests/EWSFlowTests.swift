@@ -665,6 +665,22 @@ struct EWSFlowTests {
         s.finishLoading([])
         #expect(!s.isLoading)
     }
+
+    /// BUG-168: the history's first step fetches the newest 200 of every folder. One folder Exchange refuses (here
+    /// the Inbox: access denied) doesn't stop the folders after it, and it isn't asked first again on the next run.
+    @Test func oneRefusedFolderDoesNotStopTheNewestOfTheOthers() async throws {
+        let refused = EWSReply.resp("FindItem", EWSReply.err("FindItem", "ErrorAccessDenied", "Access is denied."))
+        let drafts = EWSReply.resp("FindItem", EWSReply.ok("FindItem", "<m:RootFolder TotalItemsInView=\"1\" IncludesLastItemInRange=\"true\">"
+            + "<t:Items>\(EWSReply.summary("D1", subject: "Plan"))</t:Items></m:RootFolder>"))
+        let server = ScriptedServer([refused, drafts], fallback: EWSReply.fault("ErrorAccessDenied", "Access is denied."))
+        defer { server.stop() }
+        let s = store(server, folders: false)
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .drafts, id: "DRAFTS")], account: acct.id)
+        await s.syncHistory()
+        #expect(s.messages.contains { $0.remoteID == "D1" && $0.mailbox == .drafts },
+                "Drafts got nothing; \(server.served) requests, status: \(s.status ?? "")")
+        #expect(s.status?.contains("Access is denied") == true, "the refusal is shown: \(s.status ?? "-")")
+    }
 }
 
 /// What the server saw when the send arrived (BUG-177).

@@ -2185,9 +2185,12 @@ public final class MailStore {
                 showHistoryProgress(acct)
                 do {
                     fetched.append((role, try await backend.newest(in: folder, limit: 200)))
+                } catch where pauseIfSignInFailed(error, account: acct) || error is URLError || error is ServerBusy {
+                    break  // the account can't be asked now
                 } catch {
-                    _ = pauseIfSignInFailed(error, account: acct)
-                    break
+                    // Exchange refuses this folder: the others still get their newest (BUG-168). The page-by-page
+                    // step below asks it once more and shows the refusal.
+                    newestLoaded.insert(key(acct, role))
                 }
                 if since.duration(to: .now) > Self.historyBatch { show() }
             }

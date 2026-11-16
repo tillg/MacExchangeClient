@@ -24,6 +24,7 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-16", features: [
+            "When the server refuses one folder, the newest mail of your other folders still arrives right away.",
             "An invite you answered still shows your answer in Trash, instead of asking you to respond again.",
             "Archive in an account that has no Archive mailbox now leaves the message where it is and says so, instead of moving it away and back.",
             "An account whose server doesn't answer at all (for example off the VPN) no longer delays your other accounts' new mail and changes.",
