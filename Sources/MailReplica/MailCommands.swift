@@ -72,12 +72,14 @@ struct MailCommands: Commands {
         }
         CommandMenu("Mailbox") {
             Button("Get New Mail") { Task { await store.refresh() } }.keyboardShortcut("n", modifiers: [.command, .shift])
-            Divider()
             Button("Mark All Messages as Read") { store.markAllRead(in: store.selectedMailbox) }
             Divider()
-            ForEach(Array(store.favoriteMailboxes.enumerated()), id: \.offset) { i, ref in
-                Button(label(ref)) { store.selectedMailbox = ref }
-                    .keyboardShortcut(MailStore.favoriteKey(at: i).map { KeyboardShortcut(KeyEquivalent($0)) })
+            // Mail's Mailbox ▸ Go to Favorite Mailbox, ⌘1–⌘9 (BUG-230).
+            Menu("Go to Favorite Mailbox") {
+                ForEach(Array(store.favoriteMailboxes.enumerated()), id: \.offset) { i, ref in
+                    Button(label(ref)) { store.selectedMailbox = ref }
+                        .keyboardShortcut(MailStore.favoriteKey(at: i).map { KeyboardShortcut(KeyEquivalent($0)) })
+                }
             }
         }
         CommandMenu("Message") {
