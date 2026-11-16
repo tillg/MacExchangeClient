@@ -710,6 +710,19 @@ public final class MailStore {
     }
 
     public func move(_ ids: Set<Message.ID>, to box: MailboxKind) {
+        var ids = ids
+        if box == .archive {
+            // A server account whose folder list is known and has no Archive: its mail stays, with the reason,
+            // rather than moving away, failing unsent and jumping back as "refused" (BUG-255).
+            let without = Set(messages.lazy.filter { ids.contains($0.id) }.map(\.accountID)).filter { acct in
+                backends[acct] != nil && remoteFolders[acct].map { !$0.contains { $0.role == .archive } } == true
+            }
+            if let acct = accounts.first(where: { without.contains($0.id) }) {
+                status = "“\(acct.name)” has no Archive mailbox"
+                ids = Set(messages.lazy.filter { ids.contains($0.id) && !without.contains($0.accountID) }.map(\.id))
+                if ids.isEmpty { return }
+            }
+        }
         keepingSelectionVisible(ids) { update(ids) { $0.mailbox = box } }
     }
 

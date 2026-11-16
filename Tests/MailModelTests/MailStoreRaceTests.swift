@@ -489,5 +489,23 @@ struct MailStoreRaceTests {
         #expect(served == 2, "B's own change and check went out while A was silent: served \(served)")
         #expect(a.served == 2, "A's change and check still went out once it answered: \(a.served)")
     }
+
+    /// BUG-255: Archive in an account whose folder list has no Archive folder leaves the message where it is and
+    /// says why; nothing is sent, so nothing is "refused by Exchange". With an Archive folder it moves as before.
+    @Test func archiveWithoutAnArchiveFolderStaysPutAndSaysSo() async throws {
+        let server = RaceServer([])
+        defer { server.stop() }
+        let s = store(server)
+        s.setRemoteFolders([RemoteFolder(role: .inbox, id: "INBOX"), RemoteFolder(role: .trash, id: "DEL")], account: acct.id)
+        s.merge([summary("A1"), summary("A2")], account: acct.id, mailbox: .inbox)
+        s.selectedMailbox = .account(acct.id, .inbox)
+        let first = try #require(s.messages.first { $0.remoteID == "A1" }?.id)
+        s.selection = [first]
+        s.archiveSelection()
+        #expect(s.messages.allSatisfy { $0.mailbox == .inbox })
+        #expect(s.selection == [first], "the message stays selected")
+        #expect(s.outbox.isEmpty && server.served == 0)
+        #expect(s.status == "“Exchange” has no Archive mailbox", "status: \(s.status ?? "-")")
+    }
 }
 }
