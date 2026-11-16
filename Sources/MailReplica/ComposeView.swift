@@ -98,12 +98,6 @@ struct ComposeView: View {
         .background(Color(nsColor: .textBackgroundColor))
         .navigationTitle(draft.subject.isEmpty ? "New Message" : draft.subject)
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button { send() } label: { Label("Send", systemImage: "paperplane") }
-                    .keyboardShortcut("d", modifiers: [.command, .shift])
-                    .disabled(!canSend)
-                    .help("Send message")
-            }
             if draft.inviteAnswer == nil {
                 // Mail's ComposeWindow.toolbar: insertAttachment:.
                 ToolbarItem {
@@ -127,6 +121,13 @@ struct ComposeView: View {
                     }
                         .keyboardShortcut("s", modifiers: .command).disabled(draft.loadingOriginal != nil)
                 }
+            }
+            // Mail's ComposeWindow.toolbar: send: is last, drawn as arrow.up (BUG-232).
+            ToolbarItem {
+                Button { send() } label: { Label("Send", systemImage: "arrow.up") }
+                    .keyboardShortcut("d", modifiers: [.command, .shift])
+                    .disabled(!canSend)
+                    .help("Send message")
             }
         }
         .frame(minWidth: 480, minHeight: 360)
