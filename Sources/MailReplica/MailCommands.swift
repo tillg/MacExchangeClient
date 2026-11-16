@@ -7,6 +7,8 @@ struct MailCommands: Commands {
     let store: MailStore
     @Environment(\.openWindow) private var openWindow
     @FocusedValue(\.attachFiles) private var attachFiles
+    @FocusedValue(\.goBack) private var goBack
+    @FocusedValue(\.goForward) private var goForward
     @AppStorage("includeAttachmentsWithReplies") private var includeMode = IncludeAttachments.never
 
     private var hasSelection: Bool { !store.selection.isEmpty }
@@ -41,9 +43,16 @@ struct MailCommands: Commands {
             Button("What's New") { openWindow(id: "whats-new") }
         }
         SidebarCommands()
+        // View ▸ Back ⇧⌘[, Forward ⇧⌘] and Filter ▸ Enable Message Filter ⌘L, as in MainMenu.nib (BUG-229).
         CommandGroup(after: .sidebar) {
-            Toggle("Enable Message Filter", isOn: Bindable(store).filterUnread)
-                .keyboardShortcut("l")
+            Button("Back") { goBack?() }
+                .keyboardShortcut("[", modifiers: [.command, .shift]).disabled(goBack == nil)
+            Button("Forward") { goForward?() }
+                .keyboardShortcut("]", modifiers: [.command, .shift]).disabled(goForward == nil)
+            Menu("Filter") {
+                Toggle("Enable Message Filter", isOn: Bindable(store).filterUnread)
+                    .keyboardShortcut("l")
+            }
         }
         CommandMenu("Mailbox") {
             Button("Get New Mail") { Task { await store.refresh() } }.keyboardShortcut("n", modifiers: [.command, .shift])

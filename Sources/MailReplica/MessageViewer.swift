@@ -24,6 +24,8 @@ struct MessageViewer: View {
         }
         .navigationTitle(store.title)
         .navigationSubtitle(subtitle)
+        .focusedSceneValue(\.goBack, back.isEmpty ? nil : { goBack() })
+        .focusedSceneValue(\.goForward, forward.isEmpty ? nil : { goForward() })
         .searchable(text: $store.searchText, placement: .toolbar, prompt: "Search")
         .onChange(of: store.selectedMailbox) { old, _ in
             if back.last != old { back.append(old); forward.removeAll() }
@@ -214,5 +216,20 @@ extension FlagColor {
         case .purple: .purple
         case .gray: .gray
         }
+    }
+}
+
+/// The viewer in front's mailbox history, for View ▸ Back and Forward. Plain keys: the `@Entry` macro needs Xcode.
+struct GoBackKey: FocusedValueKey { typealias Value = () -> Void }
+struct GoForwardKey: FocusedValueKey { typealias Value = () -> Void }
+
+extension FocusedValues {
+    var goBack: (() -> Void)? {
+        get { self[GoBackKey.self] }
+        set { self[GoBackKey.self] = newValue }
+    }
+    var goForward: (() -> Void)? {
+        get { self[GoForwardKey.self] }
+        set { self[GoForwardKey.self] = newValue }
     }
 }
