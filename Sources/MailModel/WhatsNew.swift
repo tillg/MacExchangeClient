@@ -24,6 +24,11 @@ public struct ChangeLogDay: Identifiable, Sendable {
 public enum WhatsNew {
     public static let days: [ChangeLogDay] = [
         ChangeLogDay(date: "2026-11-16", features: [
+            "Mail with a signature logo no longer shows a stray picture code at the start of its preview or in your reply.",
+            "If the Exchange server hits an internal error, your change (such as marking as read) now waits and is retried instead of being undone.",
+            "A mistyped server address (for example ftp://… or a port that is too large) now says Invalid server instead of contacting another address.",
+            "One damaged character in an old email no longer stops the whole message from opening.",
+            "In mail that has no plain-text version, quoted text, lists and tables start on their own line, sentences no longer break in the middle, and replies no longer get an empty line after every line.",
             "The Control-click menu on a message now has Move to and lists Move to Junk and Delete before Flag, as in Mail.",
             "Send in the new message window is now an up arrow at the right end of the toolbar, as in Mail.",
             "Flagged in the sidebar now shows how many messages are flagged.",
