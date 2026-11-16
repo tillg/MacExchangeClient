@@ -33,6 +33,22 @@ struct MailCommands: Commands {
             }
             .keyboardShortcut("y").disabled(store.selectedMessage?.attachments.isEmpty ?? true)
         }
+        // Delete is in Mail's Edit menu, after Paste (BUG-228).
+        CommandGroup(after: .pasteboard) {
+            Button("Delete") {
+                // ⌘⌫ is also the text system's "delete to the start of the line". In Mail, Delete goes to the first
+                // responder, so typing in a compose window or the search field never deletes mail (BUG-218).
+                // Only the key: Edit ▸ Delete chosen with the mouse still deletes mail.
+                let mouse: [NSEvent.EventType] = [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp]
+                if !mouse.contains(NSApp.currentEvent?.type ?? .keyDown),
+                   let text = (NSApp.keyWindow ?? NSApp.orderedWindows.first)?.firstResponder as? NSTextView, text.isEditable {
+                    text.deleteToBeginningOfLine(nil)
+                } else {
+                    store.deleteSelection()
+                }
+            }
+                .keyboardShortcut(.delete).disabled(!hasSelection)
+        }
         CommandGroup(after: .textEditing) {
             Picker("Include Attachments With Replies", selection: $includeMode) {
                 ForEach(IncludeAttachments.allCases, id: \.self) { Text($0.title).tag($0) }
@@ -73,34 +89,25 @@ struct MailCommands: Commands {
             Button("Forward") { reply(.forward) }.keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(store.selectedMessage == nil)
             Divider()
-            Button("Mark as Read/Unread") { store.toggleRead(store.withConversations(store.selection)) }
+            // Mail's order: Mark as Read, Move to Junk, Flag ▸ (… Clear Flag, Toggle Flag), —, Archive (BUG-228).
+            let ids = store.withConversations(store.selection)
+            Button(ids.contains { store.message($0)?.isRead == false } || !hasSelection ? "Mark as Read" : "Mark as Unread") {
+                store.toggleRead(ids)
+            }
                 .keyboardShortcut("u", modifiers: [.command, .shift]).disabled(!hasSelection)
-            Button("Toggle Flag") { store.toggleFlag(store.withConversations(store.selection)) }
-            .keyboardShortcut("l", modifiers: [.command, .shift]).disabled(!hasSelection)
+            Button(store.isAllJunk(ids) ? "Not Junk" : "Move to Junk") { store.junkSelection() }
+                .keyboardShortcut("j", modifiers: [.command, .shift]).disabled(!hasSelection)
             Menu("Flag") {
-                ForEach(FlagColor.allCases, id: \.self) { c in Button(c.title) { store.setFlag(c, for: store.withConversations(store.selection)) } }
+                ForEach(FlagColor.allCases, id: \.self) { c in Button(c.title) { store.setFlag(c, for: ids) } }
                 Divider()
-                Button("Clear Flag") { store.setFlag(nil, for: store.withConversations(store.selection)) }
+                Button("Clear Flag") { store.setFlag(nil, for: ids) }
+                Button("Toggle Flag") { store.toggleFlag(ids) }
+                    .keyboardShortcut("l", modifiers: [.command, .shift])
             }
             .disabled(!hasSelection)
             Divider()
             Button("Archive") { store.archiveSelection() }
                 .keyboardShortcut("a", modifiers: [.command, .control]).disabled(!hasSelection)
-            Button(store.isAllJunk(store.withConversations(store.selection)) ? "Not Junk" : "Move to Junk") { store.junkSelection() }
-                .keyboardShortcut("j", modifiers: [.command, .shift]).disabled(!hasSelection)
-            Button("Delete") {
-                // ⌘⌫ is also the text system's "delete to the start of the line". In Mail, Delete goes to the first
-                // responder, so typing in a compose window or the search field never deletes mail (BUG-218).
-                // Only the key: Message ▸ Delete chosen with the mouse still deletes mail.
-                let mouse: [NSEvent.EventType] = [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp]
-                if !mouse.contains(NSApp.currentEvent?.type ?? .keyDown),
-                   let text = (NSApp.keyWindow ?? NSApp.orderedWindows.first)?.firstResponder as? NSTextView, text.isEditable {
-                    text.deleteToBeginningOfLine(nil)
-                } else {
-                    store.deleteSelection()
-                }
-            }
-                .keyboardShortcut(.delete).disabled(!hasSelection)
         }
     }
 
