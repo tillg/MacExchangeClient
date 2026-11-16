@@ -33,6 +33,10 @@ public struct ExchangeAccount: Codable, Hashable, Sendable {
         // A user or password in the field ("me:pw@host") makes it invalid, so it is never saved (BUG-245).
         guard let url = URL(string: "https://\(s)\(path)"), url.host?.isEmpty == false, url.user == nil,
               url.password == nil, var c = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        // Not a server: another scheme or a typo of one ("ftp://h", "https:/h", "https//h"), a query or fragment that
+        // swallows the EWS path, an empty or out-of-range port. It must not become a URL to another host or path.
+        guard c.query == nil, c.fragment == nil, !c.path.hasPrefix("//"), c.port.map({ (1...65535).contains($0) }) ?? true,
+              !s.prefix(while: { !"/?#".contains($0) }).hasSuffix(":") else { return nil }
         // The same server however it is written: host in lower case, no default port (BUG-242).
         c.host = c.host?.lowercased()
         if c.port == 443 { c.port = nil }

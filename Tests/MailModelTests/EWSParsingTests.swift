@@ -415,6 +415,14 @@ struct EWSParsingTests {
         }
     }
 
+    /// BUG-244: input that isn't a server is "Invalid server", not a URL to another host or without the EWS path.
+    @Test func malformedServerIsInvalidNotAnotherHost() {
+        for s in ["ftp://mail.example.com", "https:/mail.example.com", "https//mail.example.com", "mail.example.com?x",
+                  "mail.example.com#frag", "mail.example.com:99999", "mail.example.com:0", "mail.example.com:"] {
+            #expect(ExchangeAccount(email: "a@b.c", username: "u", server: s).ewsURL == nil, "\(s)")
+        }
+    }
+
     @Test func controlCharacterReferencesDontBreakParsing() throws {
         let raw = "<a><s>x&#8;y&#x1F;z&#X0b;&#9;&#10;&#13;&#32;&amp;#8;</s></a>"
         #expect((try? XMLDocument(data: Data(raw.utf8))) == nil)
